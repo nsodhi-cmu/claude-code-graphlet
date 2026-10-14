@@ -3,26 +3,26 @@
 graphlet is a Claude Code mod that draws graphs, nodes and the links between them, inside Claude Code. It is for other mods to build on. A mod hands it a graph, and graphlet draws the graph in that mod's pane, scrolls it, and says which node the person picked.
 
 ```
-                            ┌───────┐
-                            │ Start │
-                            └───┬───┘
-                                │
-                                ▼
-                      ┌──────────────────┐
-                      │ Read the request │
-                      └─────────┬────────┘
+                             ┌───────┐
+                             │ Start │
+                             └───┬───┘
+                                 │
+                                 ▼
+                       ┌──────────────────┐
+                       │ Read the request │
+                       └────────┬─────────┘
                                 │ ▲
-                                │ └┈┈┈┈┈┈┈┈┈┈┈┈┐
-                                ▼              ┊
-                        ╔══════════════╗       ┊
-                        ║ Is it valid? ║       ┊
-                        ╚═══════╤══════╝       ┊
-                   ┌────────────┴────────────┐ ┊
-                   ▼                         ▼ ┊
-       ┌──────────────────────┐  ┌─────────────┴────────┐
+                                │ └┈┈┈┈┈┈┈┈┈┈┈┐
+                                ▼             ┊
+                        ╔══════════════╗      ┊
+                        ║ Is it valid? ║      ┊
+                        ╚═══════╤══════╝      ┊
+                   ┌────────────┴───────────┐ ┊
+                   ▼                        ▼ ┊
+       ┌──────────────────────┐  ┌────────────┴─────────┐
        │ Save to the database │  │ Ask for a correction │
-       └─┬─────────┬──────────┘  └──────────────────────┘
-         │         └─┐
+       └─┬───────────┬────────┘  └──────────────────────┘
+         │           │
          ▼           │
 ┌─────────────────┐  │
 │ Notify the team │  │
@@ -36,7 +36,7 @@ graphlet is a Claude Code mod that draws graphs, nodes and the links between the
 ```
 
 - **Any directed graph.** The nodes are laid out in layers down the drawing, along the way the links run. A graph with loops is drawn too: the link that closes a loop runs back up, dashed.
-- **Every link is drawn**, between neighboring layers, past layers, back up, and between two nodes of one layer. One box's links fan out on a row of their own, apart from another box's.
+- **Every link is drawn, and can be followed**, between neighboring layers, past layers, back up, and between two nodes of one layer. One box's links fan out on a row of their own, links from different boxes reach a box at arrowheads of their own, and a link that only crosses another passes over it.
 - **It scrolls.** A graph larger than its room is seen through a window that follows the selection, and that the wheel moves.
 - **It answers the mouse and the keyboard.** A click selects a node, the arrow keys move from node to node along the links, and the mod that owns the pane hears each pick.
 - **It is a library, and no more.** It adds no command, starts no agent, and calls no model.
@@ -108,7 +108,7 @@ While developing, load both from disk: `claude --plugin-dir ./graphlet --plugin-
 - A link leaves a box where its border has a tick, and reaches a box at an arrowhead.
 - A solid line runs with the flow, down the drawing. A dashed line runs against it: the link that closes a loop, on its way back up.
 - A line that passes a layer beside its boxes is a link bound for a layer farther on.
-- Lines that meet in a tee are joined: they leave the same box, or reach the same box.
+- Lines that meet are joined: they leave the same box, or reach the same box. A link that only crosses another passes over it unbroken.
 - `↺` in a box says the node links to itself.
 - The selected node's box has a double frame, and its links and the boxes they reach are lit.
 
@@ -130,7 +130,7 @@ These are a person's, and hold for every graph any mod draws. They are in `/conf
 | :- | :- |
 | **Scrolling** | How a graph wider than its room scrolls. `pinned` slides the long layers and keeps the ones that fit in view. `sheet` lays every layer on one sheet as wide as the longest, each box by the boxes it is linked to, and moves the sheet whole. |
 | **Long labels** | What becomes of a label too long for one line of its box. `wrap` breaks it onto more lines. `clip` keeps it to one, cut in the middle. |
-| **Links** | How the links between two layers share the rows there. `separate` gives each box's links a row of their own wherever they would run into another's. `merged` runs them all along one row, which is shorter; selecting a node shows which links are its own. |
+| **Links** | How the links between two layers share the rows there. `separate` gives each box's links a row of their own wherever they would run into another's, and each box an arrowhead for each set of boxes whose links reach it. `merged` runs them all along one row into one arrowhead a box, which is shorter; selecting a node shows which links are its own. |
 
 ## How It Works
 
@@ -166,7 +166,7 @@ It reads no file, stores nothing between sessions, calls no model, and makes no 
 - Layers run top to bottom only.
 - Links have a direction. A graph with none is drawn as if each link ran the way it was given.
 - A pane holds one graph, of at most 500 nodes and 500 links. What is past those is left out.
-- Links to one box meet at its one arrowhead, and where the links between two layers are too tangled to be kept apart, some share a stretch of line. Selecting a node lights its own.
+- Where the links between two layers are too tangled to be kept apart, two of them may share a stretch of line. Selecting a node lights its own.
 - A label is drawn one cell a character, so a label written in characters two cells wide pushes its row out of line.
 
 ## License

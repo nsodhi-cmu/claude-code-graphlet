@@ -2,7 +2,7 @@ import { canvasOf, footRow, spansOf } from './draw'
 import type { Canvas, Drawing, Hit, Paint, Pan, Room } from './draw'
 import { isJoined } from './layers'
 import type { Graph } from './layers'
-import { routeOf, sizeOf } from './layout'
+import { layTracks, routeOf, sizeOf } from './layout'
 import type { Channel, End, Layout, Place, Shelf } from './layout'
 import { sightOf, slideOf, within } from './window'
 
@@ -110,28 +110,24 @@ const JUNCTIONS: Record<number, string> = {
 /** How a straight run of wire is drawn where every wire in the cell runs against the flow. */
 const DASHED: Record<string, string> = { '│': '┊', '─': '┈' }
 
-/** What the wires make of one cell: the ways they leave it, an arrowhead, whether any is lit, and whether any runs with the flow. */
-type Mark = { ways: number; head?: string; isLit: boolean; isSolid: boolean }
+/** What the wires of one bundle make of one cell: the ways they leave it, whether any is lit, and whether any runs with the flow. */
+type Mark = { ways: number; isLit: boolean; isSolid: boolean }
 
 /**
  * Paints the wires of one channel. A wire goes from the border it leaves to
  * its track, along it, and on to the border it reaches, or straight across
- * where it leaves and arrives in one column. A wire against the flow
- * is dashed, what touches the selected node is lit over what does not, and a
- * wire to a place out of the window runs off the window's edge.
+ * where it leaves and arrives in one column. A wire against the flow is
+ * dashed, what touches the selected node is lit over what does not, and a
+ * wire to a place out of the window runs off the window's edge. Wires of one
+ * bundle that meet are joined, in a tee or a cross; a wire that only crosses
+ * another bundle's passes over it unbroken, and breaks the line it crosses.
  */
 function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Channel, selected: string | null, seen: Seen): void {
   const first = seen.yOf(channel.top)
   const below = first + channel.rows
-  const marks = new Map<string, Mark>()
+  const cells = new Map<string, Map<number, Mark>>()
+  const heads = new Map<string, { char: string; isLit: boolean }>()
   const exits = new Map<string, { char: string; isLit: boolean; paint: Paint }>()
-  const markAt = (x: number, y: number): Mark | undefined => {
-    if (x < 0 || x >= seen.columns) return undefined
-    const key = `${x},${y}`
-    const mark = marks.get(key) ?? { ways: 0, isLit: false, isSolid: false }
-    marks.set(key, mark)
-    return mark
-  }
   /** The row of the border an end meets: the bottom of its own box, which may be shorter than its shelf, or the top of the shelf below. */
   const borderOfEnd = (end: End): number =>
     end.isAbove ? seen.yOf(layout.shelves[end.place.shelf]?.top ?? 0) + end.place.rows - 1 : below
@@ -142,11 +138,10 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
     const isLit = selected !== null && (wire.link.from === selected || wire.link.to === selected)
     const [start, end] = [borderOfEnd(wire.from), borderOfEnd(wire.to)]
     const draw = (x: number, y: number, ways: number): void => {
-      const mark = markAt(x, y)
-      if (mark === undefined) return
-      mark.ways |= ways
-      mark.isLit ||= isLit
-      mark.isSolid ||= !wire.isUp
+      if (x < 0 || x >= seen.columns) return
+      const marks = cells.get(`${x},${y}`) ?? new Map<number, Mark>()
+      const mark = marks.get(wire.bundle) ?? { ways: 0, isLit: false, isSolid: false }
+      cells.set(`${x},${y}`, marks.set(wire.bundle, { ways: mark.ways | ways, isLit: mark.isLit || isLit, isSolid: mark.isSolid || !wire.isUp }))
     }
     /** Marks a column of the wire between a border and its turn, the border's own row left to the box. */
     const down = (x: number, border: number): void => {
@@ -161,8 +156,10 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
     for (let x = Math.max(left, 0); x <= Math.min(right, seen.columns - 1); x += 1) {
       draw(x, turn, (x > left ? LEFT : 0) | (x < right ? RIGHT : 0))
     }
-    const head = wire.hasHead ? markAt(into, wire.to.isAbove ? end + 1 : end - 1) : undefined
-    if (head !== undefined) head.head = wire.to.isAbove ? '▲' : '▼'
+    if (wire.hasHead) {
+      const key = `${into},${wire.to.isAbove ? end + 1 : end - 1}`
+      heads.set(key, { char: wire.to.isAbove ? '▲' : '▼', isLit: isLit || (heads.get(key)?.isLit ?? false) })
+    }
 
     const { place } = wire.from
     if ('lane' in place.slot) continue
@@ -179,16 +176,25 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
     const [x = 0, y = 0] = key.split(',').map(Number)
     canvas.put(x, y, exit.char, { paint: exit.isLit ? 'accent' : exit.paint })
   }
-  for (const [key, mark] of marks) {
+  for (const [key, marks] of cells) {
     const [x = 0, y = 0] = key.split(',').map(Number)
-    const line = JUNCTIONS[mark.ways] ?? ' '
-    canvas.put(x, y, mark.head ?? (mark.isSolid ? line : (DASHED[line] ?? line)), { paint: mark.isLit ? 'accent' : 'dim' })
+    const upright = [...marks.values()].filter(mark => (mark.ways & (UP | DOWN)) !== 0)
+    const shown = upright.length > 0 ? upright : [...marks.values()]
+    const line = JUNCTIONS[shown.reduce((ways, mark) => ways | mark.ways, 0)] ?? ' '
+    const isSolid = shown.some(mark => mark.isSolid)
+    canvas.put(x, y, isSolid ? line : (DASHED[line] ?? line), { paint: shown.some(mark => mark.isLit) ? 'accent' : 'dim' })
+  }
+  for (const [key, head] of heads) {
+    const [x = 0, y = 0] = key.split(',').map(Number)
+    canvas.put(x, y, head.char, { paint: head.isLit ? 'accent' : 'dim' })
   }
 }
 
 /**
  * Paints a layout through a window at `pan`. Every shelf slides under the
- * window together, each as far as its own end. The last row is the foot: it
+ * window together, each as far as its own end, and the wires between two
+ * shelves that have slid apart are given their tracks again as they now
+ * stand. The last row is the foot: it
  * counts the nodes out of view of a graph larger than the room, and holds
  * the corner a click opens the graph as a web page by.
  */
@@ -205,7 +211,10 @@ export function paint(layout: Layout, graph: Graph, selected: string | null, roo
   }
 
   const hits = layout.shelves.flatMap(shelf => paintShelf(canvas, graph, shelf, selected, seen))
-  for (const channel of layout.channels) paintChannel(canvas, graph, layout, channel, selected, seen)
+  for (const channel of layout.channels) {
+    if (channel.isLoose) layTracks(channel, seen.xOf)
+    paintChannel(canvas, graph, layout, channel, selected, seen)
+  }
 
   const rows = canvas.cells.map(spansOf)
   const boxes = layout.shelves.flatMap(shelf =>

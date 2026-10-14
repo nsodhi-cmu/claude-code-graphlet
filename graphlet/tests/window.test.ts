@@ -72,6 +72,26 @@ describe('a layer longer than the room', () => {
     for (const row of [1, 12, 17]) expect(end[row]).toBe(start[row])
   })
 
+  test('the links between a layer that fits and one that has slid are given their rows again as they now stand, so they never run into one line', () => {
+    const graph = readGraph({
+      nodes: [
+        ...['A', 'B'].map(id => ({ id, label: id, layer: 0 })),
+        ...Array.from({ length: 8 }, (_, index) => ({ id: `c${index + 1}`, label: `c${index + 1}`, layer: 1 })),
+      ],
+      links: [
+        { from: 'A', to: 'c4' },
+        { from: 'B', to: 'c5' },
+      ],
+    })
+    const room = { columns: 52, rows: 10 }
+    expect(picture(pinned.draw(graph, 'c8', room, pinned.show(graph, 'c8', room, ORIGIN))).slice(2, 6)).toEqual([
+      '                  └──┬──┘  └──┬──┘',
+      '            ┌────────┘        │',
+      '            │        ┌────────┘',
+      '            ▼        ▼',
+    ])
+  })
+
   test('which nodes a window shows, and where, does not depend on which of them is selected', () => {
     const graph = wide(12)
     const room = { columns: 60, rows: 40 }

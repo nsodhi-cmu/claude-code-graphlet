@@ -12,16 +12,16 @@ A box is as wide as its widest line and no narrower than `BOX_COLUMNS`, which le
 
 ## Ports
 
-A link meets a box at one of two ports on the box's top and on its bottom. With the flow, down the drawing, a link leaves a box's bottom and enters a box's top by the main port, in the box's middle. Against the flow it uses the side port, a little to the right. So a link back up arrives beside the links that leave, never on top of them.
+A link meets a lane in its one column. Each face of a box, its top and its bottom, has a port for the links that leave it, and a port for each bundle of links that reaches it, `PORT_STEP` apart across its middle. `dealPorts` orders a face's ports by where along their shelves the places at the links' other ends stand, so links from the left arrive on the left; of two that lead to the same place, the one with the flow is first. A box too narrow for its ports is widened. So a link back up arrives beside the links that leave, and links from different boxes into one box arrive at arrowheads of their own.
 
-A link that crosses a channel leaves its box straight toward the port it is bound for, wherever the box reaches over that port clear of its corners, and else by its own port.
+A link that crosses a channel leaves its box straight toward the port it is bound for, wherever the box reaches over that port clear of its corners and its other ports, and else by its own port. A link that leaves with others keeps clear of the columns beside their port, so that two ticks never touch.
 
 ## Shelves
 
 `layoutOf` seats the longest shelf first, in the middle of the columns it is laid out across, and then each other shelf against the one nearer it:
 
-- A box goes as near as it can to the middle of the boxes it is joined to. The boxes are pushed apart where they would overlap, and slid back together toward where they wanted to be.
-- A lane then goes to the very column of what it is joined to, and pushes aside the boxes in its way, so that a link runs straight through every shelf it passes.
+- A box goes as near as it can to where its ports stand over or under the ports of the boxes it is joined to. The boxes are pushed apart where they would overlap, and slid back together toward where they wanted to be.
+- A lane then goes to the very column of the port it is joined to, and pushes aside the boxes in its way, so that a link runs straight through every shelf it passes.
 - Last, the shelf moves a column either way where that stands more of it exactly over or under what it is joined to.
 
 How wide a shelf is laid out is the `scroll` setting's to say. `pinned`: across the room's columns where it fits them, and across its own length where it is longer, alone from the left edge. `sheet`: every shelf across the longest.
@@ -34,15 +34,15 @@ A wire that does not go straight across turns on one row of the channel, its tra
 
 ### Tracks
 
-Wires that share a track run into one line, which says that everything on it is joined. So wires share a track only as a bundle that says nothing false: the wires that leave one port, a fan, together with the fans of every other port that is wired to the very same ports. Several boxes' links to one box are such a bundle, and so are two boxes that both link to the same two.
+Wires that share a track run into one line, which says that everything on it is joined. So wires share a track only as a bundle that says nothing false: the wires that leave one face, a fan, together with the fans of every other face whose wires reach the very same faces. Several boxes' links to one box alone are such a bundle, and so are two boxes that both link to the same two.
 
 `layTracks` gives each bundle a track.
 
 - Two bundles share a track only where their runs do not meet.
 - A bundle that comes down a column to its track goes above a bundle that goes down the same column from its own, so that the two never run into one line. Where bundles ask that of each other in a ring, one of them is not given it, and the two do share a stretch of that column.
 - Of the bundles that may go on a track, the ones that cross the rest least from there go first.
-- Where the two shelves of a channel are laid out across different columns, they slide apart under a window, and what does not meet as laid out may once they have slid. There no two bundles share a track.
+- Where the two shelves of a channel are laid out across different columns, they slide apart under a window, and what does not meet as laid out may once they have slid. There no two bundles share a track, and each time the window moves the bundles are given their tracks again as the shelves now stand.
 
-Two bundles that reach the same box still meet at its arrowhead, since a box has one port for what arrives with the flow. A link is read toward its arrowhead: down a solid line, and up a dashed one. Where that leaves a doubt, selecting a node lights which links are its own.
+Wires of different bundles that cross are painted as one passing over the other, so that a junction always means joined.
 
-With the `links` setting at `merged`, every wire of a channel turns on the one track, as one bus. That is shorter, and says less: which links are whose is told by selecting a node.
+With the `links` setting at `merged`, every wire of a channel that runs the one way, with the flow or against it, is one bundle on the one track, and a box has one port for it. That is shorter, and says less: which links are whose is told by selecting a node.

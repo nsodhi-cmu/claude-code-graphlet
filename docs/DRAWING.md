@@ -5,9 +5,9 @@ A drawing is rows of painted text, and the rectangles of them that answer a clic
 ## Reading The Picture
 
 ```
-               ┌─────┐
-               │  A  │
-               └──┬──┘
+                ┌─────┐
+                │  A  │
+                └─┬───┘
                   │ ▲
                   │ └┈┈┈┐
                   ▼     ┊
@@ -16,15 +16,16 @@ A drawing is rows of painted text, and the rectangles of them that answer a clic
                └──┬──┘  ┊
                   │ ┌┈┈┈┘
                   ▼ ┊
-               ┌────┴┐
-               │  C  │
-               └─────┘
+                ┌───┴─┐
+                │  C  │
+                └─────┘
 ```
 
 - A box is a node. A link leaves a box where its border has a tick, and reaches a box at an arrowhead.
 - A solid line is a link that runs with the flow, down the drawing. A dashed line is a link that runs against it: the link that closes a loop, on its way back up.
 - A line that passes a layer beside its boxes is a link bound for a layer farther on.
-- Lines that meet in a tee are joined: they leave the same box, or reach the same box. Where one line goes straight through another, in a cross, either two links only cross there, or one box's links part ways under it.
+- Lines that meet are joined, in a tee or a cross: they leave the same box, or reach the same box. Where a link only crosses another, it passes over unbroken, and the line it crosses is broken there.
+- A box has an arrowhead of its own for each set of boxes whose links reach it together, so links from different boxes never run into one line on the way to it.
 - `↺` in a box says the node links to itself.
 
 ## What Is Selected

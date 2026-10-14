@@ -151,17 +151,40 @@ describe('the rows between two shelves', () => {
     expect(tracks(laid(graphOf(['a', 'b', 'c', 'd'], [['a', 'c'], ['a', 'd'], ['b', 'c'], ['b', 'd']])))).toBe(1)
   })
 
-  test('links that would run into each other, and are bound for different nodes, turn on rows of their own', () => {
-    const graph = graphOf(['a', 'b', 'x', 'y', 'z'], [['a', 'y'], ['a', 'z'], ['b', 'x'], ['b', 'y']])
-    expect(tracks(laid(graph))).toBe(2)
-    expect(rows(laid(graph))[0]).toBe(3)
+  /** Two nodes whose links reach one node from either side, the one's reaching on past it. */
+  const APART = readGraph({
+    nodes: [
+      ...['u0', 'u1', 'u2'].map(id => ({ id, label: id, layer: 0 })),
+      ...['d0', 'd1', 'd2'].map(id => ({ id, label: id, layer: 1 })),
+    ],
+    links: [
+      { from: 'u0', to: 'd0' },
+      { from: 'u1', to: 'd0' },
+      { from: 'u1', to: 'd2' },
+    ],
+  })
+
+  test('one node\'s links turn on a row of their own where they would run into another node\'s', () => {
+    expect(tracks(laid(APART))).toBe(2)
+    expect(rows(laid(APART))[0]).toBe(3)
   })
 
   test('merged, every link turns on the one row', () => {
-    const graph = graphOf(['a', 'b', 'x', 'y', 'z'], [['a', 'y'], ['a', 'z'], ['b', 'x'], ['b', 'y']])
-    const layout = laid(graph, { ...LOOK, links: 'merged' })
+    const layout = laid(APART, { ...LOOK, links: 'merged' })
     expect(tracks(layout)).toBe(1)
     expect(rows(layout)[0]).toBe(2)
+  })
+
+  test('a node has a port for each bundle of links that reaches it, and a box is widened where its ports need the room', () => {
+    const sources = ['a', 'b', 'c', 'd']
+    const graph = graphOf([...sources, 'T', ...sources.map(id => `${id}2`)], [...sources.map(id => [id, 'T'] as [string, string]), ...sources.map(id => [id, `${id}2`] as [string, string])])
+    const layout = laid(graph)
+    const into = layout.channels[0]?.wires.filter(wire => 'node' in wire.to.place.slot && wire.to.place.slot.node.id === 'T') ?? []
+    expect(new Set(into.map(wire => wire.to.at)).size).toBe(4)
+    expect(into[0]?.to.place.width).toBe(9)
+    const merged = laid(graph, { ...LOOK, links: 'merged' })
+    const one = merged.channels[0]?.wires.filter(wire => 'node' in wire.to.place.slot && wire.to.place.slot.node.id === 'T') ?? []
+    expect(new Set(one.map(wire => wire.to.at)).size).toBe(1)
   })
 
   test('a link back up has a row for its arrowhead above the rows the links turn on', () => {

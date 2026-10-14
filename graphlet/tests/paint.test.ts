@@ -49,9 +49,9 @@ describe('the drawing', () => {
 
   test('a link that closes a loop runs back up dashed, down a lane past the layers between, to an arrowhead beside where the node\'s own links leave', () => {
     expect(graphRows(drawn(graphOf(['A', 'B', 'C'], [['A', 'B'], ['B', 'C'], ['C', 'A']])))).toEqual([
-      '               ┌─────┐',
-      '               │  A  │',
-      '               └──┬──┘',
+      '                ┌─────┐',
+      '                │  A  │',
+      '                └─┬───┘',
       '                  │ ▲',
       '                  │ └┈┈┈┐',
       '                  ▼     ┊',
@@ -60,9 +60,9 @@ describe('the drawing', () => {
       '               └──┬──┘  ┊',
       '                  │ ┌┈┈┈┘',
       '                  ▼ ┊',
-      '               ┌────┴┐',
-      '               │  C  │',
-      '               └─────┘',
+      '                ┌───┴─┐',
+      '                │  C  │',
+      '                └─────┘',
     ])
   })
 
@@ -70,29 +70,29 @@ describe('the drawing', () => {
     expect(graphRows(drawn(graphOf(['A', 'B'], [['A', 'B'], ['B', 'A']])))).toEqual([
       '                ┌─────┐',
       '                │  A  │',
-      '                └──┬──┘',
-      '                   │ ▲',
-      '                   │ ┊',
-      '                   ▼ ┊',
-      '                ┌────┴┐',
+      '                └─┬───┘',
+      '                  │ ▲',
+      '                  │ ┊',
+      '                  ▼ ┊',
+      '                ┌───┴─┐',
       '                │  B  │',
       '                └─────┘',
     ])
   })
 
-  test('a link past a layer runs straight down a lane beside that layer\'s boxes, and joins the other links to its node', () => {
+  test('a link past a layer runs straight down a lane beside that layer\'s boxes, to an arrowhead of its own on the node it reaches', () => {
     const graph = graphOf(['A', 'B', 'C', 'D', 'E'], [['A', 'B'], ['B', 'C'], ['A', 'C'], ['C', 'D'], ['A', 'D'], ['B', 'E'], ['E', 'D']])
     expect(graphRows(drawn(graph))).toEqual([
-      '             ┌─────┐',
-      '             │  A  │',
-      '             └──┬──┘',
-      '                ├─────┬─────┐',
-      '                ▼     │     │',
-      '             ┌─────┐  │     │',
-      '             │  B  │  │     │',
-      '             └──┬──┘  │     │',
-      '             ┌──┴─────┤     │',
-      '             ▼        ▼     │',
+      '              ┌─────┐',
+      '              │  A  │',
+      '              └──┬──┘',
+      '                 ├─────┬────┐',
+      '                 ▼     │    │',
+      '              ┌─────┐  │    │',
+      '              │  B  │  │    │',
+      '              └──┬──┘  │    │',
+      '             ┌───┴───┐ │    │',
+      '             ▼       ▼ ▼    │',
       '          ┌─────┐  ┌─────┐  │',
       '          │  E  │  │  C  │  │',
       '          └──┬──┘  └──┬──┘  │',
@@ -128,10 +128,10 @@ describe('the drawing', () => {
       '          ▼        ▼        ▼',
       '       ┌─────┐  ┌─────┐  ┌─────┐',
       '       │  B  │  │  C  │  │  D  │',
-      '       └──┬──┘  └──┬──┘  └─────┘',
-      '          │ ▲      │          ▲',
-      '          │ └──────┘          │',
-      '          └───────────────────┘',
+      '       └───┬─┘  └──┬──┘  └─────┘',
+      '         ▲ │       │        ▲',
+      '         └─│───────┘        │',
+      '           └────────────────┘',
     ])
   })
 
@@ -192,15 +192,15 @@ describe('the drawing', () => {
       '              ▼                    ▼',
       '          ┌───────┐  ┌──────────────────────────┐',
       '          │ short │  │ a-file-with-a-very-long- │',
-      '          └───┬───┘  │ name.component.ts        │',
-      '              │ ▲    └─────────────┬────────────┘',
-      '              │ ┊                  │',
-      '              │ └┈┈┈┈┈┈┈┐          │',
-      '              └───────┬─┼──────────┘',
-      '                      ▼ ┊',
-      '                   ┌────┴┐',
-      '                   │ end │',
-      '                   └─────┘',
+      '          └──┬────┘  │ name.component.ts        │',
+      '             │ ▲     └─────────────┬────────────┘',
+      '             │ ┊                   │',
+      '             └─┊──────┬────────────┘',
+      '               └┈┈┈┈┐ │',
+      '                    ┊ ▼',
+      '                  ┌─┴───┐',
+      '                  │ end │',
+      '                  └─────┘',
     ])
     const hits = boxes(drawn(graph, null, { columns: 60, rows: 60 }))
     expect(hits.map(hit => [hit.node, hit.height])).toEqual([
@@ -224,8 +224,8 @@ describe('the drawing', () => {
       '           │ cart.ts │  │ invoice-line-item-    │',
       '           └────┬────┘  │ renderer.component.ts │',
       '                │       └───────────────────────┘',
-      '                │                     ▲',
-      '                └─────────────────────┘',
+      '                │                   ▲',
+      '                └───────────────────┘',
     ])
   })
 
@@ -244,44 +244,69 @@ describe('the drawing', () => {
 
   const MESH = graphOf(['b', 'a', 'c', 'z', 'x', 'y'], [['a', 'x'], ['a', 'y'], ['a', 'z'], ['b', 'x'], ['b', 'z'], ['c', 'y'], ['c', 'x']])
 
-  test('links that would run into each other, and are bound for different nodes, turn on rows of their own', () => {
+  test('links from different nodes reach a node at arrowheads of their own, and a link that crosses another passes over it unbroken', () => {
     expect(graphRows(drawn(MESH)).slice(2, 7)).toEqual([
       '       └──┬──┘  └──┬──┘  └──┬──┘',
-      '          ├────────┼────────┤',
-      '          ├────────┤        │',
-      '          │        ├────────┤',
-      '          ▼        ▼        ▼',
+      '         ┌┴──────┐ │ ┌──────┴┐',
+      '         │ ┌─────│─┼─│─────┐ │',
+      '         ▼ ▼     ▼ ▼ ▼     ▼ ▼',
+      '       ┌─────┐  ┌─────┐  ┌─────┐',
     ])
   })
 
-  test('a fan that comes down a column to its row goes above a fan that reaches a box down that column, so neither reads as the other\'s', () => {
+  test('one node\'s links turn on a row of their own where they would run into another node\'s; merged, they share one', () => {
     const graph = readGraph({
       nodes: [
-        ...['u0', 'u1', 'u2', 'u3'].map(id => ({ id, label: id, layer: 0 })),
+        ...['u0', 'u1', 'u2'].map(id => ({ id, label: id, layer: 0 })),
         ...['d0', 'd1', 'd2'].map(id => ({ id, label: id, layer: 1 })),
       ],
       links: [
-        { from: 'u0', to: 'd1' },
-        { from: 'u0', to: 'd2' },
+        { from: 'u0', to: 'd0' },
         { from: 'u1', to: 'd0' },
-        { from: 'u1', to: 'd1' },
-        { from: 'u3', to: 'd0' },
+        { from: 'u1', to: 'd2' },
       ],
     })
     expect(graphRows(drawn(graph, null, { columns: 70, rows: 60 }))).toEqual([
-      '                  ┌─────┐  ┌─────┐  ┌─────┐  ┌─────┐',
-      '                  │ u0  │  │ u1  │  │ u2  │  │ u3  │',
-      '                  └──┬──┘  └──┬──┘  └─────┘  └──┬──┘',
-      '                     │        ├────────┐        │',
-      '                     ├────────┤        ├────────┘',
-      '                     ▼        ▼        ▼',
-      '                  ┌─────┐  ┌─────┐  ┌─────┐',
-      '                  │ d2  │  │ d1  │  │ d0  │',
-      '                  └─────┘  └─────┘  └─────┘',
+      '                      ┌─────┐  ┌─────┐  ┌─────┐',
+      '                      │ u0  │  │ u1  │  │ u2  │',
+      '                      └──┬──┘  └──┬──┘  └─────┘',
+      '                      ┌──┘        │',
+      '                      │ ┌─────────┴──────┐',
+      '                      ▼ ▼                ▼',
+      '                    ┌─────┐  ┌─────┐  ┌─────┐',
+      '                    │ d0  │  │ d1  │  │ d2  │',
+      '                    └─────┘  └─────┘  └─────┘',
+    ])
+    expect(graphRows(drawn(graph, null, { columns: 70, rows: 60 }, { ...LOOK, links: 'merged' })).slice(2, 5)).toEqual([
+      '                      └──┬──┘  └──┬──┘  └─────┘',
+      '                       ┌─┴────────┴──────┐',
+      '                       ▼                 ▼',
     ])
   })
 
-  test('merged, they all turn on one row', () => {
+  test('links that come down a column to their row go above links that leave the row down that column, so the two never run into one line', () => {
+    const graph = readGraph({
+      nodes: [
+        ...['u0', 'u1'].map(id => ({ id, label: id, layer: 0 })),
+        ...['d0', 'd1', 'd2'].map(id => ({ id, label: id, layer: 1 })),
+      ],
+      links: [
+        { from: 'u0', to: 'd0' },
+        { from: 'u0', to: 'd1' },
+        { from: 'u0', to: 'd2' },
+        { from: 'u1', to: 'd1' },
+        { from: 'u1', to: 'd2' },
+      ],
+    })
+    expect(graphRows(drawn(graph, null, { columns: 70, rows: 60 })).slice(2, 6)).toEqual([
+      '                              └──┬──┘  └──┬──┘',
+      '                                 │ ┌──────┴─┐',
+      '                         ┌───────┼─│──────┐ │',
+      '                         ▼       ▼ ▼      ▼ ▼',
+    ])
+  })
+
+  test('merged, every link turns on one row and every node has one arrowhead', () => {
     expect(graphRows(drawn(MESH, null, SMALL, { ...LOOK, links: 'merged' })).slice(2, 5)).toEqual([
       '       └──┬──┘  └──┬──┘  └──┬──┘',
       '          ├────────┼────────┤',
