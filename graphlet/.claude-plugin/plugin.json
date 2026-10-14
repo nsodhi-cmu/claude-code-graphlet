@@ -1,0 +1,42 @@
+{
+  "name": "graphlet",
+  "version": "0.1.0",
+  "description": "Draws graphs of nodes and links inside Claude Code, for other mods to build on",
+  "author": {
+    "name": "Neal",
+    "url": "https://github.com/nsodhi-cmu"
+  },
+  "homepage": "https://github.com/nsodhi-cmu/claude-code-graphlet",
+  "repository": "https://github.com/nsodhi-cmu/claude-code-graphlet",
+  "license": "Apache-2.0",
+  "keywords": [
+    "mod",
+    "graph",
+    "diagram",
+    "dag",
+    "library"
+  ],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "scroll": {
+      "type": "string",
+      "title": "Scrolling",
+      "description": "How a graph wider than its room scrolls: pinned slides the long layers and keeps the ones that fit in view; sheet lays every layer on one wide sheet and moves it whole.",
+      "options": [
+        "pinned",
+        "sheet"
+      ],
+      "default": "pinned"
+    },
+    "labels": {
+      "type": "string",
+      "title": "Long labels",
+      "description": "What becomes of a label too long for one line of its box: wrap breaks it onto more lines; clip keeps it to one line, cut in the middle.",
+      "options": [
+        "wrap",
+        "clip"
+      ],
+      "default": "wrap"
+    }
+  }
+}
