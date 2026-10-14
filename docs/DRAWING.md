@@ -76,7 +76,7 @@ The last row of a drawing is its foot. A graph with no nodes has no drawing, and
 
 ## Paints
 
-A run of text is in one paint: a node's tone, or `accent` for what is selected or linked to it. `COLORS` in `draw.ts` gives each paint a key of the person's theme, so a drawing follows the theme they chose.
+A run of text is in one paint: a node's tone, or `accent` for what is selected or linked to it. `COLORS` in `draw.ts` gives each paint a key of the person's theme, so a drawing follows the theme they chose, and `styleOf` turns a run into the props of the `Text` that paints it.
 
 | Paint | Theme color |
 | :- | :- |

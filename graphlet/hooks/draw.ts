@@ -21,6 +21,17 @@ export const COLORS: Readonly<Record<Paint, string | undefined>> = {
 /** A run of text in one paint. */
 export type Span = { text: string; paint: Paint; isBold?: true; isInverse?: true }
 
+/** How a surface's `Text` paints a run. */
+export function styleOf(span: Span): { color?: string; dimColor?: true; bold?: true; inverse?: true } {
+  const color = COLORS[span.paint]
+  return {
+    ...(color === undefined ? {} : { color }),
+    ...(span.paint === 'dim' ? { dimColor: true } : {}),
+    ...(span.isBold ? { bold: true } : {}),
+    ...(span.isInverse ? { inverse: true } : {}),
+  }
+}
+
 /** Where a window stands over something larger than it, or how far it is to move: in cells. */
 export type Pan = { x: number; y: number }
 

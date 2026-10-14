@@ -1,21 +1,11 @@
-import type { ClientModule, TextProps } from 'claude-code'
+import type { ClientModule } from 'claude-code'
 
-import { COLORS } from './draw'
-import type { Drawing, Span } from './draw'
+import { styleOf } from './draw'
+import type { Drawing } from './draw'
 
 // The surface module: it paints the drawing it is handed, and posts what a
 // click lands on and each key pressed while it holds the keyboard. What to do
 // about either is the hooks module's to say.
-
-const styleOf = (span: Span): TextProps => {
-  const color = COLORS[span.paint]
-  return {
-    ...(color === undefined ? {} : { color }),
-    ...(span.paint === 'dim' ? { dimColor: true } : {}),
-    ...(span.isBold ? { bold: true } : {}),
-    ...(span.isInverse ? { inverse: true } : {}),
-  }
-}
 
 const Surface: ClientModule<Drawing> = (drawing, surface) => {
   const { Box, Text } = surface.elements
