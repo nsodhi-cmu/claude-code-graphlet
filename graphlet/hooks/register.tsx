@@ -1,10 +1,12 @@
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Graphlet } from '../types'
+import { styleOf } from './draw'
 import type { Drawing, Pan, Room } from './draw'
 import { readGraph } from './layers'
 import type { Graph } from './layers'
 import { pageOf } from './page'
+import { GUIDE, fencedOf, partsOf, pictureOf } from './reply'
 import { MOVES, viewOf } from './view'
 
 /** What a pane holds, as it was last drawn: the graph, the room it was given, the selected node, and where its window stood. */
@@ -59,6 +61,11 @@ const MOST_CELLS = 1000
 const cellsOf = (asked: unknown): number =>
   typeof asked === 'number' && Number.isFinite(asked) ? Math.min(Math.max(Math.floor(asked), 1), MOST_CELLS) : 1
 
+/** The columns the bullet opening a reply takes, which the reply's text is indented by. */
+const BULLET_COLUMNS = 2
+/** How wide a reply is taken to be on a surface that has not said. */
+const REPLY_COLUMNS = 80
+
 const isPan = (value: unknown): value is Pan =>
   typeof value === 'object' &&
   value !== null &&
@@ -112,6 +119,47 @@ export const register: Register = (on, options) => {
     if (at === undefined || e.surface !== 'terminal') return next(e)
     const { Client } = $.ui.resolve(e)
     return <Client key="graph" module="./surface.tsx" props={at.drawing} />
+  })
+
+  on('prompt.compose', async ($, e, next) => {
+    const composed = await next(e)
+    if (e.surfaces.length === 0) return composed
+    return { sections: [...composed.sections, { id: 'graphlet:graphs', text: GUIDE, scope: 'session' as const }] }
+  })
+
+  on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
+    const parts = e.props.isSummary ? [] : partsOf(e.props.text)
+    if (!parts.some(part => 'graph' in part)) return next(e)
+    const room = { columns: cellsOf((e.viewport?.columns ?? REPLY_COLUMNS) - BULLET_COLUMNS), rows: MOST_CELLS }
+    const shown = parts.map(part => ('graph' in part ? pictureOf(view, readGraph(part.graph), room) : part))
+    if (e.surface !== 'terminal') {
+      const text = shown.map(part => ('text' in part ? part.text : fencedOf(part))).join('\n\n')
+      return next({ ...e, props: { ...e.props, text } })
+    }
+    const { Box, Text, Markdown } = $.ui.resolve(e)
+    const [first, ...rest] = shown
+    const lead = first !== undefined && 'text' in first ? [await next({ ...e, props: { ...e.props, text: first.text } })] : []
+    const following = lead.length > 0 ? rest : shown
+    return (
+      <Box flexDirection="column">
+        {[
+          ...lead,
+          ...following.map(part => (
+            <Box flexDirection="column" marginLeft={BULLET_COLUMNS} marginTop={1}>
+              {'text' in part ? (
+                <Markdown text={part.text} />
+              ) : (
+                part.rows.map(row => (
+                  <Text wrap="truncate-end">
+                    {row.length === 0 ? ' ' : row.map(span => <Text {...styleOf(span)}>{span.text}</Text>)}
+                  </Text>
+                ))
+              )}
+            </Box>
+          )),
+        ]}
+      </Box>
+    )
   })
 
   on('ui.message', async ($, e, next) => {

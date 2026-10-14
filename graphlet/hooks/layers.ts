@@ -15,7 +15,7 @@ export type Graph = { nodes: GraphletNode[]; links: GraphletLink[]; isDirected: 
 /** How many times the layers are ordered against their neighbors, down and back up, before the best ordering is kept. */
 const SWEEPS = 4
 /** The tones a node may have. Any other is dropped, and the node drawn plain. */
-const TONES: readonly GraphletTone[] = ['plain', 'dim', 'note', 'good', 'warn', 'bad']
+export const TONES: readonly GraphletTone[] = ['plain', 'dim', 'note', 'good', 'warn', 'bad']
 /** What a node with nothing to call it by is labelled. */
 const NAMELESS = '·'
 /** The most nodes and the most links of a graph that are read. A graph past either is no picture a person can follow, and is slow to lay out. */

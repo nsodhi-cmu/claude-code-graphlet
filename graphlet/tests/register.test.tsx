@@ -1,13 +1,16 @@
 import { expect, test } from 'claude-code/testing'
 import type { Engine, Plugin } from 'claude-code/testing'
-import type { On, RenderPropsOf } from 'claude-code'
+import type { On, RenderPropsOf, RenderSurface } from 'claude-code'
 
 import { LOOK, SHOP, graphOf, picture, undirected } from './fixture'
+import { GUIDE } from '../hooks/reply'
 import { viewOf } from '../hooks/view'
 
 // The mod through the engine, as another mod uses it: a host says what its
 // panes hold, places the drawing among its own elements, and hears what the
-// person does to the graph.
+// person does to the graph. And as the model uses it: a reply that holds a
+// graph block, drawn on each surface, and the section of the system prompt
+// that tells the model of such blocks.
 
 /**
  * A mod that uses graphlet. It shows the shop's graph in two panes: `free`,
@@ -370,4 +373,133 @@ test('a graph its owner says is undirected reaches graphlet as one, and is drawn
   expect(await rowsOf(pane)).toEqual(picture(view.draw(ring, 'a', { columns: 90, rows: 40 }, ORIGIN)))
   expect((await rowsOf(pane)).join('\n')).not.toMatch(/[▲▼]/)
   await pane.unmount()
+})
+
+const REPLY = [
+  'Here is how a request flows:',
+  '',
+  '```graphlet',
+  'Start -> Read the request -> Valid?',
+  'Valid? -> Save it -> Done',
+  'Valid? -> Ask for a correction [warn]',
+  'Ask for a correction -> Read the request',
+  '```',
+  '',
+  'The dashed line is the retry.',
+].join('\n')
+
+/** The picture of the graph in `REPLY`. */
+const FLOW = [
+  '            ┌───────┐',
+  '            │ Start │',
+  '            └───┬───┘',
+  '                │',
+  '                ▼',
+  '      ┌──────────────────┐',
+  '      │ Read the request │',
+  '      └────────┬─────────┘',
+  '               │ ▲',
+  '               │ └┈┈┈┈┈┈┈┈┐',
+  '               ▼          ┊',
+  '          ┌────────┐      ┊',
+  '          │ Valid? │      ┊',
+  '          └────┬───┘      ┊',
+  '     ┌─────────┴────────┐ ┊',
+  '     ▼                  ▼ ┊',
+  '┌─────────┐  ┌────────────┴─────────┐',
+  '│ Save it │  │ Ask for a correction │',
+  '└────┬────┘  └──────────────────────┘',
+  '     │',
+  '     ▼',
+  ' ┌──────┐',
+  ' │ Done │',
+  ' └──────┘',
+]
+
+/** Stands in for the engine's own drawing of a reply's text: the bullet, on the block that opens a reply, and then the text. */
+const replies = (on: On): void => {
+  on('ui.render', { component: 'AssistantMessage' }, ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return h(Text, {}, `${e.props.isFirstOfReply ? '● ' : ''}${e.props.text}`) as never
+  })
+}
+
+/** A surface drawing a block of a reply, in a transcript 80 columns wide. */
+const say = ($: Engine, surface: RenderSurface, text: string, rest: Partial<RenderPropsOf['AssistantMessage']> = {}) =>
+  $.ui.mount({
+    plugin: 'graphlet',
+    surface,
+    component: 'AssistantMessage',
+    props: { text, isFirstOfReply: true, ...rest },
+    viewport: { columns: 80, rows: 40 },
+  })
+
+/** What a drawn element says: its own text and its children's. */
+const textOf = (node: unknown): string =>
+  typeof node === 'string' ? node : ((node as { children?: unknown[] }).children ?? []).map(textOf).join('')
+
+/** A drawn tree as the lines a terminal shows: each Text its lines, a Markdown its text, and a Box's margins as blank rows above and columns to the left. */
+const screenOf = (node: unknown): string[] => {
+  if (typeof node === 'string') return node.split('\n')
+  const { type, props = {}, children = [] } = node as { type?: string; props?: Record<string, unknown>; children?: unknown[] }
+  if (type === 'Text') return textOf(node).split('\n')
+  if (type === 'Markdown') return String(props.text).split('\n')
+  const left = ' '.repeat(Number(props.marginLeft ?? 0))
+  const above = Array<string>(Number(props.marginTop ?? 0)).fill('')
+  return [...above, ...children.flatMap(screenOf).map(line => (line === '' ? '' : `${left}${line}`))]
+}
+
+test('a graph block in a reply is drawn in its place, in color, under the engine\'s own drawing of the text before it', async ($, on) => {
+  replies(on)
+  const reply = await say($, 'terminal', REPLY)
+  expect(screenOf(await reply.drawn())).toEqual([
+    '● Here is how a request flows:',
+    '',
+    ...FLOW.map(line => `  ${line}`),
+    '',
+    '  The dashed line is the retry.',
+  ])
+  expect(await reply.find({ type: 'Text', text: /^Ask for a correction$/ })).toMatchObject({ props: { color: 'warning' } })
+  expect(await reply.find({ type: 'Markdown' })).toMatchObject({ props: { text: 'The dashed line is the retry.' } })
+  await reply.unmount()
+})
+
+test('a reply with no graph in its blocks, a block still being written, and a summary are left to the engine as they are', async ($, on) => {
+  replies(on)
+  const texts = ['Nothing to draw.', 'Being written:\n\n```graphlet\nA -> B', '```graphlet\n\n```', '```mermaid\ngraph TD; A --> B\n```']
+  for (const text of texts) {
+    const reply = await say($, 'terminal', text)
+    expect(screenOf(await reply.drawn())).toEqual(`● ${text}`.split('\n'))
+    await reply.unmount()
+  }
+  const summary = await say($, 'terminal', REPLY, { isSummary: true })
+  expect(screenOf(await summary.drawn())).toEqual(`● ${REPLY}`.split('\n'))
+  await summary.unmount()
+})
+
+test('on every other surface, a graph block becomes its picture as plain text, fenced as code', async ($, on) => {
+  replies(on)
+  for (const surface of ['desktop', 'vscode', 'mobile'] as const) {
+    const reply = await say($, surface, REPLY)
+    expect(screenOf(await reply.drawn())).toEqual([
+      '● Here is how a request flows:',
+      '',
+      '```text',
+      ...FLOW,
+      '```',
+      '',
+      'The dashed line is the retry.',
+    ])
+    await reply.unmount()
+  }
+})
+
+test('the model is told of graph blocks wherever the session draws, and not in a run that draws nowhere', async ($, on) => {
+  const intro = { id: 'intro', text: 'You are Claude Code.', scope: 'shared' as const }
+  on('prompt.compose', () => ({ sections: [intro] }))
+  const compose = (surfaces: RenderSurface[]) =>
+    $.prompt.compose({ model: 'claude', promptModel: 'claude', surfaces, tools: [], outputStyle: null, traits: [] })
+  expect((await compose(['terminal'])).sections).toEqual([intro, { id: 'graphlet:graphs', text: GUIDE, scope: 'session' }])
+  expect((await compose(['mobile'])).sections.map(section => section.id)).toEqual(['intro', 'graphlet:graphs'])
+  expect((await compose([])).sections).toEqual([intro])
 })

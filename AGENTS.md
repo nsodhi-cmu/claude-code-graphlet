@@ -50,7 +50,8 @@
 - Prefer OS-agnostic code; where a platform split is unavoidable, isolate it in one function.
 - Keep the settings few. Each is one choice a person makes about how every graph is drawn, and none is a number.
 - Prefer making illegal states unrepresentable over documenting that they are illegal.
-- The mod adds no command, starts no agent, and calls no model.
+- The mod adds no command, registers no tool, starts no agent, and calls no model.
+- What the mod tells the model is one section of the system prompt, and the section rides on every request of every session that draws: keep it as short as it can be and still be followed. It says what a graph block is and when to write one, and nothing else.
 
 # Git
 

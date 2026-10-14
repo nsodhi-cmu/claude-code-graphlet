@@ -2,7 +2,7 @@
 
 # graphlet
 
-graphlet is a Claude Code mod: a plugin whose hooks are TypeScript that Claude Code loads and runs itself. It draws graphs, nodes and the links between them, in the terminal. It is a library for other mods: it adds `$.graphlet` to the engine's interface, a mod that depends on it hands it a graph, and graphlet draws the graph inside that mod's pane and says what the person did to it.
+graphlet is a Claude Code mod: a plugin whose hooks are TypeScript that Claude Code loads and runs itself. It draws graphs, nodes and the links between them, in the terminal. It is a library for other mods: it adds `$.graphlet` to the engine's interface, a mod that depends on it hands it a graph, and graphlet draws the graph inside that mod's pane and says what the person did to it. And Claude draws graphs with it: graphlet tells the model, in one section of the system prompt, that a fenced `graphlet` block in a reply is drawn, and draws each such block in the transcript.
 
 ## Commands
 
@@ -11,6 +11,7 @@ claude plugin validate --strict ./graphlet    # what the engine would refuse to 
 claude plugin validate --strict .             # the marketplace manifest
 claude plugin test ./graphlet                 # every test, with no session and no model
 claude --plugin-dir ./graphlet --plugin-dir <a mod that uses it>
+claude --plugin-dir ./graphlet                # Claude draws graphs in its replies
 ```
 
 There is no build and nothing to install. To type-check, load the mod once so that Claude Code writes its API types into `graphlet/.claude-plugin/types/`, then point TypeScript at `graphlet/tsconfig.json`.
@@ -29,10 +30,11 @@ graphlet/hooks/
   view.ts         a graph as a person looks at it, drawn as their settings say
   draw.ts         what a drawing is made of
   page.ts         the graph as a web page
+  reply.ts        a reply's graph blocks: finding them, reading them, and drawing them still
   surface.tsx     the surface module that paints a drawing and posts clicks and keys
 graphlet/tests/   the tests, one file for each of those it tests
 graphlet/types/   the contract: a graph's types, and what the mod adds to `$`
-docs/             one file for each part: the API, the layers, the layout, the drawing, the page
+docs/             one file for each part: the API, the layers, the layout, the drawing, the page, the replies
 ```
 
 ## What The Engine Expects
@@ -46,9 +48,11 @@ The engine reads a hooks module's source before it loads it, and refuses what it
 - A `Client` is the only element that receives pointer events and arrow keys, and it receives keys only after a click on it. Its posts reach the hooks of the plugin that drew it, and no other's.
 - An event matcher, an environment variable's name, and a `Client`'s `module` path are literals in the source. A call on a plugin's noun is refused from a module whose source does not spell it, which is why a test raises `graphlet.select` through a hook of an inline plugin and not from its own body.
 - In the test kit, an inline plugin's `register` closes over nothing of the test file, and its `tier` says where it loads: `prepend` puts a mod that uses graphlet outside it, as a dependent is.
+- A `ui.render` hook on `AssistantMessage` answers for one block of a reply, its bullet and the room above it included. `next(e)` with a rewritten `text` is the engine's own drawing of that text, so the text before a graph keeps the reply's bullet that way. The stored message is never changed.
+- A `prompt.compose` hook adds to the system prompt, and its `e.surfaces` is empty in a run that draws nowhere. Where an organization manages Claude Code, the engine runs it only for a plugin the organization lists in managed settings.
 
 The API's types are the reference for everything else: `graphlet/.claude-plugin/types/claude-code/index.d.ts`, once the mod has been loaded.
 
 ## Trying A Change
 
-The tests cover the layout, the drawing, and the engine's side with a stand-in for a mod that uses graphlet. To see a graph in a real pane, load graphlet beside a mod that depends on it, with one `--plugin-dir` each.
+The tests cover the layout, the drawing, and the engine's side with a stand-in for a mod that uses graphlet, and for the engine's own drawing of a reply. To see a graph in a real pane, load graphlet beside a mod that depends on it, with one `--plugin-dir` each. To see one in a reply, load graphlet alone and ask Claude for a graph.

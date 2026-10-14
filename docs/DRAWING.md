@@ -1,6 +1,6 @@
 # The Drawing
 
-A drawing is rows of painted text, and the rectangles of them that answer a click. Painting one is `graphlet/hooks/paint.ts`, the window it is painted through is `graphlet/hooks/window.ts`, and what both are made of is `graphlet/hooks/draw.ts`. The surface module `graphlet/hooks/surface.tsx` puts the rows on the terminal and posts what a click lands on.
+A drawing is rows of painted text, and the rectangles of them that answer a click. Painting one is `graphlet/hooks/paint.ts`, the window it is painted through is `graphlet/hooks/window.ts`, and what both are made of is `graphlet/hooks/draw.ts`. The surface module `graphlet/hooks/surface.tsx` puts a pane's rows on the terminal and posts what a click lands on. A graph in a reply is drawn as a [still picture](REPLIES.md#the-picture), its rows put on the terminal by the hook itself.
 
 ## Reading The Picture
 
@@ -69,6 +69,8 @@ The last row of a drawing is its foot. A graph with no nodes has no drawing, and
 
 - Under a graph larger than its room, it counts the nodes out of view past each edge: `← 3 more`, `↑ 2 more · ↓ 5 more`, `12 more →`. A click on a count scrolls the graph most of a room that way.
 - In its right corner is `html ↗`. A click there opens the graph as a [web page](PAGE.md).
+
+A still picture in a reply keeps the counts and drops the corner, and has no foot when all of it is in view.
 
 ## Moving The Selection
 

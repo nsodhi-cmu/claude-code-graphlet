@@ -1,0 +1,168 @@
+import type { GraphletGraph, GraphletLink, GraphletNode, GraphletTone } from '../types'
+import { rowText } from './draw'
+import type { Drawing, Room, Span } from './draw'
+import { TONES } from './layers'
+import type { Graph } from './layers'
+import { LEAST_COLUMNS } from './layout'
+import type { View } from './view'
+
+// Graphs in a reply: the fenced blocks marked `graphlet` that the model
+// writes, each read from its lines of arrows, and drawn as a still picture,
+// or as plain text where a surface draws no picture.
+
+/** The language a fenced block names to be drawn as a graph. */
+export const LANGUAGE = 'graphlet'
+
+/** What the model is told of graph blocks, as one section of the system prompt. */
+export const GUIDE = `# Graphs in replies
+
+This session draws graphs of nodes and links in your replies. When how things connect matters to the answer (a flow, a pipeline, dependencies, states and their transitions, a call graph), write the graph as a fenced code block whose language is \`${LANGUAGE}\`, one chain of nodes per line, each \`->\` a link:
+
+\`\`\`${LANGUAGE}
+Start -> Read the request -> Valid?
+Valid? -> Save it -> Done
+Valid? -> Ask for a correction [warn]
+Ask for a correction -> Read the request
+\`\`\`
+
+- A node is its label: the same label on several lines is one node. A line with no arrow is a node on its own.
+- A tone in brackets after a label colors its node: [good], [warn], [bad], [note], or [dim].
+- Links have a direction and may form loops. The layers run top to bottom and are worked out from the links; there are no link labels, shapes, or styles.
+- Keep labels to a few words. Introduce the graph with a sentence: the block is drawn in its place, as wide as the reply.
+- Only in replies, never in a file you write. When the person asks for Mermaid, Graphviz, or a text diagram, write that instead.`
+
+/** A reply cut at its graph blocks, in order: the runs of text between them, and each block's graph. */
+export type Part = { text: string } | { graph: GraphletGraph }
+
+/** The line that opens a fenced block: its run of backticks, with none after it on the line, or of tildes; and the first word after the run. */
+const OPENING = /^\s*(`{3,}(?=[^`]*$)|~{3,})\s*(\S*)/
+/** A line that does nothing but close a fenced block. */
+const CLOSING = /^\s*(`{3,}|~{3,})\s*$/
+/** What joins two nodes on a line: an arrow, the link running the way it points. A longer arrow, `-->`, leaves its extra dashes on the label before it. */
+const ARROW = /->|→/
+/** A tone in brackets at the end of a label. */
+const TONE = new RegExp(`\\[(${TONES.join('|')})\\]$`, 'i')
+
+/** What is written between two arrows, less the blanks around it and the dashes at its end. */
+const trimmed = (said: string): string => {
+  let end = said.length
+  while (end > 0 && (said[end - 1] === '-' || /\s/.test(said[end - 1] ?? ''))) end -= 1
+  return said.slice(0, end).trim()
+}
+
+/** Whether a line closes the fenced block `fence` opened: a run of the same character, at least as long. */
+const closes = (line: string, fence: string): boolean => {
+  const [, run = ''] = CLOSING.exec(line) ?? []
+  return run[0] === fence[0] && run.length >= fence.length
+}
+
+/**
+ * A reply cut at its graph blocks. A graph block is a fenced block whose
+ * language is `graphlet`, that is closed, and that names a node. Every other
+ * fenced block stays in the text whole, a `graphlet` one inside it too, and a
+ * block still open runs to the reply's end, as it is drawn while it streams.
+ * A run of text with nothing in it but blanks is left out.
+ */
+export function partsOf(reply: string): Part[] {
+  const lines = reply.split('\n')
+  const parts: Part[] = []
+  let run: string[] = []
+  const flush = (): void => {
+    const first = run.findIndex(line => line.trim() !== '')
+    if (first !== -1) parts.push({ text: run.slice(first).join('\n').trimEnd() })
+    run = []
+  }
+  for (let at = 0; at < lines.length; ) {
+    const line = lines[at] ?? ''
+    const [, fence = '', language = ''] = OPENING.exec(line) ?? []
+    if (fence === '') {
+      run.push(line)
+      at += 1
+      continue
+    }
+    const end = lines.findIndex((one, index) => index > at && closes(one, fence))
+    if (end === -1) {
+      run.push(...lines.slice(at))
+      break
+    }
+    const graph = language.toLowerCase() === LANGUAGE ? graphOf(lines.slice(at + 1, end)) : undefined
+    if (graph !== undefined && graph.nodes.length > 0) {
+      flush()
+      parts.push({ graph })
+    } else {
+      run.push(...lines.slice(at, end + 1))
+    }
+    at = end + 1
+  }
+  flush()
+  return parts
+}
+
+/**
+ * The graph a block's lines say. Each line is a chain of labels joined by
+ * arrows, `->`, `-->` or `→`, each arrow a link; a line with no arrow names a
+ * node alone. A node is known by its label, so the same label on any line is
+ * the same node, and a tone in brackets after a label is its node's, the
+ * first one given. A blank label is passed over.
+ */
+export function graphOf(lines: readonly string[]): GraphletGraph {
+  const nodes = new Map<string, GraphletNode>()
+  const links: GraphletLink[] = []
+  const nodeOf = (said: string): string[] => {
+    const words = trimmed(said)
+    const tone = TONE.exec(words)
+    const id = trimmed(tone === null ? words : words.slice(0, tone.index)).replace(/\s+/g, ' ')
+    if (id === '') return []
+    const node = nodes.get(id) ?? { id, label: id }
+    if (node.tone === undefined && tone?.[1] !== undefined) node.tone = tone[1].toLowerCase() as GraphletTone
+    nodes.set(id, node)
+    return [id]
+  }
+  for (const line of lines) {
+    const ids = line.split(ARROW).flatMap(nodeOf)
+    ids.forEach((to, index) => {
+      const from = ids[index - 1]
+      if (from !== undefined) links.push({ from, to })
+    })
+  }
+  return { nodes: [...nodes.values()], links }
+}
+
+/** A row less its first `count` cells. */
+const after = (row: Span[], count: number): Span[] => {
+  let left = count
+  return row.flatMap(span => {
+    const characters = [...span.text]
+    const cut = Math.min(left, characters.length)
+    left -= cut
+    return cut === characters.length ? [] : [{ ...span, text: characters.slice(cut).join('') }]
+  })
+}
+
+/**
+ * A graph drawn as a still picture in a room: no wider than its longest layer
+ * needs, as tall as it needs, from its top left corner, with nothing selected.
+ * Nothing in it answers a click, so its foot keeps only the counts of what is
+ * out of view, and is left off where nothing is. The columns blank down the
+ * whole of its left side are cut away.
+ */
+export function pictureOf(view: View, graph: Graph, room: Room): Drawing {
+  const columns = Math.min(room.columns, view.measure(graph, LEAST_COLUMNS).columns)
+  const drawing = view.draw(graph, null, { columns, rows: room.rows }, { x: 0, y: 0 })
+  const foot = drawing.rows.at(-1)
+  if (foot === undefined) return { rows: [], hits: [] }
+  const corner = drawing.hits.find(hit => 'page' in hit)
+  const counts = rowText(foot).slice(0, corner?.x).trimEnd()
+  const kept = [...drawing.rows.slice(0, -1), ...(counts === '' ? [] : [[{ text: counts, paint: 'dim' as const }]])]
+  const blank = Math.min(
+    ...kept.map(rowText).filter(text => text !== '').map(text => text.length - text.trimStart().length),
+  )
+  return { rows: kept.map(row => after(row, blank)), hits: [] }
+}
+
+/** A picture as plain text, fenced as code marked `text`, by more backticks than any run of them inside it. */
+export function fencedOf(drawing: Drawing): string {
+  const text = drawing.rows.map(rowText).join('\n')
+  const fence = '`'.repeat(Math.max(3, ...(text.match(/`+/g) ?? []).map(run => run.length + 1)))
+  return `${fence}text\n${text}\n${fence}`
+}

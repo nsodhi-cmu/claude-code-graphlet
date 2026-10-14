@@ -1,6 +1,6 @@
 # graphlet
 
-graphlet is a Claude Code mod that draws graphs, nodes and the links between them, inside Claude Code. It is for other mods to build on. A mod hands it a graph, and graphlet draws the graph in that mod's pane, scrolls it, and says which node the person picked.
+graphlet is a Claude Code mod that draws graphs, nodes and the links between them, inside Claude Code. Claude draws them in its replies, and other mods build on it: a mod hands it a graph, and graphlet draws the graph in that mod's pane, scrolls it, and says which node the person picked.
 
 ```
                              ┌───────┐
@@ -39,17 +39,35 @@ graphlet is a Claude Code mod that draws graphs, nodes and the links between the
 - **Every link is drawn, and can be followed**, between neighboring layers, past layers, back up, and between two nodes of one layer. One box's links fan out on a row of their own, links from different boxes reach a box at arrowheads, or ticks, of their own, and a link that only crosses another passes over it.
 - **It scrolls.** A graph larger than its room is seen through a window that follows the selection, and that the wheel moves.
 - **It answers the mouse and the keyboard.** A click selects a node, the arrow keys move from node to node along the links, and the mod that owns the pane hears each pick.
-- **It is a library, and no more.** It adds no command, starts no agent, and calls no model.
+- **Claude draws graphs in its replies.** Where graphlet is installed, Claude knows it can answer with a graph, as it knows it can answer with a table, and the graph is drawn in the transcript where Claude wrote it.
+- **It is a library for other mods.** It adds no command, registers no tool, starts no agent, and calls no model.
 
 ## Installing
 
-A mod that depends on graphlet brings it along, so there is usually nothing to install. To install it alone, at the prompt of a session:
+A mod that depends on graphlet brings it along. To install it alone, for the graphs in Claude's replies, at the prompt of a session:
 
 ```
 /plugin install graphlet --marketplace nsodhi-cmu/claude-code-graphlet
 ```
 
-graphlet is tested on Claude Code 2.1.299. Mods are new and their API still changes between releases, so an older Claude Code may not load it. It draws in the terminal; on the desktop app, the VS Code extension, and the mobile app it draws nothing, and a pane is left as its owner draws it.
+graphlet is tested on Claude Code 2.1.299. Mods are new and their API still changes between releases, so an older Claude Code may not load it. It draws in the terminal; on the desktop app, the VS Code extension, and the mobile app, a graph in a reply is shown as plain text, and a pane is left as its owner draws it.
+
+## In Claude's Replies
+
+graphlet adds a few lines to the system prompt of every session that draws, saying that a fenced block whose language is `graphlet` is drawn as a graph. Claude writes one where how things connect matters to its answer, a chain of nodes to a line:
+
+````
+```graphlet
+Start -> Read the request -> Valid?
+Valid? -> Save it -> Done
+Valid? -> Ask for a correction [warn]
+Ask for a correction -> Read the request
+```
+````
+
+The block is drawn in its place in the reply, as wide as the reply, with the person's settings. A tone in brackets colors its node. The picture is still: it does not scroll or take a selection, and a graph wider than the reply counts the nodes past its edge. Where graphlet draws no picture, the block becomes the same picture as plain text. The conversation keeps the block as Claude wrote it.
+
+[docs/REPLIES.md](docs/REPLIES.md) has the block's syntax, what the model is told, and why it is a block and not a tool.
 
 ## Using It From A Mod
 
@@ -126,7 +144,7 @@ A click on `html ↗`, in the corner under a graph, writes the graph out as one 
 
 ## Settings
 
-These are a person's, and hold for every graph any mod draws. They are in `/config`, or `/plugin configure` with graphlet's id, which names the marketplace it was installed from: `graphlet@claude-code-graphlet` when installed alone.
+These are a person's, and hold for every graph graphlet draws, in a reply or in any mod's pane. They are in `/config`, or `/plugin configure` with graphlet's id, which names the marketplace it was installed from: `graphlet@claude-code-graphlet` when installed alone.
 
 | Setting | What it picks |
 | :- | :- |
@@ -138,7 +156,7 @@ These are a person's, and hold for every graph any mod draws. They are in `/conf
 
 A graph is read leniently, put in layers, laid out, and painted through a window.
 
-[docs/](docs/) describes each part: what a mod [calls](docs/API.md), the [layers](docs/LAYERS.md), the [layout](docs/LAYOUT.md), the [drawing](docs/DRAWING.md), and the [web page](docs/PAGE.md).
+[docs/](docs/) describes each part: what a mod [calls](docs/API.md), the [layers](docs/LAYERS.md), the [layout](docs/LAYOUT.md), the [drawing](docs/DRAWING.md), the [web page](docs/PAGE.md), and the [graphs in replies](docs/REPLIES.md).
 
 ## Developing
 
@@ -156,7 +174,8 @@ A mod is code that runs inside Claude Code, unsandboxed, with your permissions. 
 
 What graphlet does with that access:
 
-- **Draws** in the panes of the mods that ask it to, and nowhere else.
+- **Tells Claude** that it can draw graphs, in one section of the system prompt of every session that draws. The section rides on every request.
+- **Draws** in Claude's replies where they hold a graph block, in the panes of the mods that ask it to, and nowhere else.
 - **Keeps** each such pane's graph, selection, and scroll position in memory, for the session.
 - **Writes one file and opens it**, only when you click `html ↗`: the graph as a web page, in your temporary folder, opened with your system's own opener (`xdg-open`, `open`, or `start`).
 
@@ -164,10 +183,12 @@ It reads no file, stores nothing between sessions, calls no model, and makes no 
 
 ## Limits
 
-- It draws in the terminal only.
+- It draws pictures in the terminal only. Elsewhere a reply's graph is plain text, and a pane's is not drawn.
+- A graph in a reply is still. It does not scroll, and has no web page.
+- Where an organization manages Claude Code, the engine adds graphlet's section to the system prompt only if the organization lists graphlet in managed settings. Otherwise Claude is not told of graph blocks there, though graphlet still draws one Claude writes.
 - Layers run top to bottom only.
 - A graph's links are all directed or all undirected. One graph cannot mix the two.
-- A pane holds one graph, of at most 500 nodes and 500 links. What is past those is left out.
+- A graph has at most 500 nodes and 500 links, and a pane holds one. What is past those is left out.
 - Where the links between two layers are too tangled to be kept apart, two of them may share a stretch of line. Selecting a node lights its own.
 - A label is drawn one cell a character, so a label written in characters two cells wide pushes its row out of line.
 

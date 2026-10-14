@@ -1,7 +1,7 @@
 {
   "name": "graphlet",
   "version": "0.1.0",
-  "description": "Draws graphs of nodes and links inside Claude Code, for other mods to build on",
+  "description": "Draws graphs of nodes and links inside Claude Code: in Claude's replies, and for other mods to build on",
   "author": {
     "name": "Neal",
     "url": "https://github.com/nsodhi-cmu"
