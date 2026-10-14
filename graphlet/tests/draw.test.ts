@@ -25,6 +25,12 @@ describe('a window brought to what it must show', () => {
     expect(reveal(10, 10, 20, 30, 100, 4)).toBe(10)
   })
 
+  test('a window with no room for the margin shows what it was moved for, and as much margin as is left', () => {
+    expect(reveal(0, 10, 13, 3, 100, 2)).toBe(10)
+    expect(reveal(0, 10, 13, 5, 100, 2)).toBe(9)
+    expect(reveal(40, 10, 13, 4, 100, 2)).toBe(10)
+  })
+
   test('a window asked to stand between two cells stands on one', () => {
     expect(reveal(10.4, 12, 20, 30, 100)).toBe(10)
     expect(reveal(10.6, 50, 60, 30, 100)).toBe(30)

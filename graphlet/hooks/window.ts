@@ -24,7 +24,7 @@ export type Sight = { isWhole: boolean; rows: number; most: Pan }
 export function sightOf(layout: Layout, room: Room): Sight {
   const x = Math.max(0, ...layout.shelves.map(shelf => shelf.across - layout.columns))
   const rows = Math.max(1, Math.min(layout.rows, room.rows - 1))
-  return { isWhole: x === 0 && rows === layout.rows, rows, most: { x, y: layout.rows - rows } }
+  return { isWhole: x === 0 && rows >= layout.rows, rows, most: { x, y: Math.max(0, layout.rows - rows) } }
 }
 
 export const within = (pan: Pan, most: Pan): Pan => ({
@@ -83,10 +83,9 @@ export function scrollIn(layout: Layout, room: Room, from: Pan, by: Pan | number
 
 /**
  * The node a move from the selected one lands on. Left and right go along
- * its shelf, past any lanes. Up and down go to a node that way that a link
- * joins it to: the one on the nearest shelf, and of those the nearest in the
- * window. With none joined to it that way, they go to the nearest node of
- * the next shelf.
+ * its shelf, past any lanes. Up and down go to the next shelf: to the node
+ * there that a link joins it to, the nearest of them in the window, or with
+ * none joined, to the nearest. So every node can be reached by the keys.
  */
 export function stepIn(
   layout: Layout,
@@ -107,14 +106,10 @@ export function stepIn(
   }
   const at = within(pan, sightOf(layout, room).most)
   const seenAt = (one: Place): number => middleOf(one, one.x - slideOf(layout, layout.shelves[one.shelf], at.x))
-  const way = move === 'up' ? -1 : 1
-  const beyond = layout.shelves
-    .flatMap(other => other.places)
-    .filter(one => 'node' in one.slot && (one.shelf - place.shelf) * way > 0)
-  const joined = beyond.filter(one => isJoined(graph, idOf(one) ?? '', selected))
-  const near = joined.length > 0 ? joined : beyond.filter(one => one.shelf === place.shelf + way)
-  const to = [...near].sort(
-    (a, b) => Math.abs(a.shelf - place.shelf) - Math.abs(b.shelf - place.shelf) || Math.abs(seenAt(a) - seenAt(place)) - Math.abs(seenAt(b) - seenAt(place)),
+  const next = (layout.shelves[place.shelf + (move === 'up' ? -1 : 1)]?.places ?? []).filter(one => 'node' in one.slot)
+  const joined = next.filter(one => isJoined(graph, idOf(one) ?? '', selected))
+  const to = [...(joined.length > 0 ? joined : next)].sort(
+    (a, b) => Math.abs(seenAt(a) - seenAt(place)) - Math.abs(seenAt(b) - seenAt(place)),
   )[0]
   return (to === undefined ? undefined : idOf(to)) ?? selected
 }

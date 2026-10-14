@@ -52,6 +52,13 @@ const openPage = async ($: EngineInterface, pane: string, graph: Graph): Promise
   $.ui.toast(`graphlet: the graph's page is at ${path}`)
 }
 
+/** The most columns, and the most rows, a room is taken to have. */
+const MOST_CELLS = 1000
+
+/** A count of cells another mod handed over, as a whole number a room can have. */
+const cellsOf = (asked: unknown): number =>
+  typeof asked === 'number' && Number.isFinite(asked) ? Math.min(Math.max(Math.floor(asked), 1), MOST_CELLS) : 1
+
 const isPan = (value: unknown): value is Pan =>
   typeof value === 'object' &&
   value !== null &&
@@ -68,10 +75,10 @@ export const register: Register = (on, options) => {
   on('engine.create', async ($, e, next) => {
     const built = await next(e)
     const graphlet: Graphlet = {
-      measure: async input => view.measure(readGraph(input.graph), Math.floor(input.columns)),
+      measure: async input => view.measure(readGraph(input.graph), cellsOf(input.columns)),
       show: async input => {
         const graph = readGraph(input.graph)
-        const room = { columns: Math.floor(input.columns), rows: Math.floor(input.rows) }
+        const room = { columns: cellsOf(input.columns), rows: cellsOf(input.rows) }
         const wanted = input.selected ?? picked.get(input.pane)
         const selected = graph.nodes.find(node => node.id === wanted)?.id ?? graph.nodes[0]?.id ?? null
         const before = held.get(input.pane)
@@ -87,7 +94,7 @@ export const register: Register = (on, options) => {
       },
       scroll: async input => {
         const at = held.get(input.pane)
-        if (at === undefined) return
+        if (at === undefined || (typeof input.by === 'number' ? !Number.isFinite(input.by) : !isPan(input.by))) return
         scrolled.set(input.pane, view.scroll(at.graph, at.room, scrolled.get(input.pane) ?? at.pan, input.by))
         built.ui.invalidate('ui.render')
       },

@@ -3,6 +3,7 @@ import { describe, expect, test } from 'claude-code/testing'
 import type { GraphletMove } from '../types'
 import { LOOK, SHOP, graphOf, picture } from './fixture'
 import type { Hit, Pan } from '../hooks/draw'
+import { readGraph } from '../hooks/layers'
 import type { Graph } from '../hooks/layers'
 import { viewOf } from '../hooks/view'
 
@@ -252,15 +253,24 @@ describe('moving the selection', () => {
     expect(inShop('src/money.ts', 'down')).toBe('src/money.ts')
   })
 
-  test('a link past a layer is followed to its end, and a step along a layer skips the lanes in it', () => {
-    const graph = graphOf(['A', 'B', 'C', 'far'], [['A', 'B'], ['B', 'C'], ['A', 'far'], ['C', 'far']])
-    const lone = graphOf(['A', 'mid', 'far'], [['A', 'far'], ['A', 'mid']])
-    expect(walk(lone, WHOLE, ORIGIN, 'far', 'up')).toBe('A')
-    expect(walk(graph, WHOLE, ORIGIN, 'B', 'right')).toBe('B')
-    expect(walk(graph, WHOLE, ORIGIN, 'A', 'down')).toBe('B')
+  test('up and down move a layer at a time, whatever link passes it, so the keys reach every node; a step along a layer skips its lanes', () => {
+    const passed = readGraph({
+      nodes: ['A', 'B', 'C'].map((id, layer) => ({ id, label: id, layer })),
+      links: [{ from: 'A', to: 'C' }],
+    })
+    expect(walk(passed, WHOLE, ORIGIN, 'A', 'down')).toBe('B')
+    expect(walk(passed, WHOLE, ORIGIN, 'C', 'up')).toBe('B')
+    expect(walk(passed, WHOLE, ORIGIN, 'B', 'right')).toBe('B')
+    expect(walk(passed, WHOLE, ORIGIN, 'A', 'down', 'down')).toBe('C')
   })
 
   test('with nothing selected, there is nowhere to move from', () => {
     expect(pinned.step(SHOP, null, 'down', WHOLE, ORIGIN)).toBeNull()
+  })
+
+  test('a graph with no nodes has a window that stands still', () => {
+    const empty = readGraph({ nodes: [], links: [] })
+    expect(pinned.show(empty, null, WHOLE, { x: 5, y: 5 })).toEqual(ORIGIN)
+    expect(pinned.scroll(empty, WHOLE, ORIGIN, 3)).toEqual(ORIGIN)
   })
 })

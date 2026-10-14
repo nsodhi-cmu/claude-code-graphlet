@@ -38,20 +38,20 @@ Lit is painted over unlit. Where links share a stretch of line, selecting a node
 A graph larger than its room is seen through a window, and never laid out again to fit: the layout depends only on the room's width.
 
 - A shelf longer than the room runs off its edge, in the order it always has. A box the edge cuts ends there in an ellipsis.
-- `showIn` says where the window stands to show the selected node. A window that already shows the whole box stays where it is. One that does not moves just far enough to show the box, the wires above and below it, and the start of the boxes beside it.
+- `showIn` says where the window stands to show the selected node. A window that already shows the whole box stays where it is. One that does not moves just far enough to show the box, the wires above and below it, and the start of the boxes beside it, or as much of those as a small room leaves it.
 - `scrollIn` scrolls the window by cells, or by turns of the wheel, which go the way the graph has more rooms' worth out of view: along it, or down it.
 - Every shelf slides under the window together, each as far as its own end. With `scroll` at `pinned`, that leaves a shelf that fits the room where it is while a longer one slides, and the wires between the two follow. With `scroll` at `sheet`, the shelves move as one.
 
 ## The Foot
 
-The last row of every drawing is its foot.
+The last row of a drawing is its foot. A graph with no nodes has no drawing, and so none.
 
 - Under a graph larger than its room, it counts the nodes out of view past each edge: `← 3 more`, `↑ 2 more · ↓ 5 more`, `12 more →`. A click on a count scrolls the graph most of a room that way.
 - In its right corner is `html ↗`. A click there opens the graph as a [web page](PAGE.md).
 
 ## Moving The Selection
 
-`stepIn` says where a move lands. Left and right go along the selected node's shelf, past any lanes. Up and down go to a node that way that a link joins it to: the one on the nearest shelf, and of those the nearest in the window. With none joined to it that way, they go to the nearest node of the next shelf. A move with nowhere to go stays where it is.
+`stepIn` says where a move lands. Left and right go along the selected node's shelf, past any lanes. Up and down go to the next shelf: to the node there that a link joins the selected one to, the nearest of them in the window, or with none joined, to the nearest. So the keys reach every node, a shelf at a time. A move with nowhere to go stays where it is.
 
 ## Paints
 

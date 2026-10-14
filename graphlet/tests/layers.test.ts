@@ -25,18 +25,30 @@ describe('reading a graph', () => {
     ])
   })
 
-  test('text is made safe to draw, and a node with no label is called by its id', () => {
+  test('text is made safe to draw, a node with no label is called by its id, and a tone that is none of the tones is dropped', () => {
     const graph = readGraph({
       nodes: [
-        { id: 'a', label: 'two\nlines\tand a tab', mark: ' ◆ ', badge: '' },
-        { id: 'b', label: '   ' },
+        { id: 'a', label: 'two\nlines\tand a tab', mark: ' ◆ ', badge: '', tone: 'warn' },
+        { id: 'b', label: '   ', tone: 'loud' as never },
+        { id: 'c\nd', label: '' },
+        { id: '  ', label: '' },
       ],
       links: [],
     })
     expect(graph.nodes).toEqual([
-      { id: 'a', label: 'two lines and a tab', mark: '◆' },
+      { id: 'a', label: 'two lines and a tab', mark: '◆', tone: 'warn' },
       { id: 'b', label: 'b' },
+      { id: 'c\nd', label: 'c d' },
+      { id: '  ', label: '·' },
     ])
+  })
+
+  test('a graph is read up to the most nodes and the most links it may have', () => {
+    const many = Array.from({ length: 700 }, (_, index) => ({ id: `n${index}`, label: 'n' }))
+    const graph = readGraph({ nodes: many, links: many.map((node, index) => ({ from: node.id, to: `n${(index + 1) % 700}` })) })
+    expect(graph.nodes).toHaveLength(500)
+    expect(graph.nodes.at(-1)?.id).toBe('n499')
+    expect(graph.links).toHaveLength(499)
   })
 
   test('what is no graph at all reads as an empty one', () => {

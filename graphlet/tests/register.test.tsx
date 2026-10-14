@@ -14,7 +14,8 @@ import { viewOf } from '../hooks/view'
  * where the selection is graphlet's to keep, and `held`, where the host says
  * which node is selected. Over each drawing it writes `host` and then what
  * graphlet answered it and what it has heard, and it has a Button for a turn
- * of the wheel and one for a step to the right.
+ * of the wheel, one for a scroll by no number at all, and one for a step to
+ * the right.
  */
 const HOST: Plugin = {
   name: 'host',
@@ -54,6 +55,7 @@ const HOST: Plugin = {
     })
     on('ui.press', { plugin: 'host' }, async ($, e) => {
       if (e.element === 'wheel') await $.graphlet.scroll({ pane: e.requestId, by: 1 })
+      if (e.element === 'drift') await $.graphlet.scroll({ pane: e.requestId, by: Number.NaN })
       if (e.element === 'right') heard.push(`step ${await $.graphlet.step({ pane: e.requestId, move: 'right' })}`)
       $.ui.invalidate('ui.render')
       return { element: e.element }
@@ -76,6 +78,7 @@ const HOST: Plugin = {
           <Text>{`host ${JSON.stringify({ size, shown, heard })}`}</Text>
           {drawing}
           <Button key="wheel" label="wheel" onPress={() => undefined} />
+          <Button key="drift" label="drift" onPress={() => undefined} />
           <Button key="right" label="right" onPress={() => undefined} />
         </Box>
       )
@@ -253,6 +256,21 @@ test('the owner passes on a turn of the wheel, and asks where a move of its own 
   await pane.press({ plugin: 'host', key: 'right' })
   expect((await said(pane)).heard).toEqual(['select free src/cart.ts', 'step src/invoice.ts'])
   expect((await said(pane)).shown.selected).toBe('src/cart.ts')
+  await pane.unmount()
+})
+
+test('a room or a scroll that is no number draws the smallest picture and scrolls nothing, and leaves the pane drawing', WITH_HOST, async ($, on) => {
+  world(on)
+  const odd = await mount($, 'free', { ...PANE, bodyColumns: Number.NaN, scroll: { offset: 0, bodyRows: Number.POSITIVE_INFINITY } })
+  expect((await said(odd)).shown).toEqual({ rows: 2, selected: 'src/price.ts' })
+  await odd.unmount()
+
+  const pane = await mount($, 'free', NARROW)
+  const before = await rowsOf(pane)
+  await pane.press({ plugin: 'host', key: 'drift' })
+  expect(await rowsOf(pane)).toEqual(before)
+  await pane.press({ plugin: 'host', key: 'wheel' })
+  expect(await rowsOf(pane)).not.toEqual(before)
   await pane.unmount()
 })
 

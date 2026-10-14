@@ -165,7 +165,7 @@ It reads no file, stores nothing between sessions, calls no model, and makes no 
 - It draws in the terminal only.
 - Layers run top to bottom only.
 - Links have a direction. A graph with none is drawn as if each link ran the way it was given.
-- A pane holds one graph.
+- A pane holds one graph, of at most 500 nodes and 500 links. What is past those is left out.
 - Links to one box meet at its one arrowhead, and where the links between two layers are too tangled to be kept apart, some share a stretch of line. Selecting a node lights its own.
 - A label is drawn one cell a character, so a label written in characters two cells wide pushes its row out of line.
 

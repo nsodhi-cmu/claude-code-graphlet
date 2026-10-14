@@ -142,20 +142,21 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
     const isLit = selected !== null && (wire.link.from === selected || wire.link.to === selected)
     const [start, end] = [borderOfEnd(wire.from), borderOfEnd(wire.to)]
     const draw = (x: number, y: number, ways: number): void => {
-      const mark = y === start || y === end ? undefined : markAt(x, y)
+      const mark = markAt(x, y)
       if (mark === undefined) return
       mark.ways |= ways
       mark.isLit ||= isLit
       mark.isSolid ||= !wire.isUp
     }
-    const down = (x: number, from: number, to: number): void => {
-      const [high, low] = [Math.min(from, to), Math.max(from, to)]
+    /** Marks a column of the wire between a border and its turn, the border's own row left to the box. */
+    const down = (x: number, border: number): void => {
+      const [high, low] = [Math.min(border, turn), Math.max(border, turn)]
       for (let y = Math.max(high, 0); y <= Math.min(low, seen.rows - 1); y += 1) {
-        draw(x, y, (y > high ? UP : 0) | (y < low ? DOWN : 0))
+        if (y !== border) draw(x, y, (y > high ? UP : 0) | (y < low ? DOWN : 0))
       }
     }
-    down(out, start, turn)
-    down(into, turn, end)
+    down(out, start)
+    down(into, end)
     const [left, right] = [Math.min(out, into), Math.max(out, into)]
     for (let x = Math.max(left, 0); x <= Math.min(right, seen.columns - 1); x += 1) {
       draw(x, turn, (x > left ? LEFT : 0) | (x < right ? RIGHT : 0))

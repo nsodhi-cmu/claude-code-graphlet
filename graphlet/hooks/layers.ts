@@ -1,4 +1,4 @@
-import type { GraphletGraph, GraphletLink, GraphletNode } from '../types'
+import type { GraphletGraph, GraphletLink, GraphletNode, GraphletTone } from '../types'
 
 // A graph in layers: every node in a row of the drawing, every link cut into
 // the stretches that cross from one layer to the next, with a lane kept for
@@ -11,33 +11,44 @@ export type Graph = { nodes: GraphletNode[]; links: GraphletLink[] }
 
 /** How many times the layers are ordered against their neighbors, down and back up, before the best ordering is kept. */
 const SWEEPS = 4
+/** The tones a node may have. Any other is dropped, and the node drawn plain. */
+const TONES: readonly GraphletTone[] = ['plain', 'dim', 'note', 'good', 'warn', 'bad']
+/** What a node with nothing to call it by is labelled. */
+const NAMELESS = '·'
+/** The most nodes and the most links of a graph that are read. A graph past either is no picture a person can follow, and is slow to lay out. */
+const MOST_NODES = 500
+const MOST_LINKS = 500
 
 const tidy = (text: unknown): string =>
   typeof text === 'string' ? text.replace(/[\u0000-\u001f\u007f-\u009f\s]+/g, ' ').trim() : ''
 
 /**
  * Reads a graph leniently: a node needs an id no node before it has, text is
- * made safe to draw, and a link is kept once, where both its ends are nodes.
- * A link from a node to itself is kept, and drawn as a sign on the node.
+ * made safe to draw, a tone that is none of the tones is dropped, and a link
+ * is kept once, where both its ends are nodes. A link from a node to itself
+ * is kept, and drawn as a sign on the node. Nodes and links past the most
+ * that are read are left out.
  */
 export function readGraph(graph: GraphletGraph): Graph {
   const nodes: GraphletNode[] = []
   const ids = new Set<string>()
   for (const node of Array.isArray(graph?.nodes) ? graph.nodes : []) {
+    if (nodes.length === MOST_NODES) break
     if (typeof node?.id !== 'string' || node.id === '' || ids.has(node.id)) continue
     ids.add(node.id)
     const [mark, badge] = [tidy(node.mark), tidy(node.badge)]
     nodes.push({
       id: node.id,
-      label: tidy(node.label) || node.id,
+      label: tidy(node.label) || tidy(node.id) || NAMELESS,
       ...(mark === '' ? {} : { mark }),
-      ...(node.tone === undefined ? {} : { tone: node.tone }),
+      ...(TONES.includes(node.tone as GraphletTone) ? { tone: node.tone } : {}),
       ...(badge === '' ? {} : { badge }),
       ...(Number.isFinite(node.layer) ? { layer: node.layer } : {}),
     })
   }
   const links: GraphletLink[] = []
   for (const link of Array.isArray(graph?.links) ? graph.links : []) {
+    if (links.length === MOST_LINKS) break
     if (!ids.has(link?.from) || !ids.has(link?.to)) continue
     if (!links.some(one => one.from === link.from && one.to === link.to)) links.push({ from: link.from, to: link.to })
   }
@@ -139,7 +150,8 @@ export type Layers = { slots: Slot[][]; pieces: Piece[][]; flats: GraphletLink[]
 
 /** How many pairs of stretches between two neighboring layers cross. */
 function crossingsOf(pieces: Piece[], upper: Slot[], lower: Slot[]): number {
-  const ends = pieces.map(piece => [upper.indexOf(piece.upper), lower.indexOf(piece.lower)] as const)
+  const [above, below] = [new Map(upper.map((slot, place) => [slot, place])), new Map(lower.map((slot, place) => [slot, place]))]
+  const ends = pieces.map(piece => [above.get(piece.upper) ?? 0, below.get(piece.lower) ?? 0] as const)
   let crossings = 0
   for (const [i, j] of ends) for (const [k, l] of ends) if (i < k && j > l) crossings += 1
   return crossings
@@ -153,11 +165,17 @@ function crossingsOf(pieces: Piece[], upper: Slot[], lower: Slot[]): number {
  */
 function sorted(layer: Slot[], beside: Slot[], pieces: Piece[]): Slot[] {
   const scale = beside.length > 1 && layer.length > 1 ? (layer.length - 1) / (beside.length - 1) : 1
+  const placeOf = new Map(beside.map((slot, place) => [slot, place]))
+  const joined = new Map<Slot, number[]>()
+  for (const piece of pieces) {
+    for (const [own, far] of [[piece.upper, piece.lower], [piece.lower, piece.upper]] as const) {
+      const place = placeOf.get(far)
+      if (place !== undefined) joined.set(own, [...(joined.get(own) ?? []), place])
+    }
+  }
   const pulls = new Map(
     layer.map((slot, own) => {
-      const places = pieces.flatMap(piece =>
-        piece.upper === slot ? [beside.indexOf(piece.lower)] : piece.lower === slot ? [beside.indexOf(piece.upper)] : [],
-      )
+      const places = joined.get(slot) ?? []
       const pull = places.length === 0 ? own : (places.reduce((sum, place) => sum + place, 0) / places.length) * scale
       return [slot, pull]
     }),
@@ -203,16 +221,20 @@ export function layersOf(graph: Graph): Layers {
 
   const crossings = (order: Slot[][]): number =>
     pieces.reduce((sum, between, index) => sum + crossingsOf(between, order[index] ?? [], order[index + 1] ?? []), 0)
-  let best = slots
-  for (let sweep = 0; sweep < SWEEPS && crossings(best) > 0; sweep += 1) {
+  let best = { slots, crossings: crossings(slots) }
+  const keepBest = (): void => {
+    const now = crossings(slots)
+    if (now < best.crossings) best = { slots, crossings: now }
+  }
+  for (let sweep = 0; sweep < SWEEPS && best.crossings > 0; sweep += 1) {
     for (let index = 1; index < count; index += 1) {
       slots = slots.with(index, sorted(slots[index] ?? [], slots[index - 1] ?? [], pieces[index - 1] ?? []))
     }
-    if (crossings(slots) < crossings(best)) best = slots
+    keepBest()
     for (let index = count - 2; index >= 0; index -= 1) {
       slots = slots.with(index, sorted(slots[index] ?? [], slots[index + 1] ?? [], pieces[index] ?? []))
     }
-    if (crossings(slots) < crossings(best)) best = slots
+    keepBest()
   }
-  return { slots: best, pieces, flats }
+  return { slots: best.slots, pieces, flats }
 }

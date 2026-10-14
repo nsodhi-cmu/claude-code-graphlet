@@ -211,6 +211,24 @@ describe('the drawing', () => {
     ])
   })
 
+  test('a link between two boxes of one layer and different heights is whole from the shorter box to the taller', () => {
+    const graph = readGraph({
+      nodes: [
+        { id: 'a', label: 'cart.ts', layer: 0 },
+        { id: 'b', label: 'invoice-line-item-renderer.component.ts', layer: 0 },
+      ],
+      links: [{ from: 'a', to: 'b' }],
+    })
+    expect(graphRows(drawn(graph, null, { columns: 60, rows: 60 }))).toEqual([
+      '           ┌─────────┐  ┌───────────────────────┐',
+      '           │ cart.ts │  │ invoice-line-item-    │',
+      '           └────┬────┘  │ renderer.component.ts │',
+      '                │       └───────────────────────┘',
+      '                │                     ▲',
+      '                └─────────────────────┘',
+    ])
+  })
+
   test('with labels cut, every box is three rows, its label cut in the middle to fit one line', () => {
     expect(graphRows(drawn(LONG, null, { columns: 60, rows: 60 }, { ...LOOK, labels: 'clip' })).slice(0, 8)).toEqual([
       '            ┌──────────────────────────────────┐',

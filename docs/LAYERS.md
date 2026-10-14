@@ -8,9 +8,11 @@ A graph is drawn in layers: every node in a row of the drawing, and every link r
 
 - A node needs an `id` that no node before it has. One without is dropped.
 - Text is made safe to draw: control characters and line breaks become spaces. A node with no label is called by its id.
+- A `tone` that is none of the tones is dropped, and the node drawn plain.
 - A link is kept where both its ends are nodes of the graph, and once however many times it is given.
 - A link from a node to itself is kept. It is drawn as a sign in the node's box, not as a line.
 - What is no graph at all reads as an empty one.
+- At most `MOST_NODES` nodes and `MOST_LINKS` links are read, 500 of each, and what is past them is left out. A graph larger than that is no picture a person can follow, and is slow to lay out.
 
 ## Which Layer A Node Stands In
 

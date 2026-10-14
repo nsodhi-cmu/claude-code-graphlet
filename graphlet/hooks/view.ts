@@ -4,7 +4,7 @@ import type { Graph } from './layers'
 import { layoutOf } from './layout'
 import type { Look } from './layout'
 import { paint } from './paint'
-import { scrollIn, showIn, sightOf, stepIn } from './window'
+import { scrollIn, showIn, stepIn } from './window'
 
 // A graph as a person looks at it: laid out for a room, seen through a
 // window, with one node selected.
@@ -20,9 +20,6 @@ export const MOVES: Readonly<Record<string, GraphletMove>> = {
   k: 'up',
   j: 'down',
 }
-
-/** A room tall enough to draw any graph whole, which is how the rows a graph needs are counted. */
-const WHOLE_ROWS = 100_000
 
 /** What a view does with a graph, drawing it as it was made to. */
 export type View = {
@@ -41,10 +38,9 @@ export type View = {
 export function viewOf(look: Look): View {
   return {
     measure: (graph, columns) => {
-      const room = { columns, rows: WHOLE_ROWS }
-      const layout = layoutOf(graph, room, look)
-      const rows = paint(layout, graph, null, room, { x: 0, y: 0 }).rows.length
-      return { columns: layout.columns + sightOf(layout, room).most.x, rows }
+      const layout = layoutOf(graph, { columns, rows: 0 }, look)
+      const across = Math.max(layout.columns, ...layout.shelves.map(shelf => shelf.across))
+      return { columns: across, rows: layout.shelves.length === 0 ? 0 : layout.rows + 1 }
     },
     draw: (graph, selected, room, pan) => paint(layoutOf(graph, room, look), graph, selected, room, pan),
     show: (graph, selected, room, from) => showIn(layoutOf(graph, room, look), selected, room, from),

@@ -189,12 +189,15 @@ export function routeOf(wire: Wire, xOf: (place: Place) => number): { out: numbe
  */
 function seat(shelf: Shelf, columns: number, beside: Place[], pieces: Piece[]): void {
   const { places } = shelf
-  const joinedTo = (place: Place): Array<{ other: Place; isUp: boolean }> =>
-    pieces.flatMap(piece => {
-      const slot = piece.upper === place.slot ? piece.lower : piece.lower === place.slot ? piece.upper : undefined
-      const other = beside.find(one => one.slot === slot)
-      return other === undefined ? [] : [{ other, isUp: piece.isUp }]
-    })
+  const placeOf = new Map(beside.map(place => [place.slot, place]))
+  const joins = new Map<Slot, Array<{ other: Place; isUp: boolean }>>()
+  for (const piece of pieces) {
+    for (const [own, far] of [[piece.upper, piece.lower], [piece.lower, piece.upper]] as const) {
+      const other = placeOf.get(far)
+      if (other !== undefined) joins.set(own, [...(joins.get(own) ?? []), { other, isUp: piece.isUp }])
+    }
+  }
+  const joinedTo = (place: Place): Array<{ other: Place; isUp: boolean }> => joins.get(place.slot) ?? []
   const portOf = (place: Place, isUp: boolean): number =>
     columnOf({ place, isAbove: true, port: isUp ? 'side' : 'main' }, place.x) - place.x
   const wanted = places.map(place => {
@@ -351,27 +354,39 @@ function bundlesOf(wires: Wire[]): Bundle[] {
  * may go on a track, the ones that cross the rest least from there go first.
  */
 function tracksOf(bundles: Bundle[], isLoose: boolean): Map<Bundle, number> {
-  const goesAbove = (a: Bundle, b: Bundle): boolean => a.fromAbove.some(column => b.fromBelow.includes(column))
+  const laid = bundles.filter(bundle => isLoose || bundle.isTurning).sort((a, b) => a.start - b.start)
+  const leaving = laid.map(bundle => new Set(bundle.fromBelow))
   const within = (columns: number[], bundle: Bundle): number =>
     columns.filter(column => column > bundle.start && column < bundle.end).length
-  /** How many times the two cross with `a` on the track above `b`. */
-  const crossings = (a: Bundle, b: Bundle): number => within(b.fromAbove, a) + within(a.fromBelow, b)
+  /** For each pair, whether the first asks to go above the second, and how many times they cross if it does. */
+  const asks = laid.map(a => laid.map((_, b) => a.fromAbove.some(column => leaving[b]?.has(column))))
+  const crossings = laid.map(a => laid.map(b => within(b.fromAbove, a) + within(a.fromBelow, b)))
+  const mustFollow = (a: number, b: number): boolean => asks[b]?.[a] === true && asks[a]?.[b] !== true
 
+  const waiting = new Set(laid.keys())
+  const held = laid.map((_, a) => [...waiting].filter(b => b !== a && mustFollow(a, b)).length)
+  const cost = laid.map((_, a) => [...waiting].reduce((sum, b) => sum + (crossings[a]?.[b] ?? 0) - (crossings[b]?.[a] ?? 0), 0))
   const tracks = new Map<Bundle, number>()
-  let waiting = bundles.filter(bundle => isLoose || bundle.isTurning).sort((a, b) => a.start - b.start)
-  for (let track = 0; waiting.length > 0; track += 1) {
-    const isFree = (bundle: Bundle): boolean =>
-      !waiting.some(other => other !== bundle && goesAbove(other, bundle) && !goesAbove(bundle, other))
-    const cost = (bundle: Bundle): number =>
-      waiting.reduce((sum, other) => sum + (other === bundle ? 0 : crossings(bundle, other) - crossings(other, bundle)), 0)
-    const free = waiting.some(isFree) ? waiting.filter(isFree) : waiting.slice(0, 1)
-    const laid: Bundle[] = []
-    for (const bundle of [...free].sort((a, b) => cost(a) - cost(b))) {
-      const isClear = laid.every(other => other.end < bundle.start || bundle.end < other.start)
-      if (laid.length === 0 || (isClear && !isLoose)) laid.push(bundle)
+  for (let track = 0; waiting.size > 0; track += 1) {
+    const free = [...waiting].filter(a => held[a] === 0)
+    const first = [...waiting][0]
+    const row: number[] = []
+    for (const a of (free.length > 0 || first === undefined ? free : [first]).sort((x, y) => (cost[x] ?? 0) - (cost[y] ?? 0) || x - y)) {
+      const [start, end] = [laid[a]?.start ?? 0, laid[a]?.end ?? 0]
+      const isClear = row.every(b => (laid[b]?.end ?? 0) < start || end < (laid[b]?.start ?? 0))
+      if (row.length === 0 || (isClear && !isLoose)) row.push(a)
     }
-    for (const bundle of laid) tracks.set(bundle, track)
-    waiting = waiting.filter(bundle => !laid.includes(bundle))
+    for (const a of row) {
+      const bundle = laid[a]
+      if (bundle !== undefined) tracks.set(bundle, track)
+      waiting.delete(a)
+    }
+    for (const a of row) {
+      for (const b of waiting) {
+        if (mustFollow(b, a)) held[b] = (held[b] ?? 0) - 1
+        cost[b] = (cost[b] ?? 0) - (crossings[b]?.[a] ?? 0) + (crossings[a]?.[b] ?? 0)
+      }
+    }
   }
   return tracks
 }

@@ -39,14 +39,16 @@ export type Room = { columns: number; rows: number }
 /**
  * Where a window `size` long over `total` stands to show `start` to `end`. A
  * window at `from` that already shows them stays there; one that does not
- * moves just far enough to show them and `margin` more on each side. What is
- * longer than the window is shown from its start.
+ * moves just far enough to show them and `margin` more on each side, or as
+ * much of that margin as the window has room for. What is longer than the
+ * window is shown from its start.
  */
 export function reveal(from: number, start: number, end: number, size: number, total: number, margin = 0): number {
   const most = Math.max(0, total - size)
   const at = Math.min(Math.max(Math.round(from), 0), most)
   if (start >= at && end <= at + size) return at
-  const shown = Math.min(Math.max(at, end + margin - size), start - margin)
+  const spare = Math.max(0, Math.min(margin, Math.floor((size - (end - start)) / 2)))
+  const shown = Math.min(Math.max(at, end + spare - size), start - spare)
   return Math.min(Math.max(shown, 0), most)
 }
 

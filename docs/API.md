@@ -48,6 +48,8 @@ A mod runs before the mods it depends on, so its hook is the outer one and graph
 | `select({ pane, node })` | Selects a node. |
 | `key({ pane, key })` | Does nothing. |
 
+A room has at least one cell each way and at most a thousand, whatever is asked: a count that is no number is taken as one. A room narrower than the narrowest a graph is laid out for, `LEAST_COLUMNS` in `graphlet/hooks/layout.ts`, is drawn as that wide. A scroll by what is no number is ignored.
+
 `show` is called on every render. A drawing is only ever of what `show` was last given, so a mod that keeps its graph and its selection in its own state hands them over each time, and a change of either redraws the pane as any change of its state does.
 
 ## The Selection
