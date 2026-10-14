@@ -37,6 +37,16 @@
         "clip"
       ],
       "default": "wrap"
+    },
+    "links": {
+      "type": "string",
+      "title": "Links",
+      "description": "How the links between two layers share the rows there: separate gives each box's links a row of their own wherever they would run into another's; merged runs them all along one row, which is shorter.",
+      "options": [
+        "separate",
+        "merged"
+      ],
+      "default": "separate"
     }
   }
 }
