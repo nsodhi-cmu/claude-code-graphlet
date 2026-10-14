@@ -45,7 +45,7 @@ export function readGraph(graph: GraphletGraph): Graph {
 }
 
 /** Whether a link runs from `from` to `to`. */
-export function isLinked(graph: Graph, from: string, to: string): boolean {
+function isLinked(graph: Graph, from: string, to: string): boolean {
   return graph.links.some(link => link.from === from && link.to === to)
 }
 

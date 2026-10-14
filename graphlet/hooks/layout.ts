@@ -22,8 +22,8 @@ export type Labels = 'wrap' | 'clip'
 
 /**
  * How the links that cross between two shelves share the rows there.
- * `separate`: links that would run into each other get rows of their own, so
- * each can be followed. `merged`: they all turn on one row, which is shorter,
+ * `separate`: one box's links turn on a row of their own wherever they would
+ * run into another's. `merged`: they all turn on one row, which is shorter,
  * and are told apart by selecting a node.
  */
 export type Links = 'separate' | 'merged'
