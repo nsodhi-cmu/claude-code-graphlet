@@ -14,7 +14,7 @@ A box is as wide as its widest line and no narrower than `BOX_COLUMNS`, which le
 
 A link meets a box at one of two ports on the box's top and on its bottom. With the flow, down the drawing, a link leaves a box's bottom and enters a box's top by the main port, in the box's middle. Against the flow it uses the side port, a little to the right. So a link back up arrives beside the links that leave, never on top of them.
 
-A link that crosses a channel leaves its box straight toward the port it is bound for, wherever the box reaches over that port, and else by its own port.
+A link that crosses a channel leaves its box straight toward the port it is bound for, wherever the box reaches over that port clear of its corners, and else by its own port.
 
 ## Shelves
 

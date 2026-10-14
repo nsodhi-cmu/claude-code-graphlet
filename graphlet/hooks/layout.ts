@@ -162,8 +162,8 @@ export function columnOf(end: End, x: number): number {
 /**
  * The column a wire leaves in and the column it arrives in, where `xOf` puts
  * each place. A wire that crosses its channel leaves its box straight toward
- * the port it is bound for where the box reaches over that port, and else by
- * its own port, to turn on its fan's track.
+ * the port it is bound for where the box reaches over that port, clear of
+ * its corners, and else by its own port, to turn on its track.
  */
 export function routeOf(wire: Wire, xOf: (place: Place) => number): { out: number; into: number } {
   const { place } = wire.from
@@ -172,7 +172,7 @@ export function routeOf(wire: Wire, xOf: (place: Place) => number): { out: numbe
   const own = columnOf(wire.from, x)
   if ('lane' in place.slot || wire.from.isAbove === wire.to.isAbove) return { out: own, into }
   const other = columnOf({ ...wire.from, port: wire.from.port === 'main' ? 'side' : 'main' }, x)
-  const isOver = into > x && into < x + place.width - 1 && into !== other
+  const isOver = into > x + 1 && into < x + place.width - 2 && into !== other
   return { out: isOver ? into : own, into }
 }
 

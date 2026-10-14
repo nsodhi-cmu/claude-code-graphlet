@@ -33,8 +33,8 @@ describe('the drawing', () => {
       '                   ▼                  ▼',
       '             ┌───────────┐  ┌──────────────────┐  ┌─────────┐  ┌────────────┐',
       '             │ ● cart.ts │  │ ● src/invoice.ts │  │ ○ ui.ts │  │ ▲ email.ts │',
-      '             └─────┬─────┘  └─────────────────┬┘  └────┬────┘  └──────┬─────┘',
-      '                   └──────────────────────────┼────────┴──────────────┘',
+      '             └─────┬─────┘  └─────────┬────────┘  └────┬────┘  └──────┬─────┘',
+      '                   └──────────────────┴───────┬────────┴──────────────┘',
       '                                              ▼',
       '                                       ┌────────────┐',
       '                                       │ ◆ price.ts │',
@@ -193,10 +193,10 @@ describe('the drawing', () => {
       '          ┌───────┐  ┌──────────────────────────┐',
       '          │ short │  │ a-file-with-a-very-long- │',
       '          └───┬───┘  │ name.component.ts        │',
-      '              │ ▲    └┬─────────────────────────┘',
-      '              │ ┊     │',
-      '              │ └┈┈┈┈┈┼┈┐',
-      '              └───────┤ ┊',
+      '              │ ▲    └─────────────┬────────────┘',
+      '              │ ┊                  │',
+      '              │ └┈┈┈┈┈┈┈┐          │',
+      '              └───────┬─┼──────────┘',
       '                      ▼ ┊',
       '                   ┌────┴┐',
       '                   │ end │',
@@ -297,7 +297,7 @@ describe('what is selected', () => {
     expect(graphRows(drawing).slice(5, 8)).toEqual([
       '             ┌───────────┐  ╔══════════════════╗  ┌─────────┐  ┌────────────┐',
       '             │ ● cart.ts │  ║ ● src/invoice.ts ║  │ ○ ui.ts │  │ ▲ email.ts │',
-      '             └─────┬─────┘  ╚═════════════════╤╝  └────┬────┘  └──────┬─────┘',
+      '             └─────┬─────┘  ╚═════════╤════════╝  └────┬────┘  └──────┬─────┘',
     ])
     expect(spansWith(drawing, '● src/invoice.ts')).toEqual([
       { text: '● src/invoice.ts', paint: 'bad', isBold: true, isInverse: true },
@@ -309,8 +309,8 @@ describe('what is selected', () => {
     expect(drawing.rows[4]?.filter(span => span.text === '▼').map(span => span.paint)).toEqual(['dim', 'accent'])
     expect(drawing.rows[5]?.filter(span => span.text.trim() !== '').map(span => span.paint)).toEqual(['bad', 'accent', 'dim', 'warn'])
     expect(drawing.rows[8]?.filter(span => span.text.trim() !== '').map(span => [span.text.length, span.paint])).toEqual([
-      [27, 'dim'],
-      [1, 'accent'],
+      [19, 'dim'],
+      [9, 'accent'],
       [24, 'dim'],
     ])
     expect(spansWith(drawing, '┌────────────┐').at(-1)?.paint).toBe('accent')
