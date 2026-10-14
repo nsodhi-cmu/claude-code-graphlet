@@ -12,6 +12,9 @@ export const LOOK: Look = { scroll: 'pinned', labels: 'wrap', links: 'separate' 
 export const graphOf = (ids: string[], links: Array<[from: string, to: string]>, rest: Partial<GraphletNode> = {}): Graph =>
   readGraph({ nodes: ids.map(id => ({ id, label: id, ...rest })), links: links.map(([from, to]) => ({ from, to })) })
 
+/** A graph read again with its links undirected. */
+export const undirected = (graph: Graph): Graph => readGraph({ ...graph, isDirected: false })
+
 /** A drawing as the text of its rows. */
 export const picture = (drawing: Drawing): string[] => drawing.rows.map(rowText)
 

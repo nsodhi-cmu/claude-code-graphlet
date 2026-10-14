@@ -6,8 +6,11 @@ import type { GraphletGraph, GraphletLink, GraphletNode, GraphletTone } from '..
 // stretches between it and its neighbors cross as little as an ordering can
 // make them.
 
-/** A graph as it is drawn: every node once, and every link once, between two of its nodes. */
-export type Graph = { nodes: GraphletNode[]; links: GraphletLink[] }
+/**
+ * A graph as it is drawn: every node once, every link once, between two of
+ * its nodes, and whether each link runs from one of them to the other.
+ */
+export type Graph = { nodes: GraphletNode[]; links: GraphletLink[]; isDirected: boolean }
 
 /** How many times the layers are ordered against their neighbors, down and back up, before the best ordering is kept. */
 const SWEEPS = 4
@@ -25,9 +28,10 @@ const tidy = (text: unknown): string =>
 /**
  * Reads a graph leniently: a node needs an id no node before it has, text is
  * made safe to draw, a tone that is none of the tones is dropped, and a link
- * is kept once, where both its ends are nodes. A link from a node to itself
- * is kept, and drawn as a sign on the node. Nodes and links past the most
- * that are read are left out.
+ * is kept once, where both its ends are nodes; in an undirected graph, once
+ * whichever way round it names them. A link from a node to itself is kept,
+ * and drawn as a sign on the node. Nodes and links past the most that are
+ * read are left out. A graph is directed unless it says it is not.
  */
 export function readGraph(graph: GraphletGraph): Graph {
   const nodes: GraphletNode[] = []
@@ -46,13 +50,17 @@ export function readGraph(graph: GraphletGraph): Graph {
       ...(Number.isFinite(node.layer) ? { layer: node.layer } : {}),
     })
   }
+  const isDirected = graph?.isDirected !== false
   const links: GraphletLink[] = []
   for (const link of Array.isArray(graph?.links) ? graph.links : []) {
     if (links.length === MOST_LINKS) break
     if (!ids.has(link?.from) || !ids.has(link?.to)) continue
-    if (!links.some(one => one.from === link.from && one.to === link.to)) links.push({ from: link.from, to: link.to })
+    const isKept = links.some(
+      one => (one.from === link.from && one.to === link.to) || (!isDirected && one.from === link.to && one.to === link.from),
+    )
+    if (!isKept) links.push({ from: link.from, to: link.to })
   }
-  return { nodes, links }
+  return { nodes, links, isDirected }
 }
 
 /** Whether a link runs from `from` to `to`. */
@@ -94,16 +102,41 @@ function packed(ranks: Map<string, number>): Map<string, number> {
 }
 
 /**
+ * How few links apart each node is from the first node the graph names of
+ * those it is joined to, through any others, whichever way the links run.
+ */
+function distancesOf(graph: Graph): Map<string, number> {
+  const distances = new Map<string, number>()
+  for (const start of graph.nodes) {
+    if (distances.has(start.id)) continue
+    distances.set(start.id, 0)
+    const reached = [start.id]
+    for (const id of reached) {
+      for (const link of graph.links) {
+        const other = link.from === id ? link.to : link.to === id ? link.from : undefined
+        if (other === undefined || distances.has(other)) continue
+        distances.set(other, (distances.get(id) ?? 0) + 1)
+        reached.push(other)
+      }
+    }
+  }
+  return distances
+}
+
+/**
  * The layer of each node, 0 the top. Where every node names its layer, those
- * are kept, in their order. Else a node stands one layer under the lowest
- * node that links to it, the links that close a loop read the other way
- * around, and is then moved down toward what it links to wherever that makes
- * more links shorter than longer.
+ * are kept, in their order. Else, in an undirected graph, a node stands as
+ * many layers down as it is links away from the first node the graph names
+ * of those it is joined to. In a directed graph, a node stands one layer
+ * under the lowest node that links to it, the links that close a loop read
+ * the other way around, and is then moved down toward what it links to
+ * wherever that makes more links shorter than longer.
  */
 export function ranksOf(graph: Graph): Map<string, number> {
   if (graph.nodes.every(node => node.layer !== undefined)) {
     return packed(new Map(graph.nodes.map(node => [node.id, node.layer ?? 0])))
   }
+  if (!graph.isDirected) return distancesOf(graph)
   const closing = loopLinks(graph)
   const down = graph.links
     .filter(link => link.from !== link.to)
@@ -207,10 +240,10 @@ export function layersOf(graph: Graph): Layers {
       flats[from]?.push(link)
       continue
     }
-    const isUp = from > to
+    const isUp = graph.isDirected && from > to
     const [first, last] = [Math.min(from, to), Math.max(from, to)]
-    const bottom = slotOf.get(isUp ? link.from : link.to)
-    let upper = slotOf.get(isUp ? link.to : link.from)
+    const bottom = slotOf.get(from > to ? link.from : link.to)
+    let upper = slotOf.get(from > to ? link.to : link.from)
     for (let layer = first; layer < last && upper !== undefined && bottom !== undefined; layer += 1) {
       const lower: Slot = layer + 1 === last ? bottom : { lane: link, isUp }
       if (lower !== bottom) slots[layer + 1]?.push(lower)

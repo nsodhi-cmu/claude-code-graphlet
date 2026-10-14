@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { LOOK, SHOP, graphOf, graphRows, picture } from './fixture'
+import { LOOK, SHOP, graphOf, graphRows, picture, undirected } from './fixture'
 import type { Drawing, Hit, Span } from '../hooks/draw'
 import { readGraph } from '../hooks/layers'
 import type { Graph } from '../hooks/layers'
@@ -319,6 +319,36 @@ describe('the drawing', () => {
       '            └──┬──┘  └──┬──┘',
       '               ├────────┤',
       '               ▼        ▼',
+    ])
+  })
+
+  test('an undirected graph is laid out from the node it names first, a link meets both its boxes at ticks with no arrowhead, and the link that closes a loop runs under a layer', () => {
+    const graph = undirected(graphOf(['a', 'b', 'c', 'd'], [['b', 'a'], ['a', 'c'], ['c', 'b'], ['d', 'c'], ['c', 'd'], ['d', 'd']]))
+    expect(graphRows(drawn(graph))).toEqual([
+      '                 ┌─────┐',
+      '                 │  a  │',
+      '                 └──┬──┘',
+      '               ┌────┴───┐',
+      '            ┌──┴──┐  ┌──┴──┐',
+      '            │  b  │  │  c  │',
+      '            └──┬──┘  └─┬─┬─┘',
+      '               └───────┘ │',
+      '                     ┌───┴──┐',
+      '                     │ d  ↺ │',
+      '                     └──────┘',
+    ])
+  })
+
+  test('in an undirected graph, a link between two nodes of one layer is a line of its own between ticks of its own; merged, it shares the one row', () => {
+    const whole = undirected(graphOf(['a', 'b', 'c', 'd'], [['a', 'b'], ['a', 'c'], ['a', 'd'], ['b', 'c'], ['b', 'd'], ['c', 'd']]))
+    expect(graphRows(drawn(whole)).slice(6)).toEqual([
+      '       └─┬─┬─┘  └─┬─┬─┘  └─┬─┬─┘',
+      '         └─│──────┘ └──────│─┘',
+      '           └───────────────┘',
+    ])
+    expect(graphRows(drawn(whole, null, SMALL, { ...LOOK, links: 'merged' })).slice(6)).toEqual([
+      '       └──┬──┘  └─┬─┬─┘  └──┬──┘',
+      '          └───────┴─┴───────┘',
     ])
   })
 

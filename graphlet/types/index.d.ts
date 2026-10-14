@@ -20,11 +20,19 @@ export type GraphletNode = {
   layer?: number
 }
 
-/** A link from one node to another, by their ids. */
+/** A link between two nodes, by their ids: from one to the other, in a directed graph. */
 export type GraphletLink = { from: string; to: string }
 
-/** A directed graph. Its links may run in a loop. */
-export type GraphletGraph = { nodes: GraphletNode[]; links: GraphletLink[] }
+/** A graph. Its links may run in a loop. */
+export type GraphletGraph = {
+  nodes: GraphletNode[]
+  links: GraphletLink[]
+  /**
+   * Whether each link runs from one node to the other. Left out, it does.
+   * `false`, a link only joins its two nodes, whichever it names first.
+   */
+  isDirected?: boolean
+}
 
 /** A step of the selection, as the arrow keys name it. */
 export type GraphletMove = 'left' | 'right' | 'up' | 'down'

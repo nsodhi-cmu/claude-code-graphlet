@@ -5,11 +5,11 @@ graphlet adds one noun to `$`, `$.graphlet`, in the `engine.create` hook of `gra
 ## A Graph
 
 ```ts
-type GraphletGraph = { nodes: GraphletNode[]; links: GraphletLink[] }
+type GraphletGraph = { nodes: GraphletNode[]; links: GraphletLink[]; isDirected?: boolean }
 type GraphletLink = { from: string; to: string }
 ```
 
-A graph is directed, and its links may run in a loop. A link names its two nodes by their ids.
+A link names its two nodes by their ids, and the links may run in a loop. A graph is directed unless it says `isDirected: false`: then a link only joins its two nodes, whichever it names first, and a link given both ways round is one link. A graph's links are all directed or all undirected.
 
 | Field of a node | What it holds |
 | :- | :- |

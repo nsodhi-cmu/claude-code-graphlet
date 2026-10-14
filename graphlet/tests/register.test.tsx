@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 import type { Engine, Plugin } from 'claude-code/testing'
 import type { On, RenderPropsOf } from 'claude-code'
 
-import { LOOK, SHOP, picture } from './fixture'
+import { LOOK, SHOP, graphOf, picture, undirected } from './fixture'
 import { viewOf } from '../hooks/view'
 
 // The mod through the engine, as another mod uses it: a host says what its
@@ -342,3 +342,32 @@ test('each system\'s opener is tried in turn, and where none opens the page grap
   await pane.unmount()
 })
 
+/** A mod that uses graphlet to show an undirected loop of three in its pane `ring`, and places the drawing as it is handed over. */
+const RING_HOST: Plugin = {
+  name: 'ring-host',
+  tier: 'prepend',
+  register(on) {
+    const RING = {
+      nodes: ['a', 'b', 'c'].map(id => ({ id, label: id })),
+      links: [
+        { from: 'a', to: 'b' },
+        { from: 'b', to: 'c' },
+        { from: 'c', to: 'a' },
+      ],
+      isDirected: false,
+    }
+    on('ui.render', { component: 'Pane', requestId: 'ring' }, async ($, e, next) => {
+      await $.graphlet.show({ pane: 'ring', graph: RING, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
+      return next(e)
+    })
+  },
+}
+
+test('a graph its owner says is undirected reaches graphlet as one, and is drawn with no arrowheads', { plugins: [RING_HOST] }, async ($, on) => {
+  world(on)
+  const pane = await mount($, 'ring')
+  const ring = undirected(graphOf(['a', 'b', 'c'], [['a', 'b'], ['b', 'c'], ['c', 'a']]))
+  expect(await rowsOf(pane)).toEqual(picture(view.draw(ring, 'a', { columns: 90, rows: 40 }, ORIGIN)))
+  expect((await rowsOf(pane)).join('\n')).not.toMatch(/[▲▼]/)
+  await pane.unmount()
+})

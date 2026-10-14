@@ -28,6 +28,26 @@ A drawing is rows of painted text, and the rectangles of them that answer a clic
 - A box has an arrowhead of its own for each set of boxes whose links reach it together, so links from different boxes never run into one line on the way to it.
 - `↺` in a box says the node links to itself.
 
+An undirected graph is drawn the same way, with no arrowheads and no flow:
+
+```
+                 ┌─────┐
+                 │  A  │
+                 └──┬──┘
+               ┌────┴───┐
+            ┌──┴──┐  ┌──┴──┐
+            │  B  │  │  C  │
+            └──┬──┘  └─┬─┬─┘
+               └───────┘ │
+                     ┌───┴──┐
+                     │ D  ↺ │
+                     └──────┘
+```
+
+- A link meets both its boxes at ticks, and every line is solid.
+- A line joins each box whose bottom it meets to each box whose top it meets. A line that meets the bottoms of two boxes of one layer, and nothing else, is the one link between those two: here, the link between B and C that closes the loop.
+- A box has a tick of its own for each set of boxes whose links reach it together, as it would an arrowhead.
+
 ## What Is Selected
 
 The selected node's box has a double frame, and its label is bold and inverse in the node's own tone. Every link that touches the selected node is lit along its whole way, in the theme's accent color, and so are the borders of the boxes at the other ends. Everything else keeps its own paint: a box's border takes its node's tone, and a link is dim.
@@ -52,7 +72,7 @@ The last row of a drawing is its foot. A graph with no nodes has no drawing, and
 
 ## Moving The Selection
 
-`stepIn` says where a move lands. Left and right go along the selected node's shelf, past any lanes. Up and down go to the next shelf: to the node there that a link joins the selected one to, the nearest of them in the window, or with none joined, to the nearest. So the keys reach every node, a shelf at a time. A move with nowhere to go stays where it is.
+`stepIn` says where a move lands. Left and right go along the selected node's shelf, past any lanes. Up and down go to the next shelf: to the node there that a link joins the selected one to, whichever way the link runs, the nearest of them in the window, or with none joined, to the nearest. So the keys reach every node, a shelf at a time. A move with nowhere to go stays where it is.
 
 ## Paints
 

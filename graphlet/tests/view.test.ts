@@ -34,6 +34,7 @@ test('any graph, in any room, under any settings, is drawn inside its room with 
         ...(pick(4) === 0 ? { mark: '◆', badge: String(pick(30)) } : {}),
       })),
       links: Array.from({ length: pick(count * 2 + 1) }, () => ({ from: `n${pick(count)}`, to: `n${pick(count)}` })),
+      isDirected: run % 3 !== 1,
     })
     const view = viewOf(LOOKS[pick(LOOKS.length)] ?? { scroll: 'pinned', labels: 'wrap', links: 'separate' })
     const room = { columns: 40 + pick(140), rows: 2 + pick(50) }

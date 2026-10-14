@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { SHOP, graphOf } from './fixture'
+import { SHOP, graphOf, undirected } from './fixture'
 import { readGraph } from '../hooks/layers'
 import type { Graph } from '../hooks/layers'
 import { pageOf } from '../hooks/page'
@@ -21,11 +21,11 @@ const boxes = (page: string): Box[] =>
 /**
  * A link as a page draws it: where its two ends stand in the graph, whether
  * its line is dashed, its path with the points along it, and the tip of its
- * arrowhead.
+ * arrowhead, where it has one.
  */
 type Drawn = { from: number; to: number; isDashed: boolean; path: string; xs: number[]; ys: number[]; tip: { x: number; y: number } }
 
-const LINK = /<g class="link" data-from="(\d+)" data-to="(\d+)"><path( stroke-dasharray="[^"]*")? d="([^"]*)"\/><polygon points="([^"]*)"\/><\/g>/g
+const LINK = /<g class="link" data-from="(\d+)" data-to="(\d+)"><path( stroke-dasharray="[^"]*")? d="([^"]*)"\/>(?:<polygon points="([^"]*)"\/>)?<\/g>/g
 
 const links = (page: string): Drawn[] =>
   [...page.matchAll(LINK)].map(([, from, to, dashes, path = '', head = '']) => {
@@ -189,6 +189,24 @@ describe('the links of a page', () => {
     expect(loop?.ys[0]).toBeGreaterThan(a.y)
     expect(loop?.tip.y).toBeGreaterThan(loop?.ys[0] ?? NaN)
     expect(loop?.tip.y).toBeLessThan(a.bottom)
+  })
+})
+
+describe('an undirected graph on a page', () => {
+  test('a link has no arrowhead and reaches its boxes, and runs down the page whichever way round it names them', () => {
+    const page = pageOf(undirected(graphOf(['a', 'b', 'c'], [['b', 'a'], ['c', 'b'], ['a', 'c'], ['c', 'c']])), '')
+    const [a, b, c] = boxes(page)
+    const [down, arc, , loop] = links(page)
+    expect(count(page, '<polygon')).toBe(0)
+    expect(links(page).map(link => [link.from, link.to, link.isDashed])).toEqual([
+      [1, 0, false],
+      [2, 1, false],
+      [0, 2, false],
+      [2, 2, false],
+    ])
+    expect([down?.ys[0], down?.ys.at(-1)]).toEqual([a?.bottom, b?.y])
+    expect(arc?.ys.at(-1)).toBe(b?.bottom)
+    expect(loop?.xs.at(-1)).toBe(c?.right)
   })
 })
 

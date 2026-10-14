@@ -35,8 +35,8 @@ graphlet is a Claude Code mod that draws graphs, nodes and the links between the
                                                           html ↗
 ```
 
-- **Any directed graph.** The nodes are laid out in layers down the drawing, along the way the links run. A graph with loops is drawn too: the link that closes a loop runs back up, dashed.
-- **Every link is drawn, and can be followed**, between neighboring layers, past layers, back up, and between two nodes of one layer. One box's links fan out on a row of their own, links from different boxes reach a box at arrowheads of their own, and a link that only crosses another passes over it.
+- **Any graph, directed or not.** The nodes are laid out in layers down the drawing. A directed graph runs along the way its links run, and the link that closes a loop runs back up, dashed. An undirected graph spreads down from the first node it names, and its links have no arrowheads.
+- **Every link is drawn, and can be followed**, between neighboring layers, past layers, back up, and between two nodes of one layer. One box's links fan out on a row of their own, links from different boxes reach a box at arrowheads, or ticks, of their own, and a link that only crosses another passes over it.
 - **It scrolls.** A graph larger than its room is seen through a window that follows the selection, and that the wheel moves.
 - **It answers the mouse and the keyboard.** A click selects a node, the arrow keys move from node to node along the links, and the mod that owns the pane hears each pick.
 - **It is a library, and no more.** It adds no command, starts no agent, and calls no model.
@@ -98,6 +98,8 @@ on('graphlet.select', async ($, e, next) => {
 })
 ```
 
+A graph is directed. Given `isDirected: false`, it is undirected: a link only joins its two nodes, whichever it names first.
+
 While developing, load both from disk: `claude --plugin-dir ./graphlet --plugin-dir ./my-mod`.
 
 [docs/API.md](docs/API.md) has every method, the selection, the keys, and the wheel.
@@ -105,10 +107,10 @@ While developing, load both from disk: `claude --plugin-dir ./graphlet --plugin-
 ## Reading A Graph
 
 - A box is a node. Its label is wrapped onto as many lines as it takes, up to a few.
-- A link leaves a box where its border has a tick, and reaches a box at an arrowhead.
-- A solid line runs with the flow, down the drawing. A dashed line runs against it: the link that closes a loop, on its way back up.
+- A link leaves a box where its border has a tick, and reaches a box at an arrowhead. In an undirected graph there are no arrowheads, and a link meets both its boxes at ticks.
+- A solid line runs with the flow, down the drawing. A dashed line runs against it: the link that closes a loop, on its way back up. An undirected graph has no flow, and every line in it is solid.
 - A line that passes a layer beside its boxes is a link bound for a layer farther on.
-- Lines that meet are joined: they leave the same box, or reach the same box. A link that only crosses another passes over it unbroken.
+- Lines that meet are joined: they leave the same box, or reach the same box. In an undirected graph, a line joins each box whose bottom it meets to each box whose top it meets, and a line that meets the bottoms of two boxes of one layer, and nothing else, joins those two. A link that only crosses another passes over it unbroken.
 - `↺` in a box says the node links to itself.
 - The selected node's box has a double frame, and its links and the boxes they reach are lit.
 
@@ -130,7 +132,7 @@ These are a person's, and hold for every graph any mod draws. They are in `/conf
 | :- | :- |
 | **Scrolling** | How a graph wider than its room scrolls. `pinned` slides the long layers and keeps the ones that fit in view. `sheet` lays every layer on one sheet as wide as the longest, each box by the boxes it is linked to, and moves the sheet whole. |
 | **Long labels** | What becomes of a label too long for one line of its box. `wrap` breaks it onto more lines. `clip` keeps it to one, cut in the middle. |
-| **Links** | How the links between two layers share the rows there. `separate` gives each box's links a row of their own wherever they would run into another's, and each box an arrowhead for each set of boxes whose links reach it. `merged` runs them all along one row into one arrowhead a box, which is shorter; selecting a node shows which links are its own. |
+| **Links** | How the links between two layers share the rows there. `separate` gives each box's links a row of their own wherever they would run into another's, and each box an arrowhead, or in an undirected graph a tick, for each set of boxes whose links reach it. `merged` runs them all along one row, into one arrowhead or tick where they reach a box, which is shorter; selecting a node shows which links are its own. |
 
 ## How It Works
 
@@ -164,7 +166,7 @@ It reads no file, stores nothing between sessions, calls no model, and makes no 
 
 - It draws in the terminal only.
 - Layers run top to bottom only.
-- Links have a direction. A graph with none is drawn as if each link ran the way it was given.
+- A graph's links are all directed or all undirected. One graph cannot mix the two.
 - A pane holds one graph, of at most 500 nodes and 500 links. What is past those is left out.
 - Where the links between two layers are too tangled to be kept apart, two of them may share a stretch of line. Selecting a node lights its own.
 - A label is drawn one cell a character, so a label written in characters two cells wide pushes its row out of line.

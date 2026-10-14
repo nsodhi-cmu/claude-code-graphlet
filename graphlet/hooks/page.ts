@@ -149,8 +149,12 @@ type Point = { x: number; y: number }
  */
 type Spot = { slot: Slot; layer: number; x: number; y: number; width: number; height: number; lines: string[] }
 
-/** A link as it is drawn: the path of its shaft, the corners of the head at its end, and whether it runs back up. */
-type Arrow = { path: string; head: string; isUp: boolean }
+/**
+ * A link as it is drawn: the path of its shaft, the point where it reaches
+ * its box and the way it is going there, a step of one across, down, or up,
+ * and whether it runs back up.
+ */
+type Arrow = { path: string; tip: Point; way: Point; isUp: boolean }
 
 const widthOf = (text: string): number => [...text].length * CHAR_WIDTH
 
@@ -210,11 +214,12 @@ function headOf(tip: Point, way: Point): string {
 
 /**
  * A link between two layers: a curve across each gap between two layers, and
- * straight along each lane it has in the layers it passes. Down the page it
- * leaves the bottom of a box and reaches the top of one, by their middles;
- * back up it does the reverse, by the ports beside them.
+ * straight along each lane it has in the layers it passes, stopping `short`
+ * of its box. Down the page it leaves the bottom of a box and reaches the top
+ * of one, by their middles; back up it does the reverse, by the ports beside
+ * them.
  */
-function runOf(from: Spot, lanes: Spot[], to: Spot, isUp: boolean): Arrow {
+function runOf(from: Spot, lanes: Spot[], to: Spot, isUp: boolean, short: number): Arrow {
   const way = isUp ? -1 : 1
   const port = isUp ? PORT_STEP : 0
   const nearOf = (spot: Spot): number => (isUp ? spot.y + spot.height : spot.y)
@@ -226,33 +231,41 @@ function runOf(from: Spot, lanes: Spot[], to: Spot, isUp: boolean): Arrow {
     path += `${curveOf(at, { x: middleOf(lane), y: nearOf(lane) })}L${middleOf(lane)},${farOf(lane)}`
     at = { x: middleOf(lane), y: farOf(lane) }
   }
-  path += curveOf(at, { x: tip.x, y: tip.y - way * HEAD.length })
-  return { path, head: headOf(tip, { x: 0, y: way }), isUp }
+  path += curveOf(at, { x: tip.x, y: tip.y - way * short })
+  return { path, tip, way: { x: 0, y: way }, isUp }
 }
 
-/** A link between two nodes of one layer: an arc under the layer, out of the middle of the first box's bottom and up into the port beside the second's. */
-function arcOf(from: Spot, to: Spot): Arrow {
+/** A link between two nodes of one layer: an arc under the layer, out of the middle of the first box's bottom and up into the port beside the second's, stopping `short` of it. */
+function arcOf(from: Spot, to: Spot, short: number): Arrow {
   const y = from.y + from.height
   const [out, into] = [middleOf(from), middleOf(to) + PORT_STEP]
-  const path = `M${out},${y}C${out},${y + ARC_DEPTH} ${into},${y + ARC_DEPTH} ${into},${y + HEAD.length}`
-  return { path, head: headOf({ x: into, y }, { x: 0, y: -1 }), isUp: false }
+  const path = `M${out},${y}C${out},${y + ARC_DEPTH} ${into},${y + ARC_DEPTH} ${into},${y + short}`
+  return { path, tip: { x: into, y }, way: { x: 0, y: -1 }, isUp: false }
 }
 
-/** A link from a node to itself: a loop out of the right side of its box and back into it. */
-function loopOf(spot: Spot): Arrow {
+/** A link from a node to itself: a loop out of the right side of its box and back into it, stopping `short` of it. */
+function loopOf(spot: Spot, short: number): Arrow {
   const x = spot.x + spot.width
   const [out, into] = [spot.y + (spot.height - LOOP.span) / 2, spot.y + (spot.height + LOOP.span) / 2]
-  const path = `M${x},${out}C${x + LOOP.reach},${out} ${x + LOOP.reach},${into} ${x + HEAD.length},${into}`
-  return { path, head: headOf({ x, y: into }, { x: -1, y: 0 }), isUp: false }
+  const path = `M${x},${out}C${x + LOOP.reach},${out} ${x + LOOP.reach},${into} ${x + short},${into}`
+  return { path, tip: { x, y: into }, way: { x: -1, y: 0 }, isUp: false }
 }
 
-/** A link as it is drawn between the boxes of its two ends: a loop, an arc, or a run through its lanes in the order it passes them. */
-function arrowOf(link: GraphletLink, from: Spot, to: Spot, spots: Spot[]): Arrow {
-  if (from === to) return loopOf(from)
-  if (from.layer === to.layer) return arcOf(from, to)
+/**
+ * A link as it is drawn between the boxes of its two ends: a loop, an arc, or
+ * a run through its lanes in the order it passes them. In a directed graph
+ * its shaft stops short of its box by the length of an arrowhead; in an
+ * undirected one it reaches the box, and runs down the page whichever way
+ * round it names its ends.
+ */
+function arrowOf(link: GraphletLink, from: Spot, to: Spot, spots: Spot[], isDirected: boolean): Arrow {
+  const short = isDirected ? HEAD.length : 0
+  if (from === to) return loopOf(from, short)
+  if (from.layer === to.layer) return arcOf(from, to, short)
   const isUp = from.layer > to.layer
   const lanes = spots.filter(spot => 'lane' in spot.slot && spot.slot.lane === link)
-  return runOf(from, isUp ? lanes.toReversed() : lanes, to, isUp)
+  if (isUp && !isDirected) return runOf(to, lanes, from, false, short)
+  return runOf(from, isUp ? lanes.toReversed() : lanes, to, isUp, short)
 }
 
 /** A node as it is drawn: its box in its tone, and in it its mark, the lines of its label, and its badge. */
@@ -270,7 +283,11 @@ function boxOf(node: GraphletNode, spot: Spot): string {
   return `<g class="node ${tone}" tabindex="0">${box}<text>${lines.join('')}</text></g>`
 }
 
-/** The drawing: every link, each naming its two ends by their places in the graph, and over them every node, in the graph's order. */
+/**
+ * The drawing: every link, each naming its two ends by their places in the
+ * graph and with an arrowhead where the graph is directed, and over them
+ * every node, in the graph's order.
+ */
 function drawingOf(graph: Graph): string {
   const spots = spotsOf(layersOf(graph).slots)
   const places = new Map<string, { index: number; spot: Spot }>()
@@ -281,10 +298,11 @@ function drawingOf(graph: Graph): string {
   const links = graph.links.flatMap(link => {
     const [from, to] = [places.get(link.from), places.get(link.to)]
     if (from === undefined || to === undefined) return []
-    const arrow = arrowOf(link, from.spot, to.spot, spots)
+    const arrow = arrowOf(link, from.spot, to.spot, spots, graph.isDirected)
     const dashes = arrow.isUp ? ` stroke-dasharray="${DASHES}"` : ''
     const ends = `data-from="${from.index}" data-to="${to.index}"`
-    return [`<g class="link" ${ends}><path${dashes} d="${arrow.path}"/><polygon points="${arrow.head}"/></g>`]
+    const head = graph.isDirected ? `<polygon points="${headOf(arrow.tip, arrow.way)}"/>` : ''
+    return [`<g class="link" ${ends}><path${dashes} d="${arrow.path}"/>${head}</g>`]
   })
   const nodes = graph.nodes.flatMap(node => {
     const place = places.get(node.id)

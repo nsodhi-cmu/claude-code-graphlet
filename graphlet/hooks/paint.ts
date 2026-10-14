@@ -116,11 +116,13 @@ type Mark = { ways: number; isLit: boolean; isSolid: boolean }
 /**
  * Paints the wires of one channel. A wire goes from the border it leaves to
  * its track, along it, and on to the border it reaches, or straight across
- * where it leaves and arrives in one column. A wire against the flow is
- * dashed, what touches the selected node is lit over what does not, and a
- * wire to a place out of the window runs off the window's edge. Wires of one
- * bundle that meet are joined, in a tee or a cross; a wire that only crosses
- * another bundle's passes over it unbroken, and breaks the line it crosses.
+ * where it leaves and arrives in one column. A border shows a tick where a
+ * wire leaves it, and where one with no arrowhead reaches it. A wire against
+ * the flow is dashed, what touches the selected node is lit over what does
+ * not, and a wire to a place out of the window runs off the window's edge.
+ * Wires of one bundle that meet are joined, in a tee or a cross; a wire that
+ * only crosses another bundle's passes over it unbroken, and breaks the line
+ * it crosses.
  */
 function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Channel, selected: string | null, seen: Seen): void {
   const first = seen.yOf(channel.top)
@@ -156,20 +158,24 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
     for (let x = Math.max(left, 0); x <= Math.min(right, seen.columns - 1); x += 1) {
       draw(x, turn, (x > left ? LEFT : 0) | (x < right ? RIGHT : 0))
     }
+    /** Marks where the wire meets a box's border, at `x` on the border's row `y`. */
+    const tick = ({ place, isAbove }: End, x: number, y: number): void => {
+      if ('lane' in place.slot) return
+      const frame = place.slot.node.id === selected ? FRAMES.selected : FRAMES.plain
+      const key = `${x},${y}`
+      exits.set(key, {
+        char: isAbove ? frame.exits.below : frame.exits.above,
+        isLit: isLit || (exits.get(key)?.isLit ?? false),
+        paint: borderOf(graph, place, selected),
+      })
+    }
+    tick(wire.from, out, start)
     if (wire.hasHead) {
       const key = `${into},${wire.to.isAbove ? end + 1 : end - 1}`
       heads.set(key, { char: wire.to.isAbove ? '▲' : '▼', isLit: isLit || (heads.get(key)?.isLit ?? false) })
+    } else {
+      tick(wire.to, into, end)
     }
-
-    const { place } = wire.from
-    if ('lane' in place.slot) continue
-    const frame = place.slot.node.id === selected ? FRAMES.selected : FRAMES.plain
-    const key = `${out},${start}`
-    exits.set(key, {
-      char: wire.from.isAbove ? frame.exits.below : frame.exits.above,
-      isLit: isLit || (exits.get(key)?.isLit ?? false),
-      paint: borderOf(graph, place, selected),
-    })
   }
 
   for (const [key, exit] of exits) {

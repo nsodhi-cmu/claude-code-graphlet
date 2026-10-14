@@ -284,6 +284,14 @@ describe('moving the selection', () => {
     expect(walk(passed, WHOLE, ORIGIN, 'A', 'down', 'down')).toBe('C')
   })
 
+  test('in an undirected graph, a step follows a link whichever way round it names its nodes, past a nearer node it does not join', () => {
+    const nodes = [...['p', 'q', 't'].map(id => ({ id, label: id, layer: 0 })), { id: 'r', label: 'r', layer: 1 }]
+    for (const [one, other] of [[['r', 'p'], ['t', 'r']], [['p', 'r'], ['r', 't']]] as const) {
+      const graph = readGraph({ nodes, links: [one, other].map(([from, to]) => ({ from, to })), isDirected: false })
+      expect(walk(graph, WHOLE, ORIGIN, 'r', 'up')).toBe('p')
+    }
+  })
+
   test('with nothing selected, there is nowhere to move from', () => {
     expect(pinned.step(SHOP, null, 'down', WHOLE, ORIGIN)).toBeNull()
   })

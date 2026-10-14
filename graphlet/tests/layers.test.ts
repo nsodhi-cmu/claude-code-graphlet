@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { graphOf } from './fixture'
+import { graphOf, undirected } from './fixture'
 import { layersOf, loopLinks, ranksOf, readGraph } from '../hooks/layers'
 import type { Graph, Slot } from '../hooks/layers'
 
@@ -52,8 +52,18 @@ describe('reading a graph', () => {
   })
 
   test('what is no graph at all reads as an empty one', () => {
-    expect(readGraph(undefined as never)).toEqual({ nodes: [], links: [] })
-    expect(readGraph({ nodes: 'many', links: null } as never)).toEqual({ nodes: [], links: [] })
+    expect(readGraph(undefined as never)).toEqual({ nodes: [], links: [], isDirected: true })
+    expect(readGraph({ nodes: 'many', links: null } as never)).toEqual({ nodes: [], links: [], isDirected: true })
+  })
+
+  test('a graph is directed unless it says it is not, and an undirected one keeps a link once whichever way round it names its nodes', () => {
+    const nodes = [{ id: 'a', label: 'a' }, { id: 'b', label: 'b' }]
+    const links = [{ from: 'a', to: 'b' }, { from: 'b', to: 'a' }, { from: 'b', to: 'b' }]
+    expect(readGraph({ nodes, links, isDirected: 'no' as never })).toMatchObject({ links, isDirected: true })
+    expect(readGraph({ nodes, links, isDirected: false })).toMatchObject({
+      links: [{ from: 'a', to: 'b' }, { from: 'b', to: 'b' }],
+      isDirected: false,
+    })
   })
 })
 
@@ -137,6 +147,26 @@ describe('layers', () => {
     expect(layers(graph)).toEqual([
       ['top1', 'top2'],
       ['y', 'x'],
+    ])
+  })
+
+  test('an undirected graph stands each node as many layers down as it is links from the first node of its part, so a loop closes under a layer and nothing runs back up', () => {
+    const graph = undirected(graphOf(['a', 'b', 'c', 'd', 'e', 'x', 'y'], [['c', 'b'], ['b', 'a'], ['d', 'c'], ['a', 'e'], ['e', 'd'], ['y', 'x']]))
+    expect(layers(graph)).toEqual([['a', 'x'], ['b', 'e', 'y'], ['c', 'd']])
+    expect(layersOf(graph).flats).toEqual([[], [], [{ from: 'd', to: 'c' }]])
+    expect(layersOf(graph).pieces.flat().filter(piece => piece.isUp)).toEqual([])
+  })
+
+  test('in an undirected graph, a link across layers the nodes name runs down its lanes from whichever end stands higher', () => {
+    const graph = readGraph({
+      nodes: ['a', 'b', 'c'].map((id, layer) => ({ id, label: id, layer })),
+      links: [{ from: 'c', to: 'a' }],
+      isDirected: false,
+    })
+    expect(layers(graph)).toEqual([['a'], ['b', 'c→a'], ['c']])
+    expect(layersOf(graph).pieces.flat().map(piece => [named(piece.upper), named(piece.lower), piece.isUp])).toEqual([
+      ['a', 'c→a', false],
+      ['c→a', 'c', false],
     ])
   })
 
