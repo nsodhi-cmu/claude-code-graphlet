@@ -69,7 +69,15 @@ A mod that says which node is selected hears each pick the same way, and the dra
 
 ## Keys And The Wheel
 
-The graph is drawn by a surface module, the only kind of element that receives arrow keys, and it receives keys only after a click on it. While it has the keyboard, graphlet moves the selection on the arrows and on `h` `j` `k` `l`, and calls `$.graphlet.key` with every other key. That method does nothing: a mod with keys of its own hooks `graphlet.key` to answer them.
+The graph is drawn by a surface module, the only kind of element that receives arrow keys, and it receives keys only after a click on it. While it has the keyboard, graphlet answers these keys itself:
+
+| Key | What it does |
+| :- | :- |
+| arrows, `h` `j` `k` `l` | Moves the selection. |
+| `f` | Draws the graph in focus on the selected node, or draws it all again. |
+| `/` | Starts finding a node by its label. While finding, what is typed is what is looked for, the selection goes to the first node found, return goes to the next, and backspace takes back what was typed, or with nothing typed, stops finding. A click on a box stops it too. |
+
+It calls `$.graphlet.key` with every other key, and with no key typed while finding. That method does nothing: a mod with keys of its own hooks `graphlet.key` to answer them.
 
 A turn of the wheel is not a key or a click. It reaches the pane, as `ui.scroll`, and the pane's owner passes it on:
 

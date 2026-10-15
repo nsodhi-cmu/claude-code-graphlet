@@ -105,7 +105,7 @@ const PAGE_LABELS = ['html ↗', '↗']
 const CORNER_GAP = 2
 
 /** How many of a graph's nodes and links were left out, said in full and said short: nothing where none were. */
-function unsaid(unread: { nodes: number; links: number }): string[] {
+export function leftOut(unread: { nodes: number; links: number }): string[] {
   const many = (count: number, what: string): string[] => (count === 0 ? [] : [`${count} ${what}${count === 1 ? '' : 's'}`])
   const told = [...many(unread.nodes, 'node'), ...many(unread.links, 'link')]
   return told.length === 0 ? [] : [`${told.join(' and ')} left out`, told.map(one => `+${one}`).join(' ')]
@@ -113,20 +113,14 @@ function unsaid(unread: { nodes: number; links: number }): string[] {
 
 /**
  * The last row of a drawing: the counts of what is out of view, when
- * anything is, then how much of the graph was left out, when any was, and in
- * its right corner what a click opens the graph as a web page by. What was
- * left out is said short where the row has no room to say it in full, and
- * keeps its place over the corner's words.
+ * anything is, then a note, when there is one, as of what was left out of the
+ * graph, and in its right corner what a click opens the graph as a web page
+ * by. The note is said as the longest of its `notes` the row has room for,
+ * and keeps its place over the corner's words.
  */
-export function footRow(
-  beyond: Beyond | undefined,
-  columns: number,
-  page: Pan,
-  y: number,
-  unread = { nodes: 0, links: 0 },
-): { row: Span[]; hits: Hit[] } {
+export function footRow(beyond: Beyond | undefined, columns: number, page: Pan, y: number, notes: string[] = []): { row: Span[]; hits: Hit[] } {
   const none = { left: 0, right: 0, above: 0, below: 0 }
-  for (const note of [...unsaid(unread), '']) {
+  for (const note of [...notes, '']) {
     for (const label of PAGE_LABELS) {
       const tail = note === '' ? label : `${note}${' '.repeat(CORNER_GAP)}${label}`
       const room = columns - tail.length - CORNER_GAP

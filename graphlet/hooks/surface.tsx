@@ -16,7 +16,7 @@ const Surface: ClientModule<Drawing> = (drawing, surface) => {
     )
     if (hit !== undefined) surface.post('node' in hit ? { node: hit.node } : 'by' in hit ? { by: hit.by } : { page: true })
   })
-  surface.onKey(event => surface.post({ key: event.key }))
+  surface.onKey(event => surface.post({ key: event.key, ...(event.ctrl === true || event.meta === true ? { isChord: true } : {}) }))
   return (
     <Box flexDirection="column">
       {drawing.rows.map(row => (

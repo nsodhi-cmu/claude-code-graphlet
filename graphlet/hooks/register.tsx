@@ -1,16 +1,16 @@
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Graphlet } from '../types'
-import { styleOf } from './draw'
+import { charactersOf, styleOf } from './draw'
 import type { Drawing, Pan, Room } from './draw'
 import { readGraph } from './layers'
 import type { Graph } from './layers'
 import { pageOf } from './page'
 import { GUIDE, fencedOf, partsOf, pictureOf } from './reply'
-import { MOVES, viewOf } from './view'
+import { MOVES, focusOf, viewOf } from './view'
 
-/** What a pane holds, as it was last drawn: the graph, the room it was given, the selected node, and where its window stood. */
-type Held = { graph: Graph; room: Room; selected: string | null; pan: Pan; drawing: Drawing }
+/** What a pane holds, as it was last drawn: the graph it was given, the graph as drawn, the room, the selected node, and where its window stood. */
+type Held = { whole: Graph; graph: Graph; room: Room; selected: string | null; pan: Pan; drawing: Drawing }
 
 const ORIGIN: Pan = { x: 0, y: 0 }
 
@@ -19,6 +19,14 @@ const held = new Map<string, Held>()
 const picked = new Map<string, string>()
 /** Where the person scrolled each pane's window to. A pane is missing while its window follows the selection. */
 const scrolled = new Map<string, Pan>()
+/** The panes whose graph is drawn in focus on the selected node. */
+const focused = new Set<string>()
+/** What the person is typing to find, in each pane where they are finding a node. */
+const finding = new Map<string, string>()
+
+/** The nodes whose labels hold what is being found, in the graph's order: none while nothing is typed. */
+const foundIn = (graph: Graph, query: string): string[] =>
+  query.trim() === '' ? [] : graph.nodes.filter(node => node.label.toLowerCase().includes(query.trim().toLowerCase())).map(node => node.id)
 /**
  * How graphs are drawn: as the plugin's options say, in a pane, and in a
  * reply folded into the room it has, with its links kept separate, since
@@ -97,9 +105,11 @@ export const register: Register = (on, options) => {
         const selected = graph.nodes.find(node => node.id === wanted)?.id ?? graph.nodes[0]?.id ?? null
         const before = held.get(input.pane)
         if (before?.selected !== selected) scrolled.delete(input.pane)
-        const pan = scrolled.get(input.pane) ?? view.show(graph, selected, room, before?.pan ?? ORIGIN)
-        const drawing = view.draw(graph, selected, room, pan)
-        held.set(input.pane, { graph, room, selected, pan, drawing })
+        const drawn = focused.has(input.pane) ? focusOf(graph, selected) : graph
+        const query = finding.get(input.pane)
+        const pan = scrolled.get(input.pane) ?? view.show(drawn, selected, room, before?.pan ?? ORIGIN)
+        const drawing = view.draw(drawn, selected, room, pan, query === undefined ? undefined : { query, found: foundIn(graph, query) })
+        held.set(input.pane, { whole: graph, graph: drawn, room, selected, pan, drawing })
         return { rows: drawing.rows.length, selected }
       },
       step: async input => {
@@ -173,13 +183,39 @@ export const register: Register = (on, options) => {
     const at = held.get(e.requestId)
     if (at === undefined || typeof e.data !== 'object' || e.data === null) return next(e)
     const pane = e.requestId
-    const { node, by, key, page } = e.data as { node?: unknown; by?: unknown; key?: unknown; page?: unknown }
+    const { node, by, key, page, isChord } = e.data as { node?: unknown; by?: unknown; key?: unknown; page?: unknown; isChord?: unknown }
+    const query = finding.get(pane)
+    const typed = key === 'space' ? ' ' : typeof key === 'string' && isChord !== true && charactersOf(key).length === 1 ? key : undefined
+    /** Selects a node, where it is one and not the selected one already, and draws the pane again either way. */
+    const pick = async (to: string | undefined): Promise<void> => {
+      if (to !== undefined && to !== at.selected) await $.graphlet.select({ pane, node: to })
+      else $.ui.invalidate('ui.render')
+    }
     if (typeof node === 'string') {
+      finding.delete(pane)
       await $.graphlet.select({ pane, node })
     } else if (isPan(by)) {
       await $.graphlet.scroll({ pane, by })
     } else if (page === true) {
-      await openPage($, pane, at.graph)
+      await openPage($, pane, at.whole)
+    } else if (query !== undefined && key === 'backspace' && query === '') {
+      finding.delete(pane)
+      $.ui.invalidate('ui.render')
+    } else if (query !== undefined && (typed !== undefined || key === 'backspace')) {
+      const asked = typed === undefined ? charactersOf(query).slice(0, -1).join('') : `${query}${typed}`
+      finding.set(pane, asked)
+      await pick(foundIn(at.whole, asked)[0])
+    } else if (query !== undefined && key === 'return') {
+      const found = foundIn(at.whole, query)
+      await pick(found[(found.indexOf(at.selected ?? '') + 1) % Math.max(found.length, 1)])
+    } else if (key === '/') {
+      finding.set(pane, '')
+      $.ui.invalidate('ui.render')
+    } else if (key === 'f') {
+      if (focused.has(pane)) focused.delete(pane)
+      else focused.add(pane)
+      scrolled.delete(pane)
+      $.ui.invalidate('ui.render')
     } else if (typeof key === 'string') {
       const move = MOVES[key]
       const to = move === undefined ? null : view.step(at.graph, at.selected, move, at.room, at.pan)

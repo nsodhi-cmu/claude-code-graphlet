@@ -5,7 +5,7 @@ import type { GraphletMove } from '../types'
 import { rowText, sizeOf } from '../hooks/draw'
 import { readGraph } from '../hooks/layers'
 import type { Look } from '../hooks/layout'
-import { MOVES, viewOf } from '../hooks/view'
+import { FOCUS_NODES, MOVES, focusOf, viewOf } from '../hooks/view'
 
 const LABELS = ['a', 'node', 'src/some/long/path/to/file.component.ts', 'Validate the incoming request', 'x-y_z.w', '', '数据库连接池', '✅ 完成']
 const LOOKS: Look[] = (['pinned', 'sheet'] as const).flatMap(scroll =>
@@ -63,3 +63,19 @@ test('the letters under the arrows move as the arrows do', () => {
   }
   expect(MOVES.t).toBeUndefined()
 })
+
+test('in focus, a graph is its selected node and those nearest it, of nodes as near the ones named first, each saying how many of its links lead out of focus', () => {
+  const ids = Array.from({ length: 30 }, (_, index) => `n${index}`)
+  const chain = readGraph({
+    nodes: [...ids.map(id => ({ id, label: id })), { id: 'far', label: 'far', badge: '2' }],
+    links: [...ids.slice(1).map((id, index) => ({ from: ids[index] ?? '', to: id })), { from: 'n29', to: 'far' }],
+  })
+  const focused = focusOf(chain, 'n10')
+  expect(focused.nodes.map(node => node.id)).toEqual(ids.slice(0, FOCUS_NODES))
+  expect(focused.nodes.find(node => node.id === 'n23')?.badge).toBe('+1')
+  expect(focused.nodes.find(node => node.id === 'n10')?.badge).toBeUndefined()
+  expect(focused.unread).toEqual({ nodes: 31 - FOCUS_NODES, links: 30 - (FOCUS_NODES - 1) })
+  expect(focusOf(chain, null)).toBe(chain)
+  expect(focusOf(chain, 'nowhere')).toBe(chain)
+})
+

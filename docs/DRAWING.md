@@ -100,6 +100,14 @@ A still picture in a reply keeps the counts and what was left out, and drops the
 
 `stepIn` says where a move lands. Left and right go along the selected node's shelf, past any lanes. Up and down go to the next shelf: to the node there that a link joins the selected one to, whichever way the link runs, the nearest of them in the window, or with none joined, to the nearest. So the keys reach every node, a shelf at a time. A move with nowhere to go stays where it is.
 
+## Focus
+
+`focusOf` in `view.ts` is a graph in focus on its selected node: that node and the nodes nearest it, by the fewest links between whichever way they run, up to `FOCUS_NODES`, and of nodes as near, those the graph names first; with the links among them. A node shown that is joined to nodes not shown says how many after its badge, `+3`, and what is not shown is counted as left out, so the foot says how much is out of focus. A graph no larger than that is drawn whole. A pane in focus draws the graph in focus on whichever node is selected, so the focus follows the selection.
+
+## Finding
+
+While a node is being found, the nodes whose labels hold what is typed, in any case, are found, in the graph's order. Their boxes have their borders in `note`, over their own tone and under the light of the selection, and the foot says what is looked for and which of the found the selected node is, `/pars · 2 of 5`, or `no match`. Nodes are found in the whole graph, in focus or not, and selecting one out of focus moves the focus to it.
+
 ## Paints
 
 A run of text is in one paint: a node's tone, or `accent` for what is selected or linked to it. `COLORS` in `draw.ts` gives each paint a key of the person's theme, so a drawing follows the theme they chose, and `styleOf` turns a run into the props of the `Text` that paints it.

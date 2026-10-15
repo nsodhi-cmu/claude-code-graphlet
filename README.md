@@ -136,6 +136,11 @@ While developing, load both from disk: `claude --plugin-dir ./graphlet --plugin-
 
 A click on a box selects its node. Once the graph has been clicked it has the keyboard, and the arrow keys, or `h` `j` `k` `l`, move the selection: left and right along a layer, up and down along a link.
 
+A graph too large to take in has two more keys:
+
+- `f` draws it in focus on the selected node: that node and the nodes nearest it, as many as a pane shows whole, each saying how many of its links lead out of focus, `+3`. The focus follows the selection, and `f` again draws the whole graph.
+- `/` finds a node by its label as it is typed. The nodes found have their borders lit, the selection goes to the first of them, and return goes to the next; the row under the graph says what is looked for and which of the found is selected, `/pars · 2 of 5`. Backspace takes back what was typed, and with nothing typed stops finding.
+
 ### A Graph Larger Than Its Room
 
 The nodes of a layer keep one order, whatever is selected. A layer longer than the room runs off its edge, a box the edge cuts ends in an ellipsis, and the last row counts the nodes out of view on each side. The graph scrolls when the selection moves out of view, and no farther than it takes to show the selected node and the start of the one past it. The wheel scrolls it without moving the selection, and so does a click on one of the counts.

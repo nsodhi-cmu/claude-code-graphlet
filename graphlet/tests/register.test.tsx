@@ -64,6 +64,14 @@ const HOST: Plugin = {
       $.ui.invalidate('ui.render')
       return { element: e.element }
     })
+    const HUB = {
+      nodes: [{ id: 'hub', label: 'hub' }, ...Array.from({ length: 40 }, (_, index) => ({ id: `leaf${index}`, label: `leaf${index}` }))],
+      links: Array.from({ length: 40 }, (_, index) => ({ from: 'hub', to: `leaf${index}` })),
+    }
+    on('ui.render', { component: 'Pane', requestId: 'big' }, async ($, e, next) => {
+      await $.graphlet.show({ pane: 'big', graph: HUB, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
+      return next(e)
+    })
     on('ui.render', { component: 'Pane' }, async ($, e, next) => {
       if (e.requestId !== 'free' && e.requestId !== 'held') return next(e)
       const { Box, Text, Button } = $.ui.resolve(e)
@@ -247,6 +255,50 @@ test('a click on a count scrolls the graph and selects nothing; the window stays
   await pane.key({ key: 'left', in: 'graph' })
   expect((await said(pane)).shown.selected).toBe('src/cart.ts')
   expect((await rowsOf(pane)).at(-1)).toStartWith('                            2 more →')
+  await pane.unmount()
+})
+
+test('/ finds a node by its label as it is typed: the selection goes to the first found and return to the next, and what is typed there is not the owner\'s', WITH_HOST, async ($, on) => {
+  world(on)
+  const pane = await mount($, 'free')
+  await click(pane, boxOf('src/email.ts'))
+  for (const key of ['/', 'i', 'n']) await pane.key({ key, in: 'graph' })
+  await pane.redraw()
+  expect((await said(pane)).shown.selected).toBe('src/invoice.ts')
+  expect((await rowsOf(pane)).at(-1)).toContain('/in · 1 of 2')
+  await pane.key({ key: 'return', in: 'graph' })
+  await pane.redraw()
+  expect((await said(pane)).shown.selected).toBe('src/pages/invoice.ts')
+  expect((await rowsOf(pane)).at(-1)).toContain('/in · 2 of 2')
+  for (const key of ['backspace', 'backspace', 'backspace', 't']) await pane.key({ key, in: 'graph' })
+  await pane.redraw()
+  expect((await rowsOf(pane)).at(-1)).not.toContain('/')
+  expect((await said(pane)).heard).toEqual([
+    'select free src/email.ts',
+    'select free src/price.ts',
+    'select free src/invoice.ts',
+    'select free src/pages/invoice.ts',
+    'select free src/price.ts',
+    'key free t',
+  ])
+  await pane.unmount()
+})
+
+test('f draws the graph in focus on the selected node and its nearest, each saying how many of its links lead out of focus, and f again draws it all', WITH_HOST, async ($, on) => {
+  world(on)
+  const pane = await mount($, 'big')
+  await pane.pointer({ type: 'down', x: 0, y: 0, button: 'left', in: 'graph' })
+  await pane.key({ key: 'f', in: 'graph' })
+  await pane.redraw()
+  const focused = (await rowsOf(pane)).join('\n')
+  expect(focused).toContain('hub  +17')
+  expect(focused).toContain('17 nodes and 17 links left out')
+  await pane.key({ key: 'f', in: 'graph' })
+  await pane.redraw()
+  const whole = (await rowsOf(pane)).join('\n')
+  expect(whole).toContain('║ hub ║')
+  expect(whole).not.toContain('+17')
+  expect(whole).not.toContain('left out')
   await pane.unmount()
 })
 

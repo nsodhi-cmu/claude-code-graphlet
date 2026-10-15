@@ -1,4 +1,4 @@
-import { canvasOf, footRow, sizeOf, spansOf } from './draw'
+import { canvasOf, footRow, leftOut, sizeOf, spansOf } from './draw'
 import type { Canvas, Drawing, Hit, Paint, Pan, Room } from './draw'
 import { isJoined } from './layers'
 import type { Graph } from './layers'
@@ -25,9 +25,14 @@ type Seen = { xOf: (place: Place) => number; yOf: (row: number) => number; colum
 
 const idOf = (place: Place): string | null => ('node' in place.slot ? place.slot.node.id : null)
 
-function borderOf(graph: Graph, place: Place, selected: string | null): Paint {
+/** What is being looked for in a graph, and the nodes whose labels hold it, in the graph's order. */
+export type Finding = { query: string; found: string[] }
+
+/** The paint of a box's border: lit where it is the selected node's or one linked to it, else `note` where its node was found, else its tone. */
+function borderOf(graph: Graph, place: Place, selected: string | null, found: Set<string>): Paint {
   const id = idOf(place)
   if (id !== null && selected !== null && (id === selected || isJoined(graph, id, selected))) return 'accent'
+  if (id !== null && found.has(id)) return 'note'
   const tone = ('node' in place.slot ? place.slot.node.tone : undefined) ?? 'plain'
   return tone === 'plain' ? 'dim' : tone
 }
@@ -38,7 +43,7 @@ function borderOf(graph: Graph, place: Place, selected: string | null): Paint {
  * box as the window shows. A box the window's edge cuts ends there in an
  * ellipsis.
  */
-function paintShelf(canvas: Canvas, graph: Graph, shelf: Shelf, selected: string | null, seen: Seen): Hit[] {
+function paintShelf(canvas: Canvas, graph: Graph, shelf: Shelf, selected: string | null, seen: Seen, found: Set<string>): Hit[] {
   const hits: Hit[] = []
   const top = seen.yOf(shelf.top)
   for (const place of shelf.places) {
@@ -53,7 +58,7 @@ function paintShelf(canvas: Canvas, graph: Graph, shelf: Shelf, selected: string
     const words = place.words ?? { mark: '', lines: [], badge: '' }
     const isSelected = node.id === selected
     const frame = isSelected ? FRAMES.selected : FRAMES.plain
-    const border = { paint: borderOf(graph, place, selected) }
+    const border = { paint: borderOf(graph, place, selected, found) }
     const [topLeft = '', topRight = '', bottomLeft = '', bottomRight = ''] = frame.corners
     const bar = frame.across.repeat(place.width - 2)
     canvas.put(left, top, `${topLeft}${bar}${topRight}`, border)
@@ -179,7 +184,7 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
       exits.set(key, {
         char: isAbove ? frame.exits.below : frame.exits.above,
         isLit: isLit || (exits.get(key)?.isLit ?? false),
-        paint: borderOf(graph, place, selected),
+        paint: borderOf(graph, place, selected, new Set()),
       })
     }
     tick(wire.from, out, start)
@@ -227,11 +232,14 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
  * window together, each as far as its own end, and the wires between two
  * shelves that have slid apart are given their tracks again as they now
  * stand. A channel the window shows nothing of, nor of either shelf beside
- * it, is passed over. The last row is the foot: it
- * counts the nodes out of view of a graph larger than the room, and holds
- * the corner a click opens the graph as a web page by.
+ * it, is passed over. Where something is being found, the boxes of the nodes
+ * found have their borders in `note`. The last row is the foot: it counts the
+ * nodes out of view of a graph larger than the room, says what is being
+ * found and which of the found the selected node is, or else what was left
+ * out of the graph, and holds the corner a click opens the graph as a web
+ * page by.
  */
-export function paint(layout: Layout, graph: Graph, selected: string | null, room: Room, pan: Pan): Drawing {
+export function paint(layout: Layout, graph: Graph, selected: string | null, room: Room, pan: Pan, finding?: Finding): Drawing {
   if (layout.shelves.length === 0) return { rows: [], hits: [] }
   const sight = sightOf(layout, room)
   const at = within(pan, sight.most)
@@ -243,7 +251,8 @@ export function paint(layout: Layout, graph: Graph, selected: string | null, roo
     rows: sight.rows,
   }
 
-  const hits = layout.shelves.flatMap(shelf => paintShelf(canvas, graph, shelf, selected, seen))
+  const found = new Set(finding?.found)
+  const hits = layout.shelves.flatMap(shelf => paintShelf(canvas, graph, shelf, selected, seen, found))
   const isInView = (top: number, rows: number): boolean => seen.yOf(top) < seen.rows && seen.yOf(top + rows) > 0
   layout.channels.forEach((channel, index) => {
     const [above, below] = [layout.shelves[index], layout.shelves[index + 1]]
@@ -264,6 +273,11 @@ export function paint(layout: Layout, graph: Graph, selected: string | null, roo
     below: boxes.filter(box => box.y + box.rows > sight.rows).length,
   }
   const page = { x: Math.max(1, layout.columns - PAGE_OVERLAP.x), y: Math.max(1, sight.rows - PAGE_OVERLAP.y) }
-  const foot = footRow(sight.isWhole ? undefined : beyond, layout.columns, page, rows.length, graph.unread)
+  const which = finding === undefined ? -1 : finding.found.indexOf(selected ?? '')
+  const notes =
+    finding === undefined
+      ? leftOut(graph.unread)
+      : [`/${finding.query} · ${finding.found.length === 0 ? 'no match' : `${Math.max(which, 0) + 1} of ${finding.found.length}`}`, `/${finding.query}`]
+  const foot = footRow(sight.isWhole ? undefined : beyond, layout.columns, page, rows.length, notes)
   return { rows: [...rows, foot.row], hits: [...hits, ...foot.hits] }
 }
