@@ -147,7 +147,7 @@ The nodes of a layer keep one order, whatever is selected. A layer longer than t
 
 ### As A Web Page
 
-A click on `html ↗`, in the corner under a graph, writes the graph out as one web page and opens it in the browser: the same layers, with every link drawn and a node's links lit as the pointer passes over it. The page is a single file with nothing fetched from the network.
+A click on `html ↗`, in the corner under a graph, writes the graph out as one web page and opens it in the browser: the same layers, with every link drawn and a node's links lit as the pointer passes over it. The page opens with the whole graph in view; the wheel zooms in around the pointer, and a drag moves it, so a graph too large for any terminal can be explored there. The page is a single file with nothing fetched from the network.
 
 ## Settings
 

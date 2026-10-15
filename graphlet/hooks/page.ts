@@ -44,8 +44,11 @@ const DASHES = '5 4'
 const ARC_DEPTH = 40
 /** How far out of its box's side a node's link to itself is pulled, and how far apart its two ends are. */
 const LOOP = { reach: 30, span: 16 }
-/** The least a drawing wider than the window is shrunk to, before it scrolls instead. */
-const LEAST_SCALE = 0.7
+
+/** How fast the wheel zooms: the drawing grows by e to the power of this times the pixels a turn of the wheel scrolls. */
+const ZOOM_RATE = 0.0015
+/** The most the wheel zooms the drawing in: this many times its own size. */
+const MOST_ZOOM = 4
 
 /** The tones a node may be drawn in, each a class of the page's style. One the page does not know is drawn plain. */
 const TONES: readonly GraphletTone[] = ['plain', 'dim', 'note', 'good', 'warn', 'bad']
@@ -81,11 +84,13 @@ const STYLE = `
     --bad: #f0736c;
   }
 }
-body { margin: 0; padding: 32px; background: var(--page); color: var(--ink); font: ${FONT_SIZE}px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+html { height: 100%; }
+body { box-sizing: border-box; height: 100%; display: flex; flex-direction: column; margin: 0; padding: 32px; background: var(--page); color: var(--ink); font: ${FONT_SIZE}px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
 h1 { margin: 0 0 24px; font-size: ${FONT_SIZE}px; font-weight: 600; color: var(--soft); }
 p { margin: 0; color: var(--soft); }
-main { overflow-x: auto; }
-svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+main { flex: 1; min-height: 0; }
+svg { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; cursor: grab; }
+svg.held { cursor: grabbing; }
 text { text-anchor: middle; fill: var(--ink); }
 .node, .link { transition: opacity 0.15s; }
 .node { outline: none; cursor: default; }
@@ -109,13 +114,64 @@ text { text-anchor: middle; fill: var(--ink); }
 `
 
 /**
- * What the page does: a node under the pointer, or else the one with the
+ * What the page does. A node under the pointer, or else the one with the
  * focus, is lit with its links and the nodes at their other ends, and the
- * rest is quieted. A node is known by its place among the page's nodes,
- * which is its place in the graph.
+ * rest is quieted; a node is known by its place among the page's nodes,
+ * which is its place in the graph. The drawing fills the window, whole and
+ * at most at its own size; the wheel zooms it in and out around the pointer,
+ * from whole to `MOST_ZOOM` times its size, a drag moves it, as far as
+ * leaves half the window on it, and a double click, or a new size of the
+ * window, shows it whole again.
  */
 const SCRIPT = `
 const svg = document.querySelector('svg')
+const whole = { width: svg.viewBox.baseVal.width, height: svg.viewBox.baseVal.height }
+let view = { x: 0, y: 0, width: whole.width, height: whole.height }
+let fitted = view
+const show = () => svg.setAttribute('viewBox', [view.x, view.y, view.width, view.height].join(' '))
+const kept = next => ({
+  ...next,
+  x: Math.min(Math.max(next.x, -next.width / 2), whole.width - next.width / 2),
+  y: Math.min(Math.max(next.y, -next.height / 2), whole.height - next.height / 2),
+})
+const fit = () => {
+  const room = svg.getBoundingClientRect()
+  const scale = Math.min(1, room.width / whole.width, room.height / whole.height)
+  const [width, height] = [room.width / scale, room.height / scale]
+  fitted = view = { x: (whole.width - width) / 2, y: 0, width, height }
+  show()
+}
+svg.addEventListener('wheel', event => {
+  event.preventDefault()
+  const room = svg.getBoundingClientRect()
+  const at = { x: view.x + ((event.clientX - room.left) / room.width) * view.width, y: view.y + ((event.clientY - room.top) / room.height) * view.height }
+  const width = Math.min(Math.max(view.width * Math.exp(event.deltaY * ${ZOOM_RATE}), room.width / ${MOST_ZOOM}), fitted.width)
+  const by = width / view.width
+  view = width === fitted.width ? fitted : kept({ x: at.x - (at.x - view.x) * by, y: at.y - (at.y - view.y) * by, width, height: view.height * by })
+  show()
+}, { passive: false })
+let held = null
+svg.addEventListener('pointerdown', event => {
+  if (event.button !== 0) return
+  held = { x: event.clientX, y: event.clientY, from: view }
+  svg.setPointerCapture(event.pointerId)
+  svg.classList.add('held')
+})
+svg.addEventListener('pointermove', event => {
+  if (held === null) return
+  const per = view.width / svg.getBoundingClientRect().width
+  view = kept({ ...held.from, x: held.from.x - (event.clientX - held.x) * per, y: held.from.y - (event.clientY - held.y) * per })
+  show()
+})
+const drop = () => {
+  held = null
+  svg.classList.remove('held')
+}
+svg.addEventListener('pointerup', drop)
+svg.addEventListener('pointercancel', drop)
+svg.addEventListener('dblclick', fit)
+window.addEventListener('resize', fit)
+fit()
 const nodes = [...svg.querySelectorAll('.node')]
 const links = [...svg.querySelectorAll('.link')]
 const light = node => {
@@ -332,8 +388,7 @@ function drawingOf(graph: Graph): string {
   })
   const width = Math.max(...spots.map(spot => spot.x + spot.width)) + MARGIN
   const height = Math.max(...spots.map(spot => spot.y + spot.height)) + MARGIN
-  const sizes = `viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" style="min-width:${Math.round(width * LEAST_SCALE)}px"`
-  return `<svg ${sizes}>\n${[...links, ...nodes].join('\n')}\n</svg>`
+  return `<svg viewBox="0 0 ${width} ${height}">\n${[...links, ...nodes].join('\n')}\n</svg>`
 }
 
 /** The graph as a web page: one self-contained HTML document. */

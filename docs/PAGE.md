@@ -13,7 +13,9 @@ A click on `html ↗`, in the corner of a drawing's [foot](DRAWING.md#the-foot),
 - A link's label, cut as the terminal cuts it, is written on its first stretch, at the middle of the curve out of the box it leaves, over a halo of the page's own color so the line under it does not cut it. Where it would stand over a label written before it, it is moved down, a line at a time, until it does not. A link from a node to itself has no label written.
 - A node under the pointer, or with the keyboard's focus, is lit with its links and the nodes at their other ends, and the rest is quieted.
 
-The colors are set once, for a light scheme and for a dark one, and the browser picks by the person's own setting. The drawing shrinks to fit a narrower window, down to a point, and then scrolls.
+The colors are set once, for a light scheme and for a dark one, and the browser picks by the person's own setting.
+
+The drawing fills the window under the title, and opens whole: shrunk to fit where it is larger than the window, and at its own size where it is not, never larger. The wheel zooms it around the pointer, out as far as whole and in as far as `MOST_ZOOM` times its own size, and a pinch on a trackpad does the same. A drag moves it, as far as leaves half the window on the drawing. A double click shows it whole again, and so does a new size of the window.
 
 The document is one file and fetches nothing: its style and its few lines of script are inline. Everything a graph says is escaped before it is written, and a node is named in the page only by its place in the graph, never by its id.
 
