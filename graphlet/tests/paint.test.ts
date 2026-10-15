@@ -606,6 +606,16 @@ describe('what the window does not show', () => {
     expect(boxes(payments).slice(0, 2).map(hit => hit.node)).toEqual(['Checkout', 'Ledger'])
   })
 
+  test('a box the edge cuts down to its border and an ellipsis shows none of its label, and its node is named', () => {
+    const shorter = graphOf(
+      ['Checkout', 'Car', 'Payments', 'Shipping', 'Receipts', 'Ledger'],
+      [['Checkout', 'Car'], ['Checkout', 'Payments'], ['Checkout', 'Shipping'], ['Checkout', 'Receipts'], ['Payments', 'Ledger'], ['Receipts', 'Ledger']],
+    )
+    const view = viewOf(LOOK)
+    const rows = graphRows(view.draw(shorter, 'Checkout', room, view.show(shorter, 'Checkout', room, ORIGIN)))
+    expect(rows.filter(row => row.endsWith('│ …') || row.endsWith('Receipts ▸'))).toHaveLength(2)
+  })
+
   test('a node the window shows, and any node while the selected one is out of view, is not named', () => {
     expect(boxes(viewOf(LOOK).draw(graph, 'Payments', WHOLE, ORIGIN)).map(hit => hit.node)).toEqual(graph.nodes.map(node => node.id))
     expect(boxes(viewOf(LOOK).draw(graph, 'Ledger', room, ORIGIN)).map(hit => hit.node)).toEqual(['Checkout', 'Cart', 'Payments', 'Shipping', 'Receipts'])

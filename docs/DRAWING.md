@@ -93,9 +93,9 @@ A graph larger than its room is seen through a window, and never laid out again 
 
 ## Names At The Edge
 
-While the window shows the selected node's label, each node joined to it whose label the window does not show is named at the window's edge, after an arrow pointing out toward it: `◂ cart.ts` down the first column and `cart.ts ▸` down the last, for a box off to that side, on the row of its label; `▴ cart.ts` along the top row and `▾ cart.ts` along the bottom, for a box above or below, under or over its middle. A name is lit, as the node's box would be, and a click on it selects the node, which moves the window to it.
+While the window shows the selected node's label, each node joined to it whose label the window does not show, apart from the ellipsis of a box the edge cuts, is named at the window's edge, after an arrow pointing out toward it: `◂ cart.ts` down the first column and `cart.ts ▸` down the last, for a box off to that side, on the row of its label; `▴ cart.ts` along the top row and `▾ cart.ts` along the bottom, for a box above or below, under or over its middle. A name is lit, as the node's box would be, and a click on it selects the node, which moves the window to it.
 
-A name covers only lines and blanks, never a box or a lit line, and has a blank on either side. The names at the sides are written first. A name with no room where it belongs goes to the nearest place along its edge that has room, and one with none is not written; the lit line still leads to the node, and the foot still counts it.
+A name covers only lines, arrowheads and blanks, never a box or anything lit, and has a blank on either side. The names at the sides are written first. A name with no room where it belongs goes to the nearest place along its edge that has room, and one with none is not written; the lit line still leads to the node, and the foot still counts it.
 
 ## The Foot
 

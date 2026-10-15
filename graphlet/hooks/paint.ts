@@ -30,6 +30,13 @@ type Box = { place: Place; x: number; y: number; rows: number }
 
 const idOf = (place: Place): string | null => ('node' in place.slot ? place.slot.node.id : null)
 
+/** How far a box's label stands in from its border and the space after it, so that its widest line, with the badge after the last, is in the box's middle. */
+function insetOf(place: Place): number {
+  const words = place.words ?? { mark: '', lines: [], badge: '' }
+  const widest = Math.max(...words.lines.map((line, index) => sizeOf(line) + (index === words.lines.length - 1 ? sizeOf(words.badge) : 0)))
+  return Math.floor((place.width - 4 - sizeOf(words.mark) - widest) / 2)
+}
+
 /** The beat of a cell of a flowing line, by how far along the way the line runs the cell stands: its row or column, counted the way the line goes. */
 const beatOf = (along: number): number => ((along % BEATS) + BEATS) % BEATS
 
@@ -76,10 +83,7 @@ function paintShelf(canvas: Canvas, graph: Graph, shelf: Shelf, selected: string
     canvas.put(left, top, `${topLeft}${bar}${topRight}`, border)
     canvas.put(left, top + place.rows - 1, `${bottomLeft}${bar}${bottomRight}`, border)
     const text = { paint: node.tone ?? 'plain', ...(isSelected ? { isBold: true as const, isInverse: true as const } : {}) }
-    const widest = Math.max(
-      ...words.lines.map((line, index) => sizeOf(line) + (index === words.lines.length - 1 ? sizeOf(words.badge) : 0)),
-    )
-    const inset = Math.floor((place.width - 4 - sizeOf(words.mark) - widest) / 2)
+    const inset = insetOf(place)
     for (let row = 1; row < place.rows - 1; row += 1) {
       canvas.put(left, top + row, frame.down, border)
       canvas.put(left + place.width - 1, top + row, frame.down, border)
@@ -262,7 +266,13 @@ const EDGES = { top: '▴', bottom: '▾', left: '◂', right: '▸' } as const
  * node.
  */
 function paintSigns(canvas: Canvas, graph: Graph, boxes: Box[], selected: string | null, seen: Seen): Hit[] {
-  const isShown = (box: Box): boolean => box.y + 1 >= 0 && box.y + 1 < seen.rows && box.x + 2 < seen.columns && box.x + box.place.width - 2 > 0
+  /** Whether the window shows some of a box's label, apart from the first and last columns, where a box the edge cuts ends in an ellipsis. */
+  const isShown = (box: Box): boolean => {
+    const words = box.place.words ?? { mark: '', lines: [], badge: '' }
+    const start = box.x + 2 + insetOf(box.place)
+    const end = start + sizeOf(words.mark) + sizeOf(words.lines[0] ?? '')
+    return box.y + 1 >= 0 && box.y + 1 < seen.rows && start < seen.columns - 1 && end > 1
+  }
   const from = boxes.find(box => idOf(box.place) === selected)
   if (selected === null || from === undefined || !isShown(from)) return []
   const signs = boxes.flatMap(box => {

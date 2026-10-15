@@ -59,8 +59,9 @@ export const GAP = 2
 export const LEAST_COLUMNS = 40
 /** How many times a folded layout that its boxes' ports still make wider than its room is folded again, narrower by as much as it overflowed. */
 const REFOLDS = 2
-/** The most nodes a graph is folded into its room for: folding more takes long, and makes a picture longer than a reply can hold. */
+/** The most nodes, and the most links, a graph is folded into its room for: folding more takes long, and makes a picture longer than a reply can hold. */
 const FOLDED_NODES = 60
+const FOLDED_LINKS = 120
 /** How far apart two ports of one face of a box are. */
 const PORT_STEP = 2
 /** The characters a long word may be broken after with nothing lost. */
@@ -688,7 +689,7 @@ export function layTracks(channel: Channel, xOf: (place: Place) => number, under
  * a node and a column and the room beside it a lane; where the boxes' ports
  * then make a shelf wider than the room after all, it is folded again into
  * less room, as long as that makes it narrower. A graph of more than
- * `FOLDED_NODES` nodes is laid out unfolded. Every face of every box
+ * `FOLDED_NODES` nodes or `FOLDED_LINKS` links is laid out unfolded. Every face of every box
  * is dealt its ports. The longest shelf is seated first, in the middle of
  * what it is laid out across, then each other shelf against the one nearer it
  * where the two are laid out across the same columns. Pinned, that is the
@@ -698,7 +699,7 @@ export function layTracks(channel: Channel, xOf: (place: Place) => number, under
  */
 export function layoutOf(graph: Graph, room: Room, look: Look, fold = false): Layout {
   const columns = Math.max(room.columns, LEAST_COLUMNS)
-  if (!fold || graph.nodes.length > FOLDED_NODES) return laidOut(graph, columns, look)
+  if (!fold || graph.nodes.length > FOLDED_NODES || graph.links.length > FOLDED_LINKS) return laidOut(graph, columns, look)
   const widestOf = (layout: Layout): number => Math.max(0, ...layout.shelves.map(shelf => shelf.width))
   let [into, layout] = [columns, laidOut(graph, columns, look, columns)]
   for (let tries = 0; tries < REFOLDS && widestOf(layout) > columns; tries += 1) {

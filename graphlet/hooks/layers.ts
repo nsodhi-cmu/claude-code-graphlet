@@ -277,13 +277,14 @@ export type Fold = { columns: number; widthOf: (node: GraphletNode) => number; g
  * at a time, from the top down, until it fits, has one node left, or giving
  * up none of those left would make it narrower, the lanes its links would
  * take past the layer being as wide as the box. A node given up goes into the
- * layer under its own, and takes down with it every node that must stay
- * under it: one it is joined to that stood lower than it, and so on from
- * there; where the layers were named, every node of the layers under its
- * own. The node given up first is the one whose links would add fewest lanes
- * past the layer, then the one joined to fewest nodes above it, then one that
- * takes no node down with it, then the one the graph names last, so that the
- * layer keeps the nodes named first. In a directed graph a node that links
+ * layer under its own, and takes down with it the nodes that must stay under
+ * it: one joined to it that stood lower than it and would now stand no lower,
+ * and so on from there. Where the layers were named, every node of the layers
+ * under its own goes down with it, but for a node that takes none down, which
+ * sinks alone. The node given up first is the one whose links would add
+ * fewest lanes past the layer, then the one with fewest links to nodes above
+ * it, then one that takes no node down with it, then the one the graph names
+ * last, so that the layer keeps the nodes named first. In a directed graph a node that links
  * to a node of its own layer stays, so that no link turns back up for the
  * fold.
  */
