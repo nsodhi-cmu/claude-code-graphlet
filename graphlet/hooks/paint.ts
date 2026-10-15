@@ -66,8 +66,9 @@ function paintShelf(canvas: Canvas, graph: Graph, shelf: Shelf, selected: string
     const left = seen.xOf(place)
     if ('lane' in place.slot) {
       const { lane, isUp } = place.slot
-      const isLit = lane.some(link => link.from === selected || link.to === selected)
-      const flows = isLit && motion !== null && lane.every(motion.isOneWay)
+      const lit = lane.filter(link => link.from === selected || link.to === selected)
+      const isLit = lit.length > 0
+      const flows = isLit && motion !== null && lit.some(motion.isOneWay)
       const pulses = isLit && motion !== null && !flows
       for (let row = 0; row < shelf.rows; row += 1) {
         const y = top + row
@@ -344,7 +345,8 @@ function paintSigns(canvas: Canvas, graph: Graph, boxes: Box[], selected: string
  * found have their borders in `note`. The nodes joined to the selected one
  * that the window does not show are named at its edge. Where the lines are to
  * move, each cell of a lit line of a link that runs one way, and has none
- * running back, has its beat; each cell of any other lit line pulses. The last
+ * running back, has its beat, and a lit lane has where any lit link it
+ * carries does; each cell of any other lit line pulses. The last
  * row is the foot: it counts the nodes out of view of a graph larger than the
  * room, says what is being found and which of the found the selected node is,
  * or else what was left out of the graph, and holds the corner a click opens

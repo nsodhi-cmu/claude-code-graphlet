@@ -23,8 +23,8 @@ export type Labels = 'wrap' | 'clip'
 /**
  * How the links that cross between two shelves share the rows there.
  * `separate`: one box's links turn on a row of their own wherever they would
- * run into another's. `merged`: they all turn on one row, which is shorter,
- * and are told apart by selecting a node.
+ * run into another's. `merged`: those of one kind turn on one row, which is
+ * shorter, and are told apart by selecting a node.
  */
 export type Links = 'separate' | 'merged'
 
@@ -161,7 +161,7 @@ export type End = { place: Place; isAbove: boolean; at: number }
 /**
  * A link's stretch across one channel, from the place it leaves to the place
  * it reaches, with an arrowhead there where that place is the link's own end
- * and the graph is directed. One that `isUp` runs against the flow. Where it
+ * and the link runs one way. One that `isUp` runs against the flow. Where it
  * does not go straight across, it turns on the row of the channel that is its
  * `track`, and where its bundle runs on two tracks, steps across to the
  * other at its `jog`. It keeps `clearOf` the other ports of the face it

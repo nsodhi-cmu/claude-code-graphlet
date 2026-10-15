@@ -34,7 +34,7 @@ const GAP = { x: 36, y: 72 }
 const MARGIN = 40
 /** How far from a box's middle the port of the links that run back up is. */
 const PORT_STEP = 12
-/** How far beside the first of them each further link between the same two boxes, of the same kind, runs. */
+/** How far beside the first of them each further link between the same two boxes, running the same way down or up the page, runs. */
 const TWIN_STEP = 10
 /** How far apart two links' labels stand, one under the other, where they would stand over each other. */
 const LABEL_STEP = BADGE_SIZE + 4
@@ -284,11 +284,11 @@ function headOf(tip: Point, way: Point): string {
  * straight along each lane it has in the layers it passes, stopping `short`
  * of its box. Down the page it leaves the bottom of a box and reaches the top
  * of one, by their middles; back up it does the reverse, by the ports beside
- * them; and either way `aside` farther left.
+ * them; and `aside` farther out, down to the left and back up to the right.
  */
 function runOf(from: Spot, lanes: Spot[], to: Spot, isUp: boolean, short: number, aside: number): Arrow {
   const way = isUp ? -1 : 1
-  const port = (isUp ? PORT_STEP : 0) - aside
+  const port = isUp ? PORT_STEP + aside : -aside
   const nearOf = (spot: Spot): number => (isUp ? spot.y + spot.height : spot.y)
   const farOf = (spot: Spot): number => (isUp ? spot.y : spot.y + spot.height)
   const tip = { x: middleOf(to) + port, y: nearOf(to) }
@@ -304,20 +304,20 @@ function runOf(from: Spot, lanes: Spot[], to: Spot, isUp: boolean, short: number
   return { path, tip, way: { x: 0, y: way }, middle, isUp }
 }
 
-/** A link between two nodes of one layer: an arc under the layer, out of the middle of the first box's bottom and up into the port beside the second's, stopping `short` of it. */
-function arcOf(from: Spot, to: Spot, short: number): Arrow {
-  const y = from.y + from.height
+/** A link between two nodes of one layer: an arc under the layer, `aside` deeper, out of the middle of the first box's bottom and up into the port beside the second's, stopping `short` of it. */
+function arcOf(from: Spot, to: Spot, short: number, aside: number): Arrow {
+  const [y, depth] = [from.y + from.height, ARC_DEPTH + aside]
   const [out, into] = [middleOf(from), middleOf(to) + PORT_STEP]
-  const path = `M${out},${y}C${out},${y + ARC_DEPTH} ${into},${y + ARC_DEPTH} ${into},${y + short}`
-  return { path, tip: { x: into, y }, way: { x: 0, y: -1 }, middle: { x: (out + into) / 2, y: y + ARC_DEPTH * 0.75 }, isUp: false }
+  const path = `M${out},${y}C${out},${y + depth} ${into},${y + depth} ${into},${y + short}`
+  return { path, tip: { x: into, y }, way: { x: 0, y: -1 }, middle: { x: (out + into) / 2, y: y + depth * 0.75 }, isUp: false }
 }
 
-/** A link from a node to itself: a loop out of the right side of its box and back into it, stopping `short` of it. */
-function loopOf(spot: Spot, short: number): Arrow {
-  const x = spot.x + spot.width
+/** A link from a node to itself: a loop out of the right side of its box, reaching `aside` farther, and back into it, stopping `short` of it. */
+function loopOf(spot: Spot, short: number, aside: number): Arrow {
+  const [x, reach] = [spot.x + spot.width, LOOP.reach + aside]
   const [out, into] = [spot.y + (spot.height - LOOP.span) / 2, spot.y + (spot.height + LOOP.span) / 2]
-  const path = `M${x},${out}C${x + LOOP.reach},${out} ${x + LOOP.reach},${into} ${x + short},${into}`
-  return { path, tip: { x, y: into }, way: { x: -1, y: 0 }, middle: { x: x + LOOP.reach * 0.75, y: (out + into) / 2 }, isUp: false }
+  const path = `M${x},${out}C${x + reach},${out} ${x + reach},${into} ${x + short},${into}`
+  return { path, tip: { x, y: into }, way: { x: -1, y: 0 }, middle: { x: x + reach * 0.75, y: (out + into) / 2 }, isUp: false }
 }
 
 /**
@@ -330,8 +330,8 @@ function loopOf(spot: Spot, short: number): Arrow {
 function arrowOf(link: Link, from: Spot, to: Spot, spots: Spot[], aside: number): Arrow {
   const { isDirected } = link
   const short = isDirected ? HEAD.length : 0
-  if (from === to) return loopOf(from, short)
-  if (from.layer === to.layer) return arcOf(from, to, short)
+  if (from === to) return loopOf(from, short, aside)
+  if (from.layer === to.layer) return arcOf(from, to, short, aside)
   const isUp = from.layer > to.layer
   const lanes = spots.filter(spot => 'lane' in spot.slot && spot.slot.lane.includes(link))
   if (isUp && !isDirected) return runOf(to, lanes, from, false, short, aside)
@@ -358,9 +358,9 @@ function boxOf(node: GraphletNode, spot: Spot): string {
  * graph, with an arrowhead where it runs one way and its label, cut as the
  * terminal cuts it, written on its first stretch, and moved down past any
  * label written there before it; and over them every node, in the graph's
- * order. A link between the same two boxes as one before it, of the same
- * kind, runs `TWIN_STEP` farther aside for each. A link from a node to
- * itself has no label written, as in the terminal.
+ * order. A link between the same two boxes as one before it, running the
+ * same way, down the page or up it, runs `TWIN_STEP` farther aside for each.
+ * A link from a node to itself has no label written, as in the terminal.
  */
 function drawingOf(graph: Graph): string {
   const spots = spotsOf(layersOf(graph).slots)
@@ -372,7 +372,8 @@ function drawingOf(graph: Graph): string {
   const twins = new Map<string, number>()
   const drawn = graph.links.flatMap(link => {
     const [from, to] = [places.get(link.from), places.get(link.to)]
-    const pair = JSON.stringify([link.isDirected, ...(link.isDirected ? [link.from, link.to] : [link.from, link.to].sort())])
+    const isUp = link.isDirected && (from?.spot.layer ?? 0) > (to?.spot.layer ?? 0)
+    const pair = JSON.stringify([isUp, ...[link.from, link.to].sort()])
     const twin = twins.get(pair) ?? 0
     twins.set(pair, twin + 1)
     return from === undefined || to === undefined ? [] : [{ link, from, to, arrow: arrowOf(link, from.spot, to.spot, spots, twin * TWIN_STEP) }]

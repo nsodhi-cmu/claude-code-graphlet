@@ -256,6 +256,22 @@ describe('links between the same two nodes on a page', () => {
     expect((first[0] ?? 0) - (second[0] ?? 0)).toBeGreaterThan(0)
     expect([first[1], first.at(-1)]).toEqual([second[1], second.at(-1)])
   })
+
+  test('a link of each kind between the same two boxes, twins between boxes of one layer, and twins that run back up all run apart, the ones back up on the far side', () => {
+    const pathsOf = (graph: Graph): number[][] => [...pageOf(graph, '').matchAll(/<g class="link"[^>]*><path(?: stroke-dasharray="[^"]*")? d="([^"]*)"/g)].map(([, path = '']) => numbers(path))
+    const [one, none] = pathsOf(readGraph({ nodes: ['a', 'b'].map(id => ({ id, label: id })), links: [{ from: 'a', to: 'b' }, { from: 'a', to: 'b', isDirected: false }] }))
+    expect(one).not.toEqual(none)
+    const flat = readGraph({ nodes: ['a', 'b'].map(id => ({ id, label: id, layer: 0 })), links: [{ from: 'a', to: 'b', label: 'x' }, { from: 'a', to: 'b', label: 'y' }] })
+    const [x, y] = pathsOf(flat)
+    expect(x).not.toEqual(y)
+    const [p = [], q = [], r = [], s = []] = pathsOf(
+      readGraph({
+        nodes: ['a', 'b'].map(id => ({ id, label: id })),
+        links: [{ from: 'a', to: 'b', label: 'p' }, { from: 'a', to: 'b', label: 'q' }, { from: 'b', to: 'a', label: 'r' }, { from: 'b', to: 'a', label: 's' }],
+      }),
+    )
+    expect(Math.min(r[0] ?? 0, s[0] ?? 0) - Math.max(p[0] ?? 0, q[0] ?? 0)).toBeGreaterThanOrEqual(12)
+  })
 })
 
 describe('the page as a document', () => {

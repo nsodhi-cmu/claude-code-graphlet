@@ -194,6 +194,27 @@ describe('layers', () => {
     expect(layersOf(graph).pieces.flat().filter(piece => piece.isUp)).toEqual([])
   })
 
+  test('a link with no direction never closes a loop, so it never turns a link that runs one way back up', () => {
+    const graph = readGraph({ nodes: ['b', 'c', 'a'].map(id => ({ id, label: id })), links: [{ from: 'a', to: 'b' }, { from: 'b', to: 'c' }, { from: 'c', to: 'a', isDirected: false }] })
+    expect(layers(graph)).toEqual([['a'], ['b', 'c→a'], ['c']])
+    expect(layersOf(graph).pieces.flat().some(piece => piece.isUp)).toBe(false)
+  })
+
+  test('any graph with links of both kinds is laid in layers, no link with no direction running up, and a link that runs one way running up only where it closes a loop of links that run one way', () => {
+    const next = numbers(23)
+    const pick = (below: number): number => Math.floor(next() * below)
+    for (let run = 0; run < 3000; run += 1) {
+      const count = 2 + pick(14)
+      const graph = readGraph({
+        nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: `n${index}` })),
+        links: Array.from({ length: pick(count * 3) }, () => ({ from: `n${pick(count)}`, to: `n${pick(count)}`, isDirected: pick(3) !== 0 })),
+      })
+      const layers = layersOf(graph)
+      const closing = loopLinks({ ...graph, links: graph.links.filter(link => link.isDirected) })
+      for (const piece of layers.pieces.flat()) expect(piece.isUp && (!piece.link.isDirected || !closing.has(piece.link))).toBe(false)
+    }
+  })
+
   test('in an undirected graph, a link across layers the nodes name runs down its lanes from whichever end stands higher', () => {
     const graph = readGraph({
       nodes: ['a', 'b', 'c'].map((id, layer) => ({ id, label: id, layer })),

@@ -263,15 +263,47 @@ export function loopLinks(graph: Graph): Set<GraphletLink> {
  * are kept, in their order. Else, where no link runs one way, a node stands
  * as many layers down as it is links away from the first node the graph
  * names of those it is joined to. Any other graph is laid in layers with the
- * links that close a loop turned around, a link that runs no way taken as
- * running from the node it names first.
+ * links that close a loop turned around, found among the links that run one
+ * way alone. A link that runs no way is taken as running from the node it
+ * names first, unless that would close a loop with the others, as they are
+ * laid; then each such link runs forward along an order the links that run
+ * one way keep as they are laid, so that none of them closes a loop.
  */
 export function ranksOf(graph: Graph): Map<string, number> {
   if (graph.nodes.every(node => node.layer !== undefined)) {
     return packed(new Map(graph.nodes.map(node => [node.id, node.layer ?? 0])))
   }
   if (graph.links.every(link => !link.isDirected)) return distancesOf(graph)
-  return ranksWith(graph, loopLinks(graph))
+  const closing = loopLinks({ ...graph, links: graph.links.filter(link => link.isDirected) })
+  /** Links as they are laid, those that close a loop turned around. */
+  const laid = (links: Link[]): Link[] => links.filter(link => link.from !== link.to).map(link => (closing.has(link) ? { ...link, from: link.to, to: link.from } : link))
+  if (orderOf(graph.nodes, laid(graph.links)).length === graph.nodes.length) return ranksWith(graph, closing)
+  const place = new Map(orderOf(graph.nodes, laid(graph.links.filter(link => link.isDirected))).map((id, index) => [id, index]))
+  const isBefore = (a: string, b: string): boolean => (place.get(a) ?? 0) < (place.get(b) ?? 0)
+  return ranksWith({ ...graph, links: graph.links.map(link => (link.isDirected || isBefore(link.from, link.to) ? link : { ...link, from: link.to, to: link.from })) }, closing)
+}
+
+/**
+ * The nodes in an order every link runs forward along, of those with nothing
+ * left before them always the one the graph names first; where the links
+ * run in a loop, only the nodes before it.
+ */
+function orderOf(nodes: GraphletNode[], links: Link[]): string[] {
+  const before = new Map(nodes.map(node => [node.id, 0]))
+  const after = new Map<string, string[]>()
+  for (const link of links) {
+    before.set(link.to, (before.get(link.to) ?? 0) + 1)
+    after.set(link.from, [...(after.get(link.from) ?? []), link.to])
+  }
+  const order: string[] = []
+  const left = nodes.map(node => node.id)
+  for (let next = left.find(id => before.get(id) === 0); next !== undefined; next = left.find(id => before.get(id) === 0)) {
+    order.push(next)
+    left.splice(left.indexOf(next), 1)
+    before.set(next, -1)
+    for (const id of after.get(next) ?? []) before.set(id, (before.get(id) ?? 0) - 1)
+  }
+  return order
 }
 
 /** The room a graph is folded into: the columns a layer may take, how wide a node's box is, and the room between two neighbors in a layer. A lane takes a column. */

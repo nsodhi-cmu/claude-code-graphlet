@@ -84,7 +84,7 @@ With the `motion` setting at `flowing`, the lit lines move. A lit link that runs
 - **Flowing.** Each cell of a flowing line has a beat, one of `BEATS`, from where it stands along the way its link runs there: its row on a stretch that runs down, its row counted upward on one that runs up, and its column counted the way a stretch across runs. A run of a flowing line has the beat of its first cell, as its `beat`, and where it runs on across cells, the `way` its beat steps from each cell to the next, so a stretch across is one run. At each step of the flow, the cells whose beat it is are beads, bright and bold in the accent, and the rest of the line is dim; at the next step the beads stand a cell farther along, and every `BEATS` steps they come round again.
 - **Pulsing.** A run of a pulsing line `isPulsing`. At each step all of it glows alike, as `PULSE` says: dim, as it is, bright, as it is, and round again.
 
-`piecesOf` cuts a run at a step into the pieces it glows in. A cell several lit lines share takes the beat of one of them, the one that runs up or down where they cross, and pulses only where none of them flows. Arrowheads, ticks and labels stay as they are. The surface module takes a step every `STEP_MS`, and only while its drawing has lines that move.
+`piecesOf` cuts a run at a step into the pieces it glows in. A cell several lit lines share takes the beat of one of them, the one that runs up or down where they cross, and pulses only where none of them flows; a lane flows where any lit link it carries flows, and else pulses. Arrowheads, ticks and labels stay as they are. The surface module takes a step every `STEP_MS`, and only while its drawing has lines that move.
 
 ## The Window
 

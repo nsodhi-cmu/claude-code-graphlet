@@ -629,6 +629,16 @@ describe('lines that flow', () => {
     expect(both.rows.flat().some(span => span.beat !== undefined)).toBe(true)
   })
 
+  test('a lane flows where a lit link it carries flows, though links it carries that are not lit run both ways', () => {
+    const graph = readGraph({
+      nodes: [['a', 0], ['b', 0], ['x', 1], ['y', 2], ['d', 3]].map(([id, layer]) => ({ id: String(id), label: String(id), layer: Number(layer) })),
+      links: [['a', 'x'], ['x', 'y'], ['y', 'd'], ['a', 'd'], ['b', 'd'], ['d', 'b']].map(([from = '', to = '']) => ({ from, to })),
+    })
+    const drawing = flowing.draw(graph, 'a', SMALL, ORIGIN)
+    expect(drawing.rows.flat().some(span => span.isPulsing)).toBe(false)
+    expect(drawing.rows.flat().some(span => span.beat !== undefined)).toBe(true)
+  })
+
   test('nothing moves that is not lit, nor with the lines still', () => {
     const moving = (drawing: Drawing): number => drawing.rows.flat().filter(span => span.beat !== undefined || span.isPulsing).length
     expect(moving(flowing.draw(loop, null, SMALL, ORIGIN))).toBe(0)
@@ -760,9 +770,9 @@ type Said = { node: string; channel: number; side: 'from' | 'to' | 'above' | 'be
  * links between them, one for one, and a link's label must be written beside
  * a tick of the node it leaves. Through a window, which may cut a label or
  * leave its box out of view, the words beside a tick need only start the
- * label of a link between the two, and a line the edge cuts with no
- * arrowhead left in view, which may run either way or none, is not read
- * for its labels.
+ * label of a link between the two; and beside a line the edge cuts with no
+ * arrowhead left in view, which may run either way or none, they need only
+ * start the label of a link of that node.
  */
 function readOff(
   graph: Graph,
@@ -889,7 +899,11 @@ function readOff(
     if (text === '' || own === undefined) continue
     const said = lines.get(find(key)) ?? []
     const isDirected = isOneWay.has(find(key))
-    if (!isDirected && isCut.has(find(key))) continue
+    if (!isDirected && isCut.has(find(key))) {
+      const isOwn = graph.links.some(link => (link.from === node || link.to === node) && labelOf(link).startsWith(text))
+      if (!isOwn) labels.push(`'${text}' beside ${node}, which has no link labelled so`)
+      continue
+    }
     const across = said.filter(end => (isDirected ? end.side === 'to' : end.side !== own.side))
     for (const other of new Set((across.length > 0 || isDirected ? across : said).map(end => end.node).filter(one => one !== node))) {
       const pair = pairOf(node, other, isDirected)
@@ -997,6 +1011,14 @@ describe('what a picture says', () => {
       expect(said.labels).toEqual([])
       expect(said.links).toEqual([...new Set(linksOf(graph, layout))])
     }
+  })
+
+  test('merged, a labeled link with no direction between two nodes of one layer keeps a line of its own', () => {
+    const graph = undirected(graphOf(['r', 'a', 'b', 'c'], [['r', 'a'], ['r', 'b'], ['a', 'c']]))
+    const labeled = readGraph({ ...graph, links: [...graph.links, { from: 'a', to: 'b', isDirected: false, label: 'go' }].map(link => (link.from === 'a' && link.to === 'c' ? { ...link, label: 'go' } : link)) })
+    const look: Look = { ...LOOK, links: 'merged' }
+    const layout = layoutOf(labeled, { columns: 60, rows: 0 }, look)
+    expect(readOff(labeled, layout, paint(layout, labeled, null, { columns: 60, rows: layout.rows + 1 }, ORIGIN), place => place.x).labels).toEqual([])
   })
 
   test('merged, where the links between two layers share one row, every label still stands beside links it is true of', READING, () => {
