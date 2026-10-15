@@ -259,7 +259,8 @@ function wiresOf(pieces: Piece[], flats: GraphletLink[], shelf: Shelf, placeOf: 
  * the fans of every other place whose wires reach the very same faces, so
  * that run together they say nothing false. In an undirected graph, whose
  * lines have no arrowheads to tell their two ends apart, a link between two
- * nodes of the shelf is a bundle alone. Merged, it is every wire with no label
+ * nodes of the shelf is a bundle alone, and merged too where it has a label.
+ * Merged, a bundle is every wire with no label
  * that runs the one way, with the flow or against it. Wires with a label are
  * bundled as they are kept apart whichever the setting, and wires with
  * different labels are never of one bundle, so that a label is true of every
@@ -274,14 +275,14 @@ function bundlesOf(wires: Wire[], links: Links, isDirected: boolean): Wire[][] {
     if (!ids.has(end.place)) ids.set(end.place, ids.size)
     return `${ids.get(end.place)}${end.isAbove ? 'v' : '^'}`
   }
-  const isAlone = (wire: Wire): boolean => links === 'separate' && !isDirected && wire.from.isAbove === wire.to.isAbove
+  const isAlone = (wire: Wire): boolean => !isDirected && wire.from.isAbove === wire.to.isAbove && (links === 'separate' || labelOf(wire.link) !== '')
   const reaching = new Map<Place, Set<Place>>()
   for (const wire of wires) if ('lane' in wire.to.place.slot) reaching.set(wire.to.place, new Set([...(reaching.get(wire.to.place) ?? []), wire.from.place]))
   /** Whether a wire leaves a box for a lane that wires from elsewhere reach too, which it must reach on a line of its own. */
   const isJoining = (wire: Wire): boolean => 'node' in wire.from.place.slot && (reaching.get(wire.to.place)?.size ?? 0) > 1
   const fans = new Map<string, { way: string; isMerged: boolean; wires: Wire[] }>()
   for (const wire of wires.filter(wire => !isAlone(wire))) {
-    const way = JSON.stringify([wire.isUp, labelOf(wire.link)])
+    const way = JSON.stringify([wire.isUp, wire.link.label ?? ''])
     const isMerged = links === 'merged' && labelOf(wire.link) === ''
     const key = isMerged ? way : `${way} ${faceOf(wire.from)}${isJoining(wire) ? ` into ${faceOf(wire.to)}` : ''}`
     fans.set(key, { way, isMerged, wires: [...(fans.get(key)?.wires ?? []), wire] })

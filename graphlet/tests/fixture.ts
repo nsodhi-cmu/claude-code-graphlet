@@ -19,7 +19,7 @@ export const undirected = (graph: Graph): Graph => readGraph({ ...graph, isDirec
 export const numbers = (seed: number): (() => number) => {
   let state = seed
   return () => {
-    state = (state * 1103515245 + 12345) & 0x7fffffff
+    state = (Math.imul(state, 1103515245) + 12345) & 0x7fffffff
     return state / 0x7fffffff
   }
 }

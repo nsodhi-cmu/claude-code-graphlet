@@ -50,4 +50,4 @@ In an undirected graph, a line has no arrowheads to tell the boxes it leaves fro
 
 Wires of different bundles that cross are painted as one passing over the other, so that a junction always means joined.
 
-With the `links` setting at `merged`, every wire of a channel with no label that runs the one way, with the flow or against it, is one bundle on the one track, and a box has one port for it. That is shorter, and says less: which links are whose is told by selecting a node. Wires with a label are still bundled as they are kept apart, each bundle on a track of its own, so a label stays true of every link of the line beside it.
+With the `links` setting at `merged`, every wire of a channel with no label that runs the one way, with the flow or against it, is one bundle on the one track, and a box has one port for it. That is shorter, and says less: which links are whose is told by selecting a node. Wires with a label are still bundled as they are kept apart, each bundle on a track of its own, so a label stays true of every link of the line beside it, and in an undirected graph a labeled link between two nodes of one shelf is still a bundle alone.
