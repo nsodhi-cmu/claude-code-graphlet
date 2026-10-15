@@ -2,7 +2,7 @@ import type { GraphletLink, GraphletNode, GraphletTone } from '../types'
 import { sizeOf } from './draw'
 import { layersOf } from './layers'
 import type { Graph, Slot } from './layers'
-import { linesOf } from './layout'
+import { labelOf, linesOf } from './layout'
 
 // The page: a graph as one HTML document that draws it in SVG, in the layers
 // and the order the terminal's picture has. The document fetches nothing,
@@ -34,6 +34,8 @@ const GAP = { x: 36, y: 72 }
 const MARGIN = 40
 /** How far from a box's middle the port of the links that run back up is. */
 const PORT_STEP = 12
+/** How far apart two links' labels stand, one under the other, where they would stand over each other. */
+const LABEL_STEP = BADGE_SIZE + 4
 /** The length of an arrowhead, and its width. */
 const HEAD = { length: 9, width: 8 }
 /** The dashes of a link that runs back up: the length of a dash, and of the gap after it. */
@@ -290,8 +292,11 @@ function boxOf(node: GraphletNode, spot: Spot): string {
 
 /**
  * The drawing: every link, each naming its two ends by their places in the
- * graph, with an arrowhead where the graph is directed and its label written
- * on its first stretch, and over them every node, in the graph's order.
+ * graph, with an arrowhead where the graph is directed and its label, cut as
+ * the terminal cuts it, written on its first stretch, and moved down past any
+ * label written there before it; and over them every node, in the graph's
+ * order. A link from a node to itself has no label written, as in the
+ * terminal.
  */
 function drawingOf(graph: Graph): string {
   const spots = spotsOf(layersOf(graph).slots)
@@ -300,15 +305,26 @@ function drawingOf(graph: Graph): string {
     const spot = spots.find(one => 'node' in one.slot && one.slot.node.id === node.id)
     if (spot !== undefined) places.set(node.id, { index, spot })
   })
-  const links = graph.links.flatMap(link => {
+  const drawn = graph.links.flatMap(link => {
     const [from, to] = [places.get(link.from), places.get(link.to)]
-    if (from === undefined || to === undefined) return []
-    const arrow = arrowOf(link, from.spot, to.spot, spots, graph.isDirected)
+    return from === undefined || to === undefined ? [] : [{ link, from, to, arrow: arrowOf(link, from.spot, to.spot, spots, graph.isDirected) }]
+  })
+  const written: Array<{ x: number; y: number; width: number }> = []
+  const writtenAt = new Map<GraphletLink, Point>()
+  for (const { link, arrow } of drawn.filter(one => one.link.from !== one.link.to && labelOf(one.link) !== '').sort((a, b) => a.arrow.middle.y - b.arrow.middle.y || a.arrow.middle.x - b.arrow.middle.x)) {
+    const width = widthOf(labelOf(link)) * (BADGE_SIZE / FONT_SIZE)
+    let { x, y } = arrow.middle
+    while (written.some(one => Math.abs(one.x - x) < (one.width + width) / 2 && Math.abs(one.y - y) < LABEL_STEP)) y += LABEL_STEP
+    written.push({ x, y, width })
+    writtenAt.set(link, { x, y })
+  }
+  const links = drawn.map(({ link, from, to, arrow }) => {
     const dashes = arrow.isUp ? ` stroke-dasharray="${DASHES}"` : ''
     const ends = `data-from="${from.index}" data-to="${to.index}"`
     const head = graph.isDirected ? `<polygon points="${headOf(arrow.tip, arrow.way)}"/>` : ''
-    const label = link.label === undefined ? '' : `<text x="${arrow.middle.x}" y="${arrow.middle.y + BASELINE}">${escaped(link.label)}</text>`
-    return [`<g class="link" ${ends}><path${dashes} d="${arrow.path}"/>${head}${label}</g>`]
+    const at = writtenAt.get(link)
+    const label = at === undefined ? '' : `<text x="${at.x}" y="${at.y + BASELINE}">${escaped(labelOf(link))}</text>`
+    return `<g class="link" ${ends}><path${dashes} d="${arrow.path}"/>${head}${label}</g>`
   })
   const nodes = graph.nodes.flatMap(node => {
     const place = places.get(node.id)

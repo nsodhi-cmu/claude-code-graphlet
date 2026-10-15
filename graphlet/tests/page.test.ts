@@ -193,6 +193,23 @@ describe('the links of a page', () => {
     expect(page).not.toContain('<i>yes')
   })
 
+  test('labels that would stand over each other are written one under the other, a long label is cut as the terminal cuts it, and a link to itself has none', () => {
+    const graph = readGraph({
+      nodes: ['a', 'b'].map(id => ({ id, label: id })),
+      links: [
+        { from: 'a', to: 'b', label: 'yes' },
+        { from: 'b', to: 'a', label: 'no' },
+        { from: 'a', to: 'a', label: 'again' },
+      ],
+    })
+    const page = pageOf(graph, 'labels')
+    const at = (text: string): number => Number(new RegExp(`<text x="[\\d.]+" y="([\\d.]+)">${text}</text>`).exec(page)?.[1])
+    expect(Math.abs(at('yes') - at('no'))).toBeGreaterThanOrEqual(11)
+    expect(page).not.toContain('again')
+    const long = pageOf(readGraph({ nodes: ['a', 'b'].map(id => ({ id, label: id })), links: [{ from: 'a', to: 'b', label: 'a much longer label than a link may say' }] }), 'long')
+    expect(long).toContain('>a much l…may say</text>')
+  })
+
   test('a link from a node to itself is a loop out of the side of its box and back into it', () => {
     const page = pageOf(graphOf(['a'], [['a', 'a']]), '')
     const [a = { x: NaN, y: NaN, right: NaN, bottom: NaN }] = boxes(page)

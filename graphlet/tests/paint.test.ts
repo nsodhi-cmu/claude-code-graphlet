@@ -700,7 +700,7 @@ function readOff(
     if (text === '' || own === undefined) continue
     const said = lines.get(find(key)) ?? []
     const across = said.filter(end => (graph.isDirected ? end.side === 'to' : end.side !== own.side))
-    for (const other of new Set((across.length > 0 ? across : said).map(end => end.node).filter(one => one !== node))) {
+    for (const other of new Set((across.length > 0 || graph.isDirected ? across : said).map(end => end.node).filter(one => one !== node))) {
       for (const label of labelsOf(node, other)) if (isWindow ? !label.startsWith(text) : label !== text) labels.push(`'${text}' beside ${node}, on its link to ${other} labelled '${label}'`)
     }
   }
@@ -793,6 +793,18 @@ describe('what a picture says', () => {
       expect(said.loose).toEqual([])
       expect(said.labels).toEqual([])
       expect(said.links).toEqual([...new Set(linksOf(graph, layout))])
+    }
+  })
+
+  test('merged, where the links between two layers share one row, every label still stands beside links it is true of', READING, () => {
+    for (let run = 0; run < 400; run += 1) {
+      const graph = anyGraph(run)
+      const look: Look = { ...someLook(), links: 'merged' }
+      const columns = viewOf(look).measure(graph, 40 + pick(100)).columns
+      const layout = layoutOf(graph, { columns, rows: 0 }, look)
+      const said = readOff(graph, layout, paint(layout, graph, null, { columns, rows: layout.rows + 1 }, ORIGIN), place => place.x)
+      expect(said.loose).toEqual([])
+      expect(said.labels).toEqual([])
     }
   })
 

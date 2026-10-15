@@ -154,15 +154,15 @@ let graphemes: Intl.Segmenter | undefined
  * tell, each code point is one.
  */
 export function charactersOf(text: string): string[] {
-  if (typeof Intl?.Segmenter !== 'function') return [...text]
+  if (typeof Intl === 'undefined' || typeof Intl.Segmenter !== 'function') return [...text]
   graphemes ??= new Intl.Segmenter(undefined, { granularity: 'grapheme' })
   return Array.from(graphemes.segment(text), part => part.segment)
 }
 
 /** The characters a terminal draws two cells wide: those of East Asian scripts and the fullwidth forms. */
 const WIDE = /^[\u1100-\u115f\u2329\u232a\u2e80-\u303e\u3041-\u33ff\u3400-\u4dbf\u4e00-\u9fff\ua000-\ua4cf\ua960-\ua97f\uac00-\ud7a3\uf900-\ufaff\ufe10-\ufe19\ufe30-\ufe6f\uff00-\uff60\uffe0-\uffe6\u{1f200}-\u{1f2ff}\u{20000}-\u{3fffd}]/u
-/** An emoji drawn as a picture, two cells wide: one that is by default, one a variation selector asks to be, or a flag. */
-const PICTURE = /^(?:\p{Emoji_Presentation}|\p{Extended_Pictographic}\ufe0f|\p{Regional_Indicator})/u
+/** An emoji drawn as a picture, two cells wide: one that is by default, one a variation selector asks to be, a flag, or a keycap. */
+const PICTURE = /^(?:\p{Emoji_Presentation}|\p{Extended_Pictographic}\ufe0f|\p{Regional_Indicator}|[#*0-9]\ufe0f?\u20e3)/u
 /** What takes no cell of its own: a mark on the character before it, or a sign that shapes the text and draws nothing. */
 const UNSEEN = /^[\p{Mn}\p{Me}\p{Cf}]+$/u
 

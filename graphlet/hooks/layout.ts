@@ -251,10 +251,12 @@ function wiresOf(pieces: Piece[], flats: GraphletLink[], shelf: Shelf, placeOf: 
  * the fans of every other place whose wires reach the very same faces, so
  * that run together they say nothing false. In an undirected graph, whose
  * lines have no arrowheads to tell their two ends apart, a link between two
- * nodes of the shelf is a bundle alone. Merged, it is every wire that runs
- * the one way, with the flow or against it. Either way, wires with different
- * labels are never of one bundle, so that a label is true of every wire of
- * the line it is written beside. Kept apart, a wire that leaves a box for a
+ * nodes of the shelf is a bundle alone. Merged, it is every wire with no label
+ * that runs the one way, with the flow or against it. Wires with a label are
+ * bundled as they are kept apart whichever the setting, and wires with
+ * different labels are never of one bundle, so that a label is true of every
+ * wire of the line it is written beside; merged, the bundles with a label keep
+ * tracks of their own, apart from the one the rest share. Kept apart, a wire that leaves a box for a
  * lane that wires from elsewhere reach too is a fan of its own, so that it meets the lane's
  * others there without joining them to the box's other links.
  */
@@ -269,16 +271,17 @@ function bundlesOf(wires: Wire[], links: Links, isDirected: boolean): Wire[][] {
   for (const wire of wires) if ('lane' in wire.to.place.slot) reaching.set(wire.to.place, new Set([...(reaching.get(wire.to.place) ?? []), wire.from.place]))
   /** Whether a wire leaves a box for a lane that wires from elsewhere reach too, which it must reach on a line of its own. */
   const isJoining = (wire: Wire): boolean => 'node' in wire.from.place.slot && (reaching.get(wire.to.place)?.size ?? 0) > 1
-  const fans = new Map<string, { way: string; wires: Wire[] }>()
+  const fans = new Map<string, { way: string; isMerged: boolean; wires: Wire[] }>()
   for (const wire of wires.filter(wire => !isAlone(wire))) {
     const way = JSON.stringify([wire.isUp, labelOf(wire.link)])
-    const key = links === 'merged' ? way : `${way} ${faceOf(wire.from)}${isJoining(wire) ? ` into ${faceOf(wire.to)}` : ''}`
-    fans.set(key, { way, wires: [...(fans.get(key)?.wires ?? []), wire] })
+    const isMerged = links === 'merged' && labelOf(wire.link) === ''
+    const key = isMerged ? way : `${way} ${faceOf(wire.from)}${isJoining(wire) ? ` into ${faceOf(wire.to)}` : ''}`
+    fans.set(key, { way, isMerged, wires: [...(fans.get(key)?.wires ?? []), wire] })
   }
   const bound = new Map<string, Wire[]>()
-  for (const [key, { way, wires: fan }] of fans) {
+  for (const [key, { way, isMerged, wires: fan }] of fans) {
     const reached = [...new Set(fan.map(wire => faceOf(wire.to)))].sort().join(' ')
-    const sign = links === 'merged' ? key : `${way} ${reached}`
+    const sign = isMerged ? key : `${way} ${reached}`
     bound.set(sign, [...(bound.get(sign) ?? []), ...fan])
   }
   return [...bound.values(), ...wires.filter(isAlone).map(wire => [wire])]
@@ -358,7 +361,7 @@ function dealPorts(shelves: Shelf[], channels: Channel[], isDirected: boolean): 
       const isLabeled = groups.some(group => group.label !== '')
       const first = isLabeled ? Math.floor((place.width - 1 - end) / 2) : Math.floor(place.width / 2) - (groups.length - 1)
       const ports = steps.map(step => first + step)
-      const written = groups.flatMap((group, index) => Array.from({ length: sizeOf(group.label) }, (_, cell) => (ports[index] ?? 0) + 1 + cell))
+      const written = groups.flatMap((group, index) => Array.from({ length: group.label === '' ? 0 : sizeOf(group.label) + 1 }, (_, cell) => (ports[index] ?? 0) + 1 + cell))
       groups.forEach((group, index) => {
         const own = ports[index] ?? 0
         const beside = group.leaving.length > 1 ? [own - 1, own + 1] : []
@@ -762,10 +765,14 @@ function laidOut(graph: Graph, columns: number, look: Look, into?: number): Layo
     top += shelf.rows
     if (channel === undefined) return
     channel.isLoose = next !== undefined && next.across !== shelf.across
+    if (look.links === 'merged') {
+      const written = channel.bundles.filter(bundle => bundle[0] !== undefined && labelOf(bundle[0].link) !== '')
+      const unwritten = channel.wires.filter(wire => labelOf(wire.link) === '')
+      channel.bundles = [...(unwritten.length > 0 ? [unwritten] : []), ...written]
+    }
     channel.bundles.forEach((bundle, index) => {
-      for (const wire of bundle) wire.bundle = look.links === 'merged' ? 0 : index
+      for (const wire of bundle) wire.bundle = index
     })
-    if (look.links === 'merged') channel.bundles = []
     const tracks = layTracks(channel, place => place.x)
     const heads = (channel.hasTopRow ? 1 : 0) + (channel.hasBottomRow ? 1 : 0)
     const spare = channel.isLoose && channel.bundles.length > 1 ? 1 : 0
