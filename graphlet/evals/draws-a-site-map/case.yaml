@@ -27,6 +27,11 @@ graders:
     pattern: '```graphlet[^`]*?(?:^\s*(?:graph|flowchart)\s+(?:TD|LR|TB|RL|BT)|subgraph|==>|-\.->|:::|\[\(|\(\[|\{\{)'
     flags: 'mi'
     match: 'not_contains'
+  - type: regex
+    name: introduces-the-graph
+    pattern: '^\s*[^\s`]'
+    flags: ''
+    match: 'contains'
   - type: llm
     name: graph-answers-the-question
     criteria: 'Judge only the graph in the ```graphlet block. PASS if all of these hold: (1) its -> links run from the home page to the about, projects, blog and contact pages; (2) from the projects page to two project pages; (3) from the blog to at least two posts; (4) every label is a few words. Extra links, such as pages linking back home, are allowed. FAIL if any does not hold.'

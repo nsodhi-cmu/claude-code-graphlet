@@ -1,0 +1,42 @@
+schema_version: '1.0'
+name: colors-what-went-wrong
+description: 'A step that failed is told apart by its tone.'
+tags: [draw]
+execution:
+  prompt: |
+    Our CI pipeline runs lint, then unit tests, then build, then integration tests, then deploy to staging, then deploy to production. The integration tests are failing, so nothing after them runs. Show me the pipeline and where it is stuck.
+  max_turns: 3
+  timeout_seconds: 180
+  allowed_tools: []
+  env:
+    EVAL_GRAPHLET_GUIDE: '1'
+runs: 3
+graders:
+  - type: regex
+    name: writes-a-graph-block
+    pattern: '^[ \t]*```graphlet[ \t]*$'
+    flags: 'm'
+    match: 'contains'
+  - type: regex
+    name: block-is-closed-with-a-link
+    pattern: '^[ \t]*```graphlet[ \t]*\n(?:(?![ \t]*```)[^\n]*\n)*?[^\n]*(?:-+>|→)[^\n]*\n(?:(?![ \t]*```)[^\n]*\n)*?[ \t]*```[ \t]*$'
+    flags: 'm'
+    match: 'contains'
+  - type: regex
+    name: no-mermaid-in-the-block
+    pattern: '```graphlet[^`]*?(?:^\s*(?:graph|flowchart)\s+(?:TD|LR|TB|RL|BT)|subgraph|==>|-\.->|:::|\[\(|\(\[|\{\{)'
+    flags: 'mi'
+    match: 'not_contains'
+  - type: regex
+    name: introduces-the-graph
+    pattern: '^\s*[^\s`]'
+    flags: ''
+    match: 'contains'
+  - type: regex
+    name: gives-a-tone
+    pattern: '```graphlet[^`]*?\[(?:bad|warn)\]'
+    flags: ''
+    match: 'contains'
+  - type: llm
+    name: marks-the-failing-step
+    criteria: 'Judge only the graph in the ```graphlet block, where a tone in square brackets after a node''s label, such as [bad] or [warn], colors that node. PASS if the node for the integration tests carries [bad] or [warn], and no step before it carries [bad]. FAIL otherwise.'

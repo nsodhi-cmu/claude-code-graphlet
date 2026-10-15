@@ -27,6 +27,11 @@ graders:
     pattern: '```graphlet[^`]*?(?:^\s*(?:graph|flowchart)\s+(?:TD|LR|TB|RL|BT)|subgraph|==>|-\.->|:::|\[\(|\(\[|\{\{)'
     flags: 'mi'
     match: 'not_contains'
+  - type: regex
+    name: introduces-the-graph
+    pattern: '^\s*[^\s`]'
+    flags: ''
+    match: 'contains'
   - type: llm
     name: graph-answers-the-question
     criteria: 'Judge only the graph in the ```graphlet block. PASS if all of these hold: (1) its nodes are TCP connection states, such as CLOSED, LISTEN, SYN_SENT, SYN_RECEIVED, ESTABLISHED, FIN_WAIT_1, FIN_WAIT_2, CLOSE_WAIT, LAST_ACK, TIME_WAIT, written in any case; (2) it has at least five of them; (3) every -> link is a transition TCP really makes, from the first state to the second, whatever words in pipes are written on it. It need not show every state or transition. FAIL if any does not hold.'

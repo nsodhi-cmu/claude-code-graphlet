@@ -27,6 +27,11 @@ graders:
     pattern: '```graphlet[^`]*?(?:^\s*(?:graph|flowchart)\s+(?:TD|LR|TB|RL|BT)|subgraph|==>|-\.->|:::|\[\(|\(\[|\{\{)'
     flags: 'mi'
     match: 'not_contains'
+  - type: regex
+    name: introduces-the-graph
+    pattern: '^\s*[^\s`]'
+    flags: ''
+    match: 'contains'
   - type: llm
     name: graph-answers-the-question
     criteria: 'Judge only the graph in the ```graphlet block. PASS if all of these hold: (1) it has nodes for the auth middleware, the router, the controller and the database; (2) following its -> links from the auth step leads to the router, then to the controller, then to the database, though other nodes, such as a decision, may stand between them; (3) some link leads to a response or back to the client. FAIL if any does not hold.'

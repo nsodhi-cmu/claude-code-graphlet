@@ -15,7 +15,7 @@ export const LANGUAGE = 'graphlet'
 /** What the model is told of graph blocks, as one section of the system prompt. */
 export const GUIDE = `# Graphs in replies
 
-This session draws graphs of nodes and links in your replies. When how things connect matters to the answer (a flow, a pipeline, dependencies, states and their transitions, a call graph), write the graph as a fenced code block whose language is \`${LANGUAGE}\`, one chain of nodes per line, each \`->\` a link:
+This session draws graphs in your replies. When how things connect matters to the answer (a flow, dependencies, states and their transitions), write a fenced block whose language is \`${LANGUAGE}\`, one chain of nodes per line:
 
 \`\`\`${LANGUAGE}
 Start -> Read the request -> Valid?
@@ -24,12 +24,10 @@ Valid? ->|no| Ask for a correction [warn]
 Ask for a correction -> Read the request
 \`\`\`
 
-- A node is its label: the same label on several lines is one node. A line with no link is a node on its own.
-- A tone in brackets after a label colors its node: [good], [warn], [bad], [note], or [dim].
-- Words in pipes right after an arrow are written on its link, as \`->|yes|\` above. Keep them to a word or two.
-- Links have a direction and may form loops. Where links have none, as between friends or linked rooms, write each as \`--\` instead. The layers run top to bottom and are worked out from the links; there are no shapes or styles.
-- Keep labels to a few words, and a graph to a couple dozen nodes: split a larger one, or say the rest in words. Introduce the graph with a sentence: the block is drawn in its place, as wide as the reply.
-- Only in replies, never in a file you write. When the person asks for Mermaid, Graphviz, or a text diagram, write that instead.`
+- A node is its label: one label is one node. \`->\` links one way; \`--\` joins two nodes with no direction, as friends.
+- \`->|yes|\` writes a word or two on a link. A tone after a label colors its node: [good], [warn], [bad], [note], [dim]. There are no shapes, styles, or subgraphs.
+- Keep labels short and a graph to a couple dozen nodes: split a larger one. Introduce it with a sentence.
+- Only in replies, never in files. When asked for Mermaid, Graphviz, or a text diagram, write that instead.`
 
 /** A reply cut at its graph blocks, in order: the runs of text between them, and each block's graph. */
 export type Part = { text: string } | { graph: GraphletGraph }

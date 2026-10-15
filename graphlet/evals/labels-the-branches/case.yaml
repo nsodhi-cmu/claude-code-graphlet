@@ -18,6 +18,11 @@ graders:
     flags: 'm'
     match: 'contains'
   - type: regex
+    name: introduces-the-graph
+    pattern: '^\s*[^\s`]'
+    flags: ''
+    match: 'contains'
+  - type: regex
     name: block-is-closed-with-a-link
     pattern: '^[ \t]*```graphlet[ \t]*\n(?:(?![ \t]*```)[^\n]*\n)*?[^\n]*(?:-+>|→)[^\n]*\n(?:(?![ \t]*```)[^\n]*\n)*?[ \t]*```[ \t]*$'
     flags: 'm'

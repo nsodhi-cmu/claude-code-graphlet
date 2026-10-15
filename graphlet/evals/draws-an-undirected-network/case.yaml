@@ -18,13 +18,18 @@ graders:
     flags: 'm'
     match: 'contains'
   - type: regex
+    name: introduces-the-graph
+    pattern: '^\s*[^\s`]'
+    flags: ''
+    match: 'contains'
+  - type: regex
     name: block-is-closed-with-a-dashed-link
     pattern: '^[ \t]*```graphlet[ \t]*\n(?:(?![ \t]*```)[^\n]*\n)*?[^\n]*[ \t]-{2,}(?=[ \t|])[^\n]*\n(?:(?![ \t]*```)[^\n]*\n)*?[ \t]*```[ \t]*$'
     flags: 'm'
     match: 'contains'
   - type: regex
-    name: no-arrows-in-the-block
-    pattern: '```graphlet[^`]*?(?:->|→|↔|<-|←)'
+    name: no-arrows-among-the-dashes
+    pattern: '```graphlet(?=(?:(?!```)[\s\S])*?[ \t]-{2,}[ \t|])(?=(?:(?!```)[\s\S])*?(?:->|→|↔|<-|←))'
     flags: ''
     match: 'not_contains'
   - type: regex

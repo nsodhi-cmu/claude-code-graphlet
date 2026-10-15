@@ -29,6 +29,11 @@ graders:
     flags: 'mi'
     match: 'not_contains'
   - type: regex
+    name: introduces-the-graph
+    pattern: '^\s*[^\s`]'
+    flags: ''
+    match: 'contains'
+  - type: regex
     name: links-app-and-router
     pattern: '```graphlet[^`]*?(?:(?<![\w.])(?:[\w.-]*/)?app\.ts(?![\w.])(?:[ \t]*\[\w+\])?[ \t]*(?:-+>|→)(?:\|[^|\n]*\|)?[ \t]*(?<![\w.])(?:[\w.-]*/)?router\.ts(?![\w.])|(?<![\w.])(?:[\w.-]*/)?router\.ts(?![\w.])(?:[ \t]*\[\w+\])?[ \t]*(?:-+>|→)(?:\|[^|\n]*\|)?[ \t]*(?<![\w.])(?:[\w.-]*/)?app\.ts(?![\w.]))'
     flags: ''

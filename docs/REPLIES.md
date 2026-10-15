@@ -108,11 +108,11 @@ What a tool would add is a result the model reads back, and a result in a run wi
 
 ## Evaluating What The Model Writes
 
-`graphlet/evals/` is a suite for `claude plugin eval`, which runs the model on each case's prompt in a `claude -p` session with graphlet loaded, and grades its reply. Every case sets `EVAL_GRAPHLET_GUIDE` to `1`, so the session is told of graph blocks as a session that draws is. The cases are of three kinds:
+`graphlet/evals/` is a suite for `claude plugin eval`, which runs the model on each case's prompt in a `claude -p` session with graphlet loaded, and grades its reply. Every case sets `EVAL_GRAPHLET_GUIDE` to `1`, so the session is told of graph blocks as a session that draws is. The cases are of these kinds:
 
 | Kind | Asks for | Graded on |
 | :- | :- | :- |
-| `draws-*`, `labels-the-branches` | something a graph answers: a flow, a state machine, files and their imports, a site map, who knows whom, decisions with named outcomes | a closed graph block with a link in it, of arrows, or for who knows whom of dashes and no arrows; no Mermaid in the block; and the graph being right: by a judge model's checklist, or for the imports and the acquaintances by a pattern for each link, written any way the block allows; the decisions, by a labeled link and a judge's checklist of their outcomes |
+| `draws-*`, `labels-the-branches`, `colors-what-went-wrong` | something a graph answers: a flow, a state machine, files and their imports, a site map, who knows whom, decisions with named outcomes, a pipeline stuck at one step | a closed graph block with a link in it, of arrows, or for who knows whom of dashes, in a block with no arrows among them; no Mermaid in the block; text before the first block, introducing it; and the graph being right: by a judge model's checklist, or for the imports and the acquaintances by a pattern for each link, written any way the block allows; the decisions, by a labeled link and a judge's checklist of their outcomes; the stuck step, by a tone and a judge's check that it is the failing step's |
 | `keeps-a-big-graph-small` | a map of a system with many parts | a graph block; no Mermaid in it; and by a judge model, no block of more than thirty nodes |
 | `quiet-*` | something no graph answers: a language question, a poem, a one-line answer | no graph block |
 | `writes-mermaid-when-asked` | a Mermaid flowchart by name | a Mermaid block, and no graph block |
