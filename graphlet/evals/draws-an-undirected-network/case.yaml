@@ -1,0 +1,62 @@
+schema_version: '1.0'
+name: draws-an-undirected-network
+description: 'Who knows whom, which has no direction, is answered with a block of -- links.'
+tags: [draw]
+execution:
+  prompt: |
+    Ana knows Ben and Cy. Ben knows Cy and Dee. Dee knows Eli. Who could introduce Ana to Eli? Show me who knows whom.
+  max_turns: 3
+  timeout_seconds: 180
+  allowed_tools: []
+  env:
+    EVAL_GRAPHLET_GUIDE: '1'
+runs: 3
+graders:
+  - type: regex
+    name: writes-a-graph-block
+    pattern: '^[ \t]*```graphlet[ \t]*$'
+    flags: 'm'
+    match: 'contains'
+  - type: regex
+    name: links-with-dashes
+    pattern: '```graphlet[^`]*?\S[ \t]*--[ \t]*\S'
+    flags: ''
+    match: 'contains'
+  - type: regex
+    name: no-arrows-in-the-block
+    pattern: '```graphlet[^`]*?(?:->|→|↔)'
+    flags: ''
+    match: 'not_contains'
+  - type: regex
+    name: joins-ana-and-ben
+    pattern: '```graphlet[^`]*?(?:\bAna(?:[ \t]*\[\w+\])?[ \t]*--[ \t]*Ben\b|\bBen(?:[ \t]*\[\w+\])?[ \t]*--[ \t]*Ana\b)'
+    flags: ''
+    match: 'contains'
+  - type: regex
+    name: joins-ana-and-cy
+    pattern: '```graphlet[^`]*?(?:\bAna(?:[ \t]*\[\w+\])?[ \t]*--[ \t]*Cy\b|\bCy(?:[ \t]*\[\w+\])?[ \t]*--[ \t]*Ana\b)'
+    flags: ''
+    match: 'contains'
+  - type: regex
+    name: joins-ben-and-cy
+    pattern: '```graphlet[^`]*?(?:\bBen(?:[ \t]*\[\w+\])?[ \t]*--[ \t]*Cy\b|\bCy(?:[ \t]*\[\w+\])?[ \t]*--[ \t]*Ben\b)'
+    flags: ''
+    match: 'contains'
+  - type: regex
+    name: joins-ben-and-dee
+    pattern: '```graphlet[^`]*?(?:\bBen(?:[ \t]*\[\w+\])?[ \t]*--[ \t]*Dee\b|\bDee(?:[ \t]*\[\w+\])?[ \t]*--[ \t]*Ben\b)'
+    flags: ''
+    match: 'contains'
+  - type: regex
+    name: joins-dee-and-eli
+    pattern: '```graphlet[^`]*?(?:\bDee(?:[ \t]*\[\w+\])?[ \t]*--[ \t]*Eli\b|\bEli(?:[ \t]*\[\w+\])?[ \t]*--[ \t]*Dee\b)'
+    flags: ''
+    match: 'contains'
+  - type: regex
+    name: no-link-between-ana-and-eli
+    pattern: '```graphlet[^`]*?(?:\bAna(?:[ \t]*\[\w+\])?[ \t]*--[ \t]*Eli\b|\bEli(?:[ \t]*\[\w+\])?[ \t]*--[ \t]*Ana\b)'
+    flags: ''
+    match: 'not_contains'
+  - type: llm
+    name: says-who-could-introduce
+    criteria: 'PASS if the reply says that Ben can introduce Ana to Dee, who knows Eli, or otherwise names the chain Ana, Ben, Dee, Eli as the way to reach Eli. FAIL otherwise.'

@@ -26,7 +26,7 @@ Ask for a correction -> Read the request
 
 - A node is its label: the same label on several lines is one node. A line with no arrow is a node on its own.
 - A tone in brackets after a label colors its node: [good], [warn], [bad], [note], or [dim].
-- Links have a direction and may form loops. The layers run top to bottom and are worked out from the links; there are no link labels, shapes, or styles.
+- Links have a direction and may form loops. Where links have none, as between friends or linked rooms, write each as \`--\` instead. The layers run top to bottom and are worked out from the links; there are no link labels, shapes, or styles.
 - Keep labels to a few words. Introduce the graph with a sentence: the block is drawn in its place, as wide as the reply.
 - Only in replies, never in a file you write. When the person asks for Mermaid, Graphviz, or a text diagram, write that instead.`
 
@@ -37,8 +37,12 @@ export type Part = { text: string } | { graph: GraphletGraph }
 const OPENING = /^\s*(`{3,}(?=[^`]*$)|~{3,})\s*(\S*)/
 /** A line that does nothing but close a fenced block. */
 const CLOSING = /^\s*(`{3,}|~{3,})\s*$/
-/** What joins two nodes on a line: an arrow, the link running the way it points. A longer arrow, `-->`, leaves its extra dashes on the label before it. */
-const ARROW = /->|→/
+/**
+ * What joins two nodes on a line: an arrow, `->`, `-->` or `→`, a link the way
+ * it points; one with a head at each end, `<->` or `↔`, a link each way; and
+ * two dashes or more, `--`, or a dash `—`, a link with no direction.
+ */
+const JOIN = /(<-+>|↔|-+>|→|-{2,}|—)/
 /** A tone in brackets at the end of a label. */
 const TONE = new RegExp(`\\[(${TONES.join('|')})\\]$`, 'i')
 
@@ -99,14 +103,16 @@ export function partsOf(reply: string): Part[] {
 
 /**
  * The graph a block's lines say. Each line is a chain of labels joined by
- * arrows, `->`, `-->` or `→`, each arrow a link; a line with no arrow names a
- * node alone. A node is known by its label, so the same label on any line is
- * the same node, and a tone in brackets after a label is its node's, the
- * first one given. A blank label is passed over.
+ * arrows or dashes, each a link; a line with neither names a node alone. A
+ * block whose links are all dashes is an undirected graph. Any other is
+ * directed, and a dash in it is a link each way, as a two-headed arrow is. A
+ * node is known by its label, so the same label on any line is the same node,
+ * and a tone in brackets after a label is its node's, the first one given. A
+ * blank label is passed over.
  */
 export function graphOf(lines: readonly string[]): GraphletGraph {
   const nodes = new Map<string, GraphletNode>()
-  const links: GraphletLink[] = []
+  const joins: Array<GraphletLink & { join: string }> = []
   const nodeOf = (said: string): string[] => {
     const words = trimmed(said)
     const tone = TONE.exec(words)
@@ -118,13 +124,20 @@ export function graphOf(lines: readonly string[]): GraphletGraph {
     return [id]
   }
   for (const line of lines) {
-    const ids = line.split(ARROW).flatMap(nodeOf)
-    ids.forEach((to, index) => {
-      const from = ids[index - 1]
-      if (from !== undefined) links.push({ from, to })
-    })
+    const said = line.split(JOIN)
+    let from: string | undefined
+    for (let at = 0; at < said.length; at += 2) {
+      const [to] = nodeOf(said[at] ?? '')
+      if (to === undefined) continue
+      if (from !== undefined) joins.push({ from, to, join: said[at - 1] ?? '' })
+      from = to
+    }
   }
-  return { nodes: [...nodes.values()], links }
+  const isUndirected = joins.length > 0 && joins.every(({ join }) => /^(-+|—)$/.test(join))
+  const links = joins.flatMap(({ from, to, join }) =>
+    isUndirected || /^-+>$|^→$/.test(join) ? [{ from, to }] : [{ from, to }, { from: to, to: from }],
+  )
+  return { nodes: [...nodes.values()], links, ...(isUndirected ? { isDirected: false } : {}) }
 }
 
 /** A row less its first `count` cells. */

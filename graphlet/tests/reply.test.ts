@@ -2,6 +2,7 @@ import { expect, test } from 'claude-code/testing'
 
 import { LOOK, graphOf as graphNamed, picture } from './fixture'
 import { GUIDE, fencedOf, graphOf, partsOf, pictureOf } from '../hooks/reply'
+import { readGraph } from '../hooks/layers'
 import { viewOf } from '../hooks/view'
 
 const view = viewOf(LOOK)
@@ -84,6 +85,16 @@ test('a block\'s lines are chains of arrows, a node is known by its label, and t
     'c → d',
     'Read the request → Not [a tone]',
   ])
+})
+
+test('a block whose links are all dashes is an undirected graph, and in any other a dash, like a two-headed arrow, is a link each way', () => {
+  const friends = graphOf(['Alice -- Bob -- Carol', 'Carol --- Dan', 'Erin — Alice', 'e-mail -- front-end'])
+  expect(friends.isDirected).toBe(false)
+  expect(friends.links.map(link => `${link.from} – ${link.to}`)).toEqual(['Alice – Bob', 'Bob – Carol', 'Carol – Dan', 'Erin – Alice', 'e-mail – front-end'])
+  const mixed = graphOf(['A -> B', 'B -- C', 'C <-> D', 'D ↔ A'])
+  expect(mixed.isDirected).toBeUndefined()
+  expect(mixed.links.map(link => `${link.from} → ${link.to}`)).toEqual(['A → B', 'B → C', 'C → B', 'C → D', 'D → C', 'D → A', 'A → D'])
+  expect(picture(pictureOf(still, readGraph(friends), { columns: 80, rows: 1000 })).join('\n')).not.toMatch(/[▲▼]/)
 })
 
 test('no run of blanks, dashes, or brackets, however long, slows the reading of a reply', () => {

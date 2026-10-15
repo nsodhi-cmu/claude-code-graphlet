@@ -24,7 +24,11 @@ Ask for a correction -> Read the request
 `partsOf` cuts a reply at its graph blocks, and `graphOf` reads each block's lines.
 
 - A graph block is a fenced block, of backticks or of tildes, whose language, the first word after the fence, is `graphlet` in any case. It is drawn once it is closed and names at least one node. One that names none is left as written.
-- Each line is a chain of labels joined by arrows, `->`, `-->`, or `→`, and each arrow is a link from the label before it to the label after. A line with no arrow names one node.
+- Each line is a chain of labels joined by arrows or dashes, each a link between the label before it and the label after. A line with neither names one node.
+  - An arrow, `->`, `-->`, or `→`, is a link the way it points.
+  - Two dashes or more, `--`, or a dash, `—`, is a link with no direction. A block whose links are all dashes is an undirected graph, drawn with no arrowheads.
+  - In a block with any arrow, a dash is a link each way, and so is an arrow with a head at each end, `<->` or `↔`, since a graph's links are all of one kind.
+  - A single hyphen is part of a label, as in `e-mail`.
 - A node is known by its label, so the same label on any line is the same node. The blanks around a label are dropped, and a run of blanks inside one is read as one space.
 - A tone in brackets at the end of a label is its node's: `[plain]`, `[dim]`, `[note]`, `[good]`, `[warn]`, or `[bad]`, in any case. The first tone given for a node holds. Brackets that name no tone are part of the label.
 - A label left blank, by an arrow at the start or the end of a line or a tone written alone, is passed over.
@@ -105,7 +109,7 @@ What a tool would add is a result the model reads back, and a result in a run wi
 
 | Kind | Asks for | Graded on |
 | :- | :- | :- |
-| `draws-*` | something a graph answers: a flow, a state machine, files and their imports, a site map | a closed graph block with a link in it, no Mermaid in the block, and the graph being right: by a judge model's checklist, or for the imports by a pattern for each link |
+| `draws-*` | something a graph answers: a flow, a state machine, files and their imports, a site map, who knows whom | a closed graph block with a link in it, no Mermaid in the block, and the graph being right: by a judge model's checklist, or for the imports and the acquaintances by a pattern for each link; who knows whom, by its links being dashes |
 | `quiet-*` | something no graph answers: a language question, a poem, a one-line answer | no graph block |
 | `writes-mermaid-when-asked` | a Mermaid flowchart by name | a Mermaid block, and no graph block |
 
