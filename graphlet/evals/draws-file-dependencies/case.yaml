@@ -25,7 +25,7 @@ graders:
     match: 'contains'
   - type: regex
     name: no-mermaid-in-the-block
-    pattern: '```graphlet[^`]*?(?:-->\||\|[^|\n]+\||^\s*(?:graph|flowchart)\s+(?:TD|LR|TB|RL|BT)|subgraph|==>|-\.->|:::|\[\(|\(\[|\{\{)'
+    pattern: '```graphlet[^`]*?(?:^\s*(?:graph|flowchart)\s+(?:TD|LR|TB|RL|BT)|subgraph|==>|-\.->|:::|\[\(|\(\[|\{\{|\w\[[^\]\n]*\]\s*(?:-|$))'
     flags: 'mi'
     match: 'not_contains'
   - type: regex

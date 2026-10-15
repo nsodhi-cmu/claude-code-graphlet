@@ -97,6 +97,17 @@ test('a block whose links are all dashes is an undirected graph, and in any othe
   expect(picture(pictureOf(still, readGraph(friends), { columns: 80, rows: 1000 })).join('\n')).not.toMatch(/[▲▼]/)
 })
 
+test('words in pipes right after an arrow or dashes are the link\'s label', () => {
+  const graph = graphOf(['Valid? ->|yes| Save it', 'Valid? -->| no | Ask again ->|retry| Read', 'A --|by train| B'])
+  expect(graph.links).toEqual([
+    { from: 'Valid?', to: 'Save it', label: 'yes' },
+    { from: 'Valid?', to: 'Ask again', label: 'no' },
+    { from: 'Ask again', to: 'Read', label: 'retry' },
+    { from: 'A', to: 'B', label: 'by train' },
+    { from: 'B', to: 'A', label: 'by train' },
+  ])
+})
+
 test('no run of blanks, dashes, or brackets, however long, slows the reading of a reply', () => {
   const long = 200_000
   const reply = [

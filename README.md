@@ -60,13 +60,13 @@ graphlet adds a few lines to the system prompt of every session that draws, sayi
 ````
 ```graphlet
 Start -> Read the request -> Valid?
-Valid? -> Save it -> Done
-Valid? -> Ask for a correction [warn]
+Valid? ->|yes| Save it -> Done
+Valid? ->|no| Ask for a correction [warn]
 Ask for a correction -> Read the request
 ```
 ````
 
-The block is drawn in its place in the reply, with the person's settings, its links always kept separate. A tone in brackets colors its node. Where links have no direction, Claude writes them as `--`, and the graph is drawn undirected, with no arrowheads. The picture fits the reply: a layer too wide for it is folded onto more rows. The picture is still: it does not scroll or take a selection, and a graph that cannot be folded narrow enough counts the nodes past its edge. Where graphlet draws no picture, the block becomes the same picture as plain text. The conversation keeps the block as Claude wrote it.
+The block is drawn in its place in the reply, with the person's settings, its links always kept separate. A tone in brackets colors its node, and words in pipes after an arrow, `->|yes|`, are written on its link. Where links have no direction, Claude writes them as `--`, and the graph is drawn undirected, with no arrowheads. The picture fits the reply: a layer too wide for it is folded onto more rows. The picture is still: it does not scroll or take a selection, and a graph that cannot be folded narrow enough counts the nodes past its edge. Where graphlet draws no picture, the block becomes the same picture as plain text. The conversation keeps the block as Claude wrote it.
 
 [docs/REPLIES.md](docs/REPLIES.md) has the block's syntax, what the model is told, and why it is a block and not a tool.
 

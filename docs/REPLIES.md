@@ -4,7 +4,7 @@ Claude, the model in a session where graphlet is installed, draws a graph in a r
 
 ## What The Model Is Told
 
-A `prompt.compose` hook adds one section to the end of the system prompt, `graphlet:graphs`, on the session's side of the cache boundary. Its text is `GUIDE` in `reply.ts`: what a block looks like, an example, the tones, and when to write one and when not to. The example is itself a block that graphlet draws.
+A `prompt.compose` hook adds one section to the end of the system prompt, `graphlet:graphs`, on the session's side of the cache boundary. Its text is `GUIDE` in `reply.ts`: what a block looks like, an example, the tones, labels, links with no direction, and when to write one and when not to. The example is itself a block that graphlet draws.
 
 The section is added wherever the session draws, that is, wherever `e.surfaces` names a surface. A run that draws nowhere, such as `claude -p`, gets no section, since a block there would reach the person as written, unless the environment variable `EVAL_GRAPHLET_GUIDE` is `1`, as the evals set it, so that what the model writes with the guide can be measured.
 
@@ -15,8 +15,8 @@ Where an organization manages Claude Code, the engine runs `prompt.compose` hook
 ````
 ```graphlet
 Start -> Read the request -> Valid?
-Valid? -> Save it -> Done
-Valid? -> Ask for a correction [warn]
+Valid? ->|yes| Save it -> Done
+Valid? ->|no| Ask for a correction [warn]
 Ask for a correction -> Read the request
 ```
 ````
@@ -29,6 +29,7 @@ Ask for a correction -> Read the request
   - Two dashes or more, `--`, or a dash, `—`, is a link with no direction. A block whose links are all dashes is an undirected graph, drawn with no arrowheads.
   - In a block with any arrow, a dash is a link each way, and so is an arrow with a head at each end, `<->` or `↔`, since a graph's links are all of one kind.
   - A single hyphen is part of a label, as in `e-mail`.
+  - Words in pipes right after an arrow or dashes, as in `Valid? ->|no| Ask again`, are the link's label, written on it. A link each way that a dash or a two-headed arrow makes carries the label both ways.
 - A node is known by its label, so the same label on any line is the same node. The blanks around a label are dropped, and a run of blanks inside one is read as one space.
 - A tone in brackets at the end of a label is its node's: `[plain]`, `[dim]`, `[note]`, `[good]`, `[warn]`, or `[bad]`, in any case. The first tone given for a node holds. Brackets that name no tone are part of the label.
 - A label left blank, by an arrow at the start or the end of a line or a tone written alone, is passed over.
@@ -109,7 +110,7 @@ What a tool would add is a result the model reads back, and a result in a run wi
 
 | Kind | Asks for | Graded on |
 | :- | :- | :- |
-| `draws-*` | something a graph answers: a flow, a state machine, files and their imports, a site map, who knows whom | a closed graph block with a link in it, no Mermaid in the block, and the graph being right: by a judge model's checklist, or for the imports and the acquaintances by a pattern for each link; who knows whom, by its links being dashes |
+| `draws-*`, `labels-the-branches` | something a graph answers: a flow, a state machine, files and their imports, a site map, who knows whom, decisions with named outcomes | a closed graph block with a link in it, no Mermaid in the block, and the graph being right: by a judge model's checklist, or for the imports and the acquaintances by a pattern for each link; who knows whom, by its links being dashes; the decisions, by a labeled link and a judge's checklist of their outcomes |
 | `quiet-*` | something no graph answers: a language question, a poem, a one-line answer | no graph block |
 | `writes-mermaid-when-asked` | a Mermaid flowchart by name | a Mermaid block, and no graph block |
 

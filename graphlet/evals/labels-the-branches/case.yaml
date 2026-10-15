@@ -1,0 +1,32 @@
+schema_version: '1.0'
+name: labels-the-branches
+description: 'Decisions with named outcomes are answered with labels on their links.'
+tags: [draw]
+execution:
+  prompt: |
+    How does a vending machine decide what to do when someone presses a button? It checks whether enough money was put in, and if so whether the item is in stock; then it either dispenses the item, refunds the money, or asks for more money. Show me the decisions.
+  max_turns: 3
+  timeout_seconds: 180
+  allowed_tools: []
+  env:
+    EVAL_GRAPHLET_GUIDE: '1'
+runs: 3
+graders:
+  - type: regex
+    name: writes-a-graph-block
+    pattern: '^[ \t]*```graphlet[ \t]*$'
+    flags: 'm'
+    match: 'contains'
+  - type: regex
+    name: block-is-closed-with-a-link
+    pattern: '^[ \t]*```graphlet[ \t]*\n(?:(?![ \t]*```)[^\n]*\n)*?[^\n]*(?:->|→)[^\n]*\n(?:(?![ \t]*```)[^\n]*\n)*?[ \t]*```[ \t]*$'
+    flags: 'm'
+    match: 'contains'
+  - type: regex
+    name: labels-a-link
+    pattern: '```graphlet[^`]*?(?:-+>|→)\|[^|\n]*\w[^|\n]*\|'
+    flags: ''
+    match: 'contains'
+  - type: llm
+    name: branches-say-their-outcome
+    criteria: 'Judge only the graph in the ```graphlet block, where a link written `a ->|word| b` carries the label `word`. PASS if both of these hold: (1) the two links leaving the check for enough money carry labels that tell its outcomes apart, such as yes and no, and so do the two leaving the check for stock; (2) following the links, enough money and in stock leads to dispensing, enough money and out of stock leads to a refund, and not enough money leads to asking for more. FAIL if either does not hold.'
