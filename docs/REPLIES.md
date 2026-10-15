@@ -89,6 +89,7 @@ A reply that opens with a graph has no text before it for the engine to draw, an
 - **Its height.** As tall as the graph needs, up to the most rows a room has, `MOST_CELLS`.
 - **It is still.** Nothing is selected or lit, no key or wheel moves it, and nothing in it answers a click. Its rows are plain `Text`, with no `Client` around them to take the pointer or the keyboard.
 - **Its foot.** There is no `html ↗` corner. A graph still wider than the reply, where a layer cannot fold far enough, the graph has more nodes than `FOLDED_NODES` or more links than `FOLDED_LINKS`, or the reply is narrower than the narrowest room a graph is laid out for, is seen from its top left corner, as a pane's is before it is scrolled, and its foot keeps the counts of the nodes past the edge, `3 more →`. A graph that is all in view has no foot.
+- **Its size.** A reply's text and pictures are one drawing to the engine, so its pictures share what the engine's bound on a drawing leaves after the text, and a picture past its share is drawn plainer, as [DRAWING.md](DRAWING.md#too-large-to-draw) tells.
 
 ## On Other Surfaces
 

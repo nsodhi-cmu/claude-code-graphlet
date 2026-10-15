@@ -1,6 +1,6 @@
 import type { ClientModule } from 'claude-code'
 
-import { styleOf } from './draw'
+import { piecesOf, styleOf } from './draw'
 import type { Drawing } from './draw'
 
 // The surface module: it paints the drawing it is handed, and posts what a
@@ -49,7 +49,13 @@ const Surface: ClientModule<Drawing, number> = (drawing, surface) => {
     <Box flexDirection="column">
       {drawing.rows.map(row => (
         <Text wrap="truncate-end">
-          {row.length === 0 ? ' ' : row.map(span => <Text {...styleOf(span, surface.state)}>{span.text}</Text>)}
+          {row.length === 0
+            ? ' '
+            : row.flatMap(span =>
+                (surface.state === undefined ? [{ text: span.text }] : piecesOf(span, surface.state)).map(piece => (
+                  <Text {...styleOf(span, piece.isBead)}>{piece.text}</Text>
+                )),
+              )}
         </Text>
       ))}
     </Box>

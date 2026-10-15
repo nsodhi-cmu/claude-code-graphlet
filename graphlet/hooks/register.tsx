@@ -1,7 +1,7 @@
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Graphlet } from '../types'
-import { charactersOf, styleOf } from './draw'
+import { MOST_TREE_CHARS, bounded, charactersOf, styleOf } from './draw'
 import type { Drawing, Pan, Room } from './draw'
 import { readGraph } from './layers'
 import type { Graph } from './layers'
@@ -151,7 +151,9 @@ export const register: Register = (on, options) => {
     const parts = e.props.isSummary ? [] : partsOf(e.props.text)
     if (!parts.some(part => 'graph' in part)) return next(e)
     const room = { columns: cellsOf((e.viewport?.columns ?? REPLY_COLUMNS) - BULLET_COLUMNS), rows: MOST_CELLS }
-    const shown = parts.map(part => ('graph' in part ? pictureOf(still, readGraph(part.graph), room) : part))
+    const words = parts.reduce((sum, part) => sum + ('text' in part ? part.text.length : 0), 0)
+    const share = Math.max(0, MOST_TREE_CHARS - words) / parts.filter(part => 'graph' in part).length
+    const shown = parts.map(part => ('graph' in part ? bounded(pictureOf(still, readGraph(part.graph), room), share) : part))
     if (e.surface !== 'terminal') {
       const text = shown.map(part => ('text' in part ? part.text : fencedOf(part))).join('\n\n')
       return next({ ...e, props: { ...e.props, text } })

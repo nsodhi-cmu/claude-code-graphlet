@@ -1,4 +1,4 @@
-import { BEATS, canvasOf, clipMiddle, footRow, leftOut, sizeOf, spansOf } from './draw'
+import { beatOf, bounded, canvasOf, clipMiddle, footRow, leftOut, sizeOf, spansOf } from './draw'
 import type { Canvas, Drawing, Hit, Paint, Pan, Room } from './draw'
 import { isJoined } from './layers'
 import type { Graph } from './layers'
@@ -37,8 +37,6 @@ function insetOf(place: Place): number {
   return Math.floor((place.width - 4 - sizeOf(words.mark) - widest) / 2)
 }
 
-/** The beat of a cell of a flowing line, by how far along the way the line runs the cell stands: its row or column, counted the way the line goes. */
-const beatOf = (along: number): number => ((along % BEATS) + BEATS) % BEATS
 
 /** What is being looked for in a graph, and the nodes whose labels hold it, in the graph's order. */
 export type Finding = { query: string; found: string[] }
@@ -331,11 +329,12 @@ function paintSigns(canvas: Canvas, graph: Graph, boxes: Box[], selected: string
  * it, is passed over. Where something is being found, the boxes of the nodes
  * found have their borders in `note`. The nodes joined to the selected one
  * that the window does not show are named at its edge. Where the lines are to
- * flow, in a directed graph, each cell of a lit line has its beat. The last row is the
- * foot: it counts the nodes out of view of a graph larger than the room, says
- * what is being found and which of the found the selected node is, or else
- * what was left out of the graph, and holds the corner a click opens the
- * graph as a web page by.
+ * flow, in a directed graph, each cell of a lit line has its beat. The last
+ * row is the foot: it counts the nodes out of view of a graph larger than the
+ * room, says what is being found and which of the found the selected node is,
+ * or else what was left out of the graph, and holds the corner a click opens
+ * the graph as a web page by. A drawing too large for the engine to draw is
+ * drawn plainer.
  */
 export function paint(layout: Layout, graph: Graph, selected: string | null, room: Room, pan: Pan, finding?: Finding, isFlowing = false): Drawing {
   if (layout.shelves.length === 0) return { rows: [], hits: [] }
@@ -378,5 +377,5 @@ export function paint(layout: Layout, graph: Graph, selected: string | null, roo
       ? leftOut(graph.unread)
       : [`/${finding.query} · ${finding.found.length === 0 ? 'no match' : `${Math.max(which, 0) + 1} of ${finding.found.length}`}`, `/${finding.query}`]
   const foot = footRow(sight.isWhole ? undefined : beyond, layout.columns, page, rows.length, notes)
-  return { rows: [...rows, foot.row], hits: [...signs, ...hits, ...foot.hits] }
+  return bounded({ rows: [...rows, foot.row], hits: [...signs, ...hits, ...foot.hits] })
 }

@@ -79,7 +79,7 @@ Lit is painted over unlit. Where links share a stretch of line, selecting a node
 
 ### Flowing
 
-With the `motion` setting at `flowing`, the lit lines of a directed graph flow. Each cell of a lit line has a beat, one of `BEATS`, from where it stands along the way its link runs there: its row on a stretch that runs down, its row counted upward on one that runs up, and its column counted the way a stretch across runs. The beat is a span's `beat`. At each step of the flow, the cells whose beat it is are beads, bright and bold in the accent, and the rest of the lit lines are dim; at the next step the beads stand a cell farther along, so they move on from the node a link leaves to the node it reaches, and every `BEATS` steps they come round again. A cell several lit lines share has the beat of the first. Arrowheads, ticks and labels stay as they are. The surface module takes a step every `STEP_MS`, and only while its drawing has lines that flow.
+With the `motion` setting at `flowing`, the lit lines of a directed graph flow. Each cell of a lit line has a beat, one of `BEATS`, from where it stands along the way its link runs there: its row on a stretch that runs down, its row counted upward on one that runs up, and its column counted the way a stretch across runs. A run of a flowing line has the beat of its first cell, as its `beat`, and where it runs on across cells, the `way` its beat steps from each cell to the next, so a stretch across is one run; `piecesOf` cuts a run at a step of the flow into its beads and the stretches between. At each step of the flow, the cells whose beat it is are beads, bright and bold in the accent, and the rest of the lit lines are dim; at the next step the beads stand a cell farther along, so they move on from the node a link leaves to the node it reaches, and every `BEATS` steps they come round again. A cell several lit lines share takes the beat of one of them, the one that runs up or down where they cross. Arrowheads, ticks and labels stay as they are. The surface module takes a step every `STEP_MS`, and only while its drawing has lines that flow.
 
 ## The Window
 
@@ -121,7 +121,7 @@ While a node is being found, the nodes whose labels hold what is typed, in any c
 
 ## Paints
 
-A run of text is in one paint: a node's tone, or `accent` for what is selected or linked to it. `COLORS` in `draw.ts` gives each paint a key of the person's theme, so a drawing follows the theme they chose, and `styleOf` turns a run into the props of the `Text` that paints it.
+A run of text is in one paint: a node's tone, or `accent` for what is selected or linked to it. `COLORS` in `draw.ts` gives each paint a key of the person's theme, so a drawing follows the theme they chose, and `styleOf` turns a run into the props of the `Text` that paints it. `spansOf` reads a row of cells as its runs. A blank looks the same in any paint but inverse, so a blank joins the run before it, and blanks before any other run take its paint, which keeps a row to few runs.
 
 | Paint | Theme color |
 | :- | :- |
@@ -132,6 +132,10 @@ A run of text is in one paint: a node's tone, or `accent` for what is selected o
 | `warn` | `warning` |
 | `bad` | `error` |
 | `accent` | `claude` |
+
+### Too Large To Draw
+
+The engine draws a tree of elements only up to a size, and unmounts a surface module, or refuses a hook's drawing, past it; each run of a row is an element. `bounded` keeps a drawing's rows within `MOST_TREE_CHARS` characters as a tree, by `treeCharsOf`'s reckoning: each run costs `PIECE_CHARS` besides its text, a run of a flowing line as many times over as the most pieces its beads may cut it into, and each row `ROW_CHARS`. A drawing within it is drawn as it is. One past it is drawn plainer, each way plainer than the one before, until it fits: its lines still; then its dim paint plain; then all but what is lit or selected plain; then all of it plain. `paint` bounds every drawing, and a reply shares what is left of the bound, after its text, among its pictures.
 
 ## Cells
 

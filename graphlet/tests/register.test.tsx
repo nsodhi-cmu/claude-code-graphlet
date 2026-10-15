@@ -68,6 +68,14 @@ const HOST: Plugin = {
       nodes: [{ id: 'hub', label: 'hub' }, ...Array.from({ length: 40 }, (_, index) => ({ id: `leaf${index}`, label: `leaf${index}` }))],
       links: Array.from({ length: 40 }, (_, index) => ({ from: 'hub', to: `leaf${index}` })),
     }
+    const DENSE = {
+      nodes: Array.from({ length: 60 }, (_, index) => ({ id: `d${index}`, label: `node number ${index}`, ...(index % 5 === 0 ? { tone: 'bad' as const } : {}) })),
+      links: Array.from({ length: 180 }, (_, index) => ({ from: `d${index < 30 ? 0 : (index * 7) % 60}`, to: `d${(index * 13 + 5) % 60}` })),
+    }
+    on('ui.render', { component: 'Pane', requestId: 'dense' }, async ($, e, next) => {
+      await $.graphlet.show({ pane: 'dense', graph: DENSE, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
+      return next(e)
+    })
     on('ui.render', { component: 'Pane', requestId: 'big' }, async ($, e, next) => {
       await $.graphlet.show({ pane: 'big', graph: HUB, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
       return next(e)
@@ -189,7 +197,7 @@ test('a pane\'s owner says what the pane holds, and next hands it the drawing to
   expect(await pane.find({ in: 'graph', type: 'Text', text: /^◆ price\.ts$/ })).toMatchObject({
     props: { color: 'suggestion', bold: true, inverse: true },
   })
-  expect(await pane.find({ in: 'graph', type: 'Text', text: /^● cart\.ts$/ })).toMatchObject({ props: { color: 'error' } })
+  expect(await pane.find({ in: 'graph', type: 'Text', text: /^● cart\.ts *$/ })).toMatchObject({ props: { color: 'error' } })
   await pane.unmount()
 })
 
@@ -426,6 +434,18 @@ test('flowing, the beads of the selected node\'s links move on at each step of t
   await pane.unmount()
 })
 
+test('a graph too busy to draw whole in a large pane is drawn plainer, as far as the engine needs, and still drawn', { ...WITH_HOST, options: { motion: 'flowing' } }, async ($, on) => {
+  world(on)
+  const pane = await mount($, 'dense', { ...PANE, bodyColumns: 200, scroll: { offset: 0, bodyRows: 60 } })
+  const rows = await rowsOf(pane)
+  expect(rows).toHaveLength(60)
+  expect(rows.some(row => row.includes('node number 0'))).toBe(true)
+  expect(JSON.stringify(await pane.drawn({ in: 'graph' })).length).toBeLessThan(100_000)
+  await pane.advance(150)
+  expect(JSON.stringify(await pane.drawn({ in: 'graph' })).length).toBeLessThan(100_000)
+  await pane.unmount()
+})
+
 test('still, the lit lines are drawn once and the clock moves nothing', WITH_HOST, async ($, on) => {
   world(on)
   const pane = await mount($, 'free')
@@ -581,7 +601,7 @@ test('a graph block in a reply is drawn in its place, in color, under the engine
     '',
     '  The dashed line is the retry.',
   ])
-  expect(await reply.find({ type: 'Text', text: /^Ask for a correction$/ })).toMatchObject({ props: { color: 'warning' } })
+  expect((await reply.findAll({ type: 'Text', text: /Ask for a correction/ })).map(text => text.props.color)).toContain('warning')
   expect(await reply.find({ type: 'Markdown' })).toMatchObject({ props: { text: 'The dashed line is the retry.' } })
   await reply.unmount()
 })

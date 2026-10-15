@@ -2,7 +2,7 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import { LOOK, SHOP, cellsOf, graphOf, graphRows, numbers, picture, undirected } from './fixture'
 import type { GraphletLink } from '../types'
-import { BEATS } from '../hooks/draw'
+import { BEATS, piecesOf } from '../hooks/draw'
 import type { Drawing, Hit, Span } from '../hooks/draw'
 import { readGraph } from '../hooks/layers'
 import type { Graph } from '../hooks/layers'
@@ -485,15 +485,15 @@ describe('what is selected', () => {
 
   test('the selected box, the boxes linked to it, and the links between them are lit; the rest keep their own paint', () => {
     expect(drawing.rows[0]?.filter(span => span.text.includes('┌')).map(span => span.paint)).toEqual(['dim', 'accent'])
-    expect(drawing.rows[4]?.filter(span => span.text === '▼').map(span => span.paint)).toEqual(['dim', 'accent'])
+    expect(drawing.rows[4]?.filter(span => span.text.trim() === '▼').map(span => span.paint)).toEqual(['dim', 'accent'])
     expect(drawing.rows[5]?.filter(span => span.text.trim() !== '').map(span => span.paint)).toEqual(['bad', 'accent', 'dim', 'warn'])
-    expect(drawing.rows[8]?.filter(span => span.text.trim() !== '').map(span => [span.text.length, span.paint])).toEqual([
+    expect(drawing.rows[8]?.filter(span => span.text.trim() !== '').map(span => [span.text.trim().length, span.paint])).toEqual([
       [19, 'dim'],
       [9, 'accent'],
       [24, 'dim'],
     ])
     expect(spansWith(drawing, '┌────────────┐').at(-1)?.paint).toBe('accent')
-    expect(spansWith(drawing, '● cart.ts')).toEqual([{ text: '● cart.ts', paint: 'bad' }])
+    expect(spansWith(drawing, '● cart.ts').map(span => span.paint)).toEqual(['bad'])
   })
 
   test('where a link leaves a box, the border shows it in the border\'s own paint, lit or not', () => {
@@ -505,7 +505,7 @@ describe('what is selected', () => {
     const money = drawn(SHOP, 'src/money.ts', WHOLE)
     expect(money.rows[16]?.filter(span => span.text.trim() !== '').slice(1, 3)).toEqual([
       { text: '→ money.ts', paint: 'dim', isBold: true, isInverse: true },
-      { text: '  2', paint: 'dim' },
+      { text: '  2 ', paint: 'dim' },
     ])
   })
 
@@ -519,7 +519,12 @@ describe('what is selected', () => {
 describe('lines that flow', () => {
   /** The picture with each cell that is a bead at `step` of the flow drawn as `•`. */
   const beadsAt = (drawing: Drawing, step: number): string[] =>
-    graphRows({ ...drawing, rows: drawing.rows.map(row => row.map(span => (span.beat === step % BEATS ? { ...span, text: '•'.repeat(cellsOf(span.text).length) } : span))) })
+    graphRows({
+      ...drawing,
+      rows: drawing.rows.map(row =>
+        row.flatMap(span => piecesOf(span, step).map(piece => ({ ...span, text: piece.isBead === true ? '•'.repeat(cellsOf(piece.text).length) : piece.text }))),
+      ),
+    })
   const loop = graphOf(['A', 'B', 'C'], [['A', 'B'], ['B', 'C'], ['C', 'A']])
   const flowing = viewOf({ ...LOOK, motion: 'flowing' })
 
@@ -602,7 +607,7 @@ describe('what the window does not show', () => {
       '                └───┬───────────────────',
       '           ▾ Ledger ▼',
     ])
-    expect(spansWith(payments, '▴ Checkout')).toEqual([{ text: '▴ Checkout', paint: 'accent' }])
+    expect(spansWith(payments, '▴ Checkout').map(span => span.paint)).toEqual(['accent'])
     expect(boxes(payments).slice(0, 2).map(hit => hit.node)).toEqual(['Checkout', 'Ledger'])
   })
 

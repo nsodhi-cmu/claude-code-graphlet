@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { beyondRow, canvasOf, clipMiddle, footRow, leftOut, reveal, rowText, sizeOf, spansOf } from '../hooks/draw'
+import { beatOf, beyondRow, bounded, canvasOf, clipMiddle, footRow, leftOut, reveal, rowText, sizeOf, spansOf } from '../hooks/draw'
+import type { Paint, Span } from '../hooks/draw'
 
 describe('a window brought to what it must show', () => {
   test('one that already shows it stays where it is', () => {
@@ -117,18 +118,42 @@ describe('text and cells', () => {
     expect(canvas.cells.map(row => rowText(spansOf(row)))).toEqual([' ay  x'])
   })
 
-  test('what is written past a canvas\'s edges is not kept, and a row reads as its runs of one paint, less the blanks it ends in', () => {
+  test('what is written past a canvas\'s edges is not kept, and a row reads as its runs of one paint, each blank in the run before it and blanks before any in the run after, less the blanks it ends in', () => {
     const canvas = canvasOf(6, 1)
     canvas.put(-2, 0, 'abcd', { paint: 'bad' })
     canvas.put(3, 0, 'xyz!', { paint: 'dim', isBold: true })
     canvas.put(0, 4, 'below', { paint: 'plain' })
     expect(canvas.cells.map(spansOf)).toEqual([
       [
-        { text: 'cd', paint: 'bad' },
-        { text: ' ', paint: 'plain' },
+        { text: 'cd ', paint: 'bad' },
         { text: 'xyz', paint: 'dim', isBold: true },
+      ],
+    ])
+    const inverse = canvasOf(9, 1)
+    inverse.put(2, 0, 'ab', { paint: 'note' })
+    inverse.put(5, 0, ' c', { paint: 'note', isInverse: true })
+    expect(inverse.cells.map(spansOf)).toEqual([
+      [
+        { text: '  ab ', paint: 'note' },
+        { text: ' c', paint: 'note', isInverse: true },
       ],
     ])
     expect(spansOf(canvasOf(4, 1).cells[0] ?? [])).toEqual([])
   })
 })
+
+describe('a drawing too large to draw', () => {
+  const row = (paints: Paint[], hasBeats = false): Span[] => paints.map((paint, x) => ({ text: '─', paint, ...(hasBeats ? { beat: beatOf(x) } : {}) }))
+  const rows = (paints: Paint[], hasBeats = false): Span[][] => Array.from({ length: 60 }, () => row(Array.from({ length: 150 }, (_, x) => paints[x % paints.length] ?? 'plain'), hasBeats))
+  const line = (paint: Paint): Span[][] => Array.from({ length: 60 }, () => [{ text: '─'.repeat(150), paint }])
+
+  test('is drawn plainer, as little as it takes: still, then with its dim paint plain, then plain but for what is lit, then all plain', () => {
+    const small = { rows: [row(['dim', 'accent', 'dim'], true)], hits: [] }
+    expect(bounded(small)).toEqual(small)
+    expect(bounded({ rows: rows(['accent'], true), hits: [] }).rows).toEqual(line('accent'))
+    expect(bounded({ rows: rows(['dim', 'plain']), hits: [] }).rows).toEqual(line('plain'))
+    expect(bounded({ rows: rows(['bad', 'warn']), hits: [] }).rows).toEqual(line('plain'))
+    expect(bounded({ rows: rows(['accent', 'bad']), hits: [] }).rows).toEqual(line('plain'))
+  })
+})
+
