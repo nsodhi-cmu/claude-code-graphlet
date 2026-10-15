@@ -28,7 +28,7 @@ Ask for a correction -> Read the request
 - A tone in brackets after a label colors its node: [good], [warn], [bad], [note], or [dim].
 - Words in pipes right after an arrow are written on its link, as \`->|yes|\` above. Keep them to a word or two.
 - Links have a direction and may form loops. Where links have none, as between friends or linked rooms, write each as \`--\` instead. The layers run top to bottom and are worked out from the links; there are no shapes or styles.
-- Keep labels to a few words. Introduce the graph with a sentence: the block is drawn in its place, as wide as the reply.
+- Keep labels to a few words, and a graph to a couple dozen nodes: split a larger one, or say the rest in words. Introduce the graph with a sentence: the block is drawn in its place, as wide as the reply.
 - Only in replies, never in a file you write. When the person asks for Mermaid, Graphviz, or a text diagram, write that instead.`
 
 /** A reply cut at its graph blocks, in order: the runs of text between them, and each block's graph. */

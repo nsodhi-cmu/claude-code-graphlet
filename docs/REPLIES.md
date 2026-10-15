@@ -4,7 +4,7 @@ Claude, the model in a session where graphlet is installed, draws a graph in a r
 
 ## What The Model Is Told
 
-A `prompt.compose` hook adds one section to the end of the system prompt, `graphlet:graphs`, on the session's side of the cache boundary. Its text is `GUIDE` in `reply.ts`: what a block looks like, an example, the tones, labels, links with no direction, and when to write one and when not to. The example is itself a block that graphlet draws.
+A `prompt.compose` hook adds one section to the end of the system prompt, `graphlet:graphs`, on the session's side of the cache boundary. Its text is `GUIDE` in `reply.ts`: what a block looks like, an example, the tones, labels, links with no direction, how large a graph to draw, and when to write one and when not to. The example is itself a block that graphlet draws.
 
 The section is added wherever the session draws, that is, wherever `e.surfaces` names a surface. A run that draws nowhere, such as `claude -p`, gets no section, since a block there would reach the person as written, unless the environment variable `EVAL_GRAPHLET_GUIDE` is `1`, as the evals set it, so that what the model writes with the guide can be measured.
 
@@ -112,6 +112,7 @@ What a tool would add is a result the model reads back, and a result in a run wi
 | Kind | Asks for | Graded on |
 | :- | :- | :- |
 | `draws-*`, `labels-the-branches` | something a graph answers: a flow, a state machine, files and their imports, a site map, who knows whom, decisions with named outcomes | a closed graph block with a link in it, of arrows, or for who knows whom of dashes and no arrows; no Mermaid in the block; and the graph being right: by a judge model's checklist, or for the imports and the acquaintances by a pattern for each link, written any way the block allows; the decisions, by a labeled link and a judge's checklist of their outcomes |
+| `keeps-a-big-graph-small` | a map of a system with many parts | a graph block; no Mermaid in it; and by a judge model, no block of more than thirty nodes |
 | `quiet-*` | something no graph answers: a language question, a poem, a one-line answer | no graph block |
 | `writes-mermaid-when-asked` | a Mermaid flowchart by name | a Mermaid block, and no graph block |
 

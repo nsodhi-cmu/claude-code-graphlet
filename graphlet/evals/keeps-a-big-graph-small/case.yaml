@@ -1,0 +1,27 @@
+schema_version: '1.0'
+name: keeps-a-big-graph-small
+description: 'A question with many parts gets graphs of a size a reply can hold.'
+tags: [draw]
+execution:
+  prompt: |
+    Map out every service in a large e-commerce platform and how they call each other: storefront, search, catalog, pricing, promotions, inventory, cart, checkout, payments, fraud, tax, shipping, warehouse, returns, accounts, auth, notifications, reviews, recommendations, analytics, and admin.
+  max_turns: 3
+  timeout_seconds: 180
+  allowed_tools: []
+  env:
+    EVAL_GRAPHLET_GUIDE: '1'
+runs: 3
+graders:
+  - type: regex
+    name: writes-a-graph-block
+    pattern: '^[ \t]*```graphlet[ \t]*$'
+    flags: 'm'
+    match: 'contains'
+  - type: regex
+    name: no-mermaid-in-the-block
+    pattern: '```graphlet[^`]*?(?:^\s*(?:graph|flowchart)\s+(?:TD|LR|TB|RL|BT)|subgraph|==>|-\.->|:::|\[\(|\(\[|\{\{)'
+    flags: 'mi'
+    match: 'not_contains'
+  - type: llm
+    name: graphs-a-reply-can-hold
+    criteria: 'Count the distinct node labels in each ```graphlet block of the reply. PASS if no block has more than thirty distinct nodes. FAIL if any block has more than thirty.'
