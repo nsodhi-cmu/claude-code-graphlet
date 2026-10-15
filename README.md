@@ -65,7 +65,7 @@ Ask for a correction -> Read the request
 ```
 ````
 
-The block is drawn in its place in the reply, as wide as the reply, with the person's settings. A tone in brackets colors its node. The picture is still: it does not scroll or take a selection, and a graph wider than the reply counts the nodes past its edge. Where graphlet draws no picture, the block becomes the same picture as plain text. The conversation keeps the block as Claude wrote it.
+The block is drawn in its place in the reply, with the person's settings. A tone in brackets colors its node. The picture fits the reply: a layer too wide for it is folded onto more rows. The picture is still: it does not scroll or take a selection, and a graph that cannot be folded narrow enough counts the nodes past its edge. Where graphlet draws no picture, the block becomes the same picture as plain text. The conversation keeps the block as Claude wrote it.
 
 [docs/REPLIES.md](docs/REPLIES.md) has the block's syntax, what the model is told, and why it is a block and not a tool.
 

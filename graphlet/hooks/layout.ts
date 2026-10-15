@@ -108,6 +108,12 @@ export function wordsOf(graph: Graph, node: GraphletNode, labels: Labels): Words
   }
 }
 
+/** How wide a box is that says `words`: as wide as its widest line, and never too narrow for its two ports to stand apart. */
+function widthOf(words: Words): number {
+  const widest = Math.max(1, ...words.lines.map((line, index) => sizeOf(line) + (index === words.lines.length - 1 ? sizeOf(words.badge) : 0)))
+  return Math.max(BOX_COLUMNS, sizeOf(words.mark) + widest + BOX_PADDING)
+}
+
 /**
  * A slot where it stands: on which shelf, where it starts along the shelf,
  * how wide it is and how many rows it takes from the shelf's top, and for a
@@ -597,24 +603,24 @@ export function layTracks(channel: Channel, xOf: (place: Place) => number, under
 }
 
 /**
- * Lays a graph out. Every face of every box is dealt its ports. The longest
- * shelf is seated first, in the middle of what it is laid out across, then
- * each other shelf against the one nearer it where the two are laid out
- * across the same columns. Pinned, that is the room's for every shelf that
- * fits it, and a longer shelf runs on alone from the left edge. The channels
- * are then given the rows their wires need.
+ * Lays a graph out. Where it is to `fold`, its layers are folded first into
+ * as many as it takes for each to fit the room, a box and the room beside it
+ * a node and a column and the room beside it a lane. Every face of every box
+ * is dealt its ports. The longest shelf is seated first, in the middle of
+ * what it is laid out across, then each other shelf against the one nearer it
+ * where the two are laid out across the same columns. Pinned, that is the
+ * room's for every shelf that fits it, and a longer shelf runs on alone from
+ * the left edge. The channels are then given the rows their wires need.
  */
-export function layoutOf(graph: Graph, room: Room, look: Look): Layout {
+export function layoutOf(graph: Graph, room: Room, look: Look, fold = false): Layout {
   const columns = Math.max(room.columns, LEAST_COLUMNS)
-  const layers = layersOf(graph)
+  const layers = layersOf(graph, fold ? { columns, widthOf: node => widthOf(wordsOf(graph, node, look.labels)), gap: GAP } : undefined)
   const placeOf = new Map<Slot, Place>()
   const shelves: Shelf[] = layers.slots.map((slots, shelf) => {
     const places = slots.map(slot => {
       const words = 'node' in slot ? wordsOf(graph, slot.node, look.labels) : undefined
-      const lines = words?.lines ?? []
-      const widest = Math.max(1, ...lines.map((line, index) => sizeOf(line) + (index === lines.length - 1 ? sizeOf(words?.badge ?? '') : 0)))
-      const width = words === undefined ? 1 : Math.max(BOX_COLUMNS, sizeOf(words.mark) + widest + BOX_PADDING)
-      const place: Place = { slot, shelf, x: 0, width, rows: lines.length + 2, ...(words === undefined ? {} : { words }) }
+      const width = words === undefined ? 1 : widthOf(words)
+      const place: Place = { slot, shelf, x: 0, width, rows: (words?.lines.length ?? 0) + 2, ...(words === undefined ? {} : { words }) }
       placeOf.set(slot, place)
       return place
     })

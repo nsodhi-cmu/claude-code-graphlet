@@ -19,8 +19,9 @@ const held = new Map<string, Held>()
 const picked = new Map<string, string>()
 /** Where the person scrolled each pane's window to. A pane is missing while its window follows the selection. */
 const scrolled = new Map<string, Pan>()
-/** How graphs are drawn: as the plugin's options say. */
+/** How graphs are drawn: as the plugin's options say, in a pane and, folded into the room it has, in a reply. */
 let view = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate' })
+let still = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate' }, true)
 
 /** The programs that open a file as the person's system would, each tried in turn: Linux's, macOS's, and Windows's. */
 const OPENERS: ReadonlyArray<(path: string) => string[]> = [
@@ -73,11 +74,13 @@ const isPan = (value: unknown): value is Pan =>
   Number.isFinite((value as Pan).y)
 
 export const register: Register = (on, options) => {
-  view = viewOf({
-    scroll: options.scroll === 'sheet' ? 'sheet' : 'pinned',
-    labels: options.labels === 'clip' ? 'clip' : 'wrap',
-    links: options.links === 'merged' ? 'merged' : 'separate',
-  })
+  const look = {
+    scroll: options.scroll === 'sheet' ? ('sheet' as const) : ('pinned' as const),
+    labels: options.labels === 'clip' ? ('clip' as const) : ('wrap' as const),
+    links: options.links === 'merged' ? ('merged' as const) : ('separate' as const),
+  }
+  view = viewOf(look)
+  still = viewOf(look, true)
 
   on('engine.create', async ($, e, next) => {
     const built = await next(e)
@@ -131,7 +134,7 @@ export const register: Register = (on, options) => {
     const parts = e.props.isSummary ? [] : partsOf(e.props.text)
     if (!parts.some(part => 'graph' in part)) return next(e)
     const room = { columns: cellsOf((e.viewport?.columns ?? REPLY_COLUMNS) - BULLET_COLUMNS), rows: MOST_CELLS }
-    const shown = parts.map(part => ('graph' in part ? pictureOf(view, readGraph(part.graph), room) : part))
+    const shown = parts.map(part => ('graph' in part ? pictureOf(still, readGraph(part.graph), room) : part))
     if (e.surface !== 'terminal') {
       const text = shown.map(part => ('text' in part ? part.text : fencedOf(part))).join('\n\n')
       return next({ ...e, props: { ...e.props, text } })

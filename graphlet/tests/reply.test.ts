@@ -5,6 +5,7 @@ import { GUIDE, fencedOf, graphOf, partsOf, pictureOf } from '../hooks/reply'
 import { viewOf } from '../hooks/view'
 
 const view = viewOf(LOOK)
+const still = viewOf(LOOK, true)
 
 test('a reply is cut at its closed graphlet blocks, and every other fence stays in the text whole, with what it holds', () => {
   const reply = [
@@ -119,6 +120,27 @@ test('a graph in a reply is drawn still, as narrow as its widest layer and again
     ' └──────┘',
   ])
   expect(drawing.hits).toEqual([])
+})
+
+test('a graph wider than its reply folds the nodes it names last onto a row of their own, and fits', () => {
+  const ids = ['root', 'one', 'two', 'three', 'four', 'five', 'six', 'seven']
+  const fan = graphNamed(ids, ids.slice(1).map(id => ['root', id] as [string, string]))
+  expect(picture(pictureOf(still, fan, { columns: 50, rows: 1000 }))).toEqual([
+    '              ┌──────┐',
+    '              │ root │',
+    '              └───┬──┘',
+    '   ┌────────┬─────┴───┬──────────┬─────┬──┬──┐',
+    '   ▼        ▼         ▼          ▼     │  │  │',
+    '┌─────┐  ┌─────┐  ┌───────┐  ┌──────┐  │  │  │',
+    '│ one │  │ two │  │ three │  │ four │  │  │  │',
+    '└─────┘  └─────┘  └───────┘  └──────┘  │  │  │',
+    '                      ┌────────────────┘ ┌│──┘',
+    '                      │        ┌─────────│┘',
+    '                      ▼        ▼         ▼',
+    '                  ┌──────┐  ┌─────┐  ┌───────┐',
+    '                  │ five │  │ six │  │ seven │',
+    '                  └──────┘  └─────┘  └───────┘',
+  ])
 })
 
 test('a still picture wider than its room keeps the count of what is past the edge, and no corner to click', () => {

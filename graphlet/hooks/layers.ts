@@ -165,6 +165,45 @@ export function ranksOf(graph: Graph): Map<string, number> {
   return packed(ranks)
 }
 
+/** The room a graph is folded into: the columns a layer may take, how wide a node's box is, and the room between two neighbors in a layer. A lane takes a column. */
+export type Fold = { columns: number; widthOf: (node: GraphletNode) => number; gap: number }
+
+/**
+ * The layers folded into a room: each layer too wide for it gives up a node
+ * at a time, from the top down, until it fits or has one node left. A node
+ * sinks into the layer under its own where it is joined to nothing there, and
+ * else into a layer put in under its own for the nodes it gives up. Of those
+ * that may go, the one joined to fewest nodes above it goes first, since each
+ * such link takes a lane past the layer it leaves, and of those the one the
+ * graph names last, so that the layer keeps the nodes named first. In a
+ * directed graph a node that links to a node of its own layer stays, so that
+ * no link turns back up for the fold.
+ */
+function folded(graph: Graph, ranks: Map<string, number>, fold: Fold): Map<string, number> {
+  const folds = new Map(ranks)
+  const links = graph.links.filter(link => link.from !== link.to)
+  const rankOf = (id: string): number => folds.get(id) ?? 0
+  const othersOf = (id: string): number[] =>
+    links.flatMap(link => (link.from === id ? [rankOf(link.to)] : link.to === id ? [rankOf(link.from)] : []))
+  const lanesIn = (rank: number): number =>
+    links.filter(link => Math.min(rankOf(link.from), rankOf(link.to)) < rank && rank < Math.max(rankOf(link.from), rankOf(link.to))).length
+  const nodesIn = (rank: number): GraphletNode[] => graph.nodes.filter(node => rankOf(node.id) === rank)
+  const fits = (nodes: GraphletNode[], lanes: number): boolean =>
+    nodes.reduce((sum, node) => sum + fold.widthOf(node), 0) + lanes + (nodes.length + lanes - 1) * fold.gap <= fold.columns
+  for (let rank = 0; rank <= Math.max(...folds.values()); rank += 1) {
+    for (let nodes = nodesIn(rank); nodes.length > 1 && !fits(nodes, lanesIn(rank)); nodes = nodesIn(rank)) {
+      const going = nodes
+        .filter(node => !graph.isDirected || !links.some(link => link.from === node.id && rankOf(link.to) === rank))
+        .map(node => ({ node, above: othersOf(node.id).filter(other => other < rank).length, isFree: !othersOf(node.id).includes(rank + 1) }))
+        .sort((a, b) => Number(b.isFree) - Number(a.isFree) || a.above - b.above || graph.nodes.indexOf(b.node) - graph.nodes.indexOf(a.node))[0]
+      if (going === undefined) break
+      if (!going.isFree) for (const [id, at] of folds) if (at > rank) folds.set(id, at + 1)
+      folds.set(going.node.id, rank + 1)
+    }
+  }
+  return folds
+}
+
 /** What stands in a layer: a node, or the lane a link passes through the layer in, up it where the link runs against the flow. */
 export type Slot = { node: GraphletNode } | { lane: GraphletLink; isUp: boolean }
 
@@ -222,10 +261,11 @@ function sorted(layer: Slot[], beside: Slot[], pieces: Piece[]): Slot[] {
  * layers are then ordered against the layer above on the way down and the
  * layer below on the way back up, a few times over, and the ordering whose
  * stretches cross least is the one kept; with nothing crossing, every layer
- * keeps the order the graph names its nodes in.
+ * keeps the order the graph names its nodes in. Given a room to `fold` into,
+ * the layers are folded into it first.
  */
-export function layersOf(graph: Graph): Layers {
-  const ranks = ranksOf(graph)
+export function layersOf(graph: Graph, fold?: Fold): Layers {
+  const ranks = fold === undefined ? ranksOf(graph) : folded(graph, ranksOf(graph), fold)
   const count = Math.max(-1, ...ranks.values()) + 1
   const slotOf = new Map<string, Slot>(graph.nodes.map(node => [node.id, { node }]))
   let slots: Slot[][] = Array.from({ length: count }, () => [])

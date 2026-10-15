@@ -3,7 +3,6 @@ import { rowText } from './draw'
 import type { Drawing, Room, Span } from './draw'
 import { TONES } from './layers'
 import type { Graph } from './layers'
-import { LEAST_COLUMNS } from './layout'
 import type { View } from './view'
 
 // Graphs in a reply: the fenced blocks marked `graphlet` that the model
@@ -147,7 +146,7 @@ const after = (row: Span[], count: number): Span[] => {
  * whole of its left side are cut away.
  */
 export function pictureOf(view: View, graph: Graph, room: Room): Drawing {
-  const columns = Math.min(room.columns, view.measure(graph, LEAST_COLUMNS).columns)
+  const columns = Math.min(room.columns, view.measure(graph, room.columns).columns)
   const drawing = view.draw(graph, null, { columns, rows: room.rows }, { x: 0, y: 0 })
   const foot = drawing.rows.at(-1)
   if (foot === undefined) return { rows: [], hits: [] }

@@ -1,7 +1,7 @@
 import type { GraphletMove, GraphletSize } from '../types'
 import type { Drawing, Pan, Room } from './draw'
 import type { Graph } from './layers'
-import { layoutOf } from './layout'
+import { LEAST_COLUMNS, layoutOf } from './layout'
 import type { Look } from './layout'
 import { paint } from './paint'
 import { scrollIn, showIn, stepIn } from './window'
@@ -35,16 +35,25 @@ export type View = {
   step: (graph: Graph, selected: string | null, move: GraphletMove, room: Room, pan: Pan) => string | null
 }
 
-export function viewOf(look: Look): View {
+/**
+ * A view that draws graphs as `look` says. One that is to `fold` folds a
+ * graph's layers into its room, and measures a graph by the columns its
+ * longest layer then takes; one that is not lays a layer longer than the room
+ * across more than it, for a window to scroll over.
+ */
+export function viewOf(look: Look, fold = false): View {
+  const laid = (graph: Graph, room: Room) => layoutOf(graph, room, look, fold)
   return {
     measure: (graph, columns) => {
-      const layout = layoutOf(graph, { columns, rows: 0 }, look)
-      const across = Math.max(layout.columns, ...layout.shelves.map(shelf => shelf.across))
+      const layout = laid(graph, { columns, rows: 0 })
+      const across = fold
+        ? Math.max(LEAST_COLUMNS, ...layout.shelves.map(shelf => shelf.width))
+        : Math.max(layout.columns, ...layout.shelves.map(shelf => shelf.across))
       return { columns: across, rows: layout.shelves.length === 0 ? 0 : layout.rows + 1 }
     },
-    draw: (graph, selected, room, pan) => paint(layoutOf(graph, room, look), graph, selected, room, pan),
-    show: (graph, selected, room, from) => showIn(layoutOf(graph, room, look), selected, room, from),
-    scroll: (graph, room, from, by) => scrollIn(layoutOf(graph, room, look), room, from, by),
-    step: (graph, selected, move, room, pan) => stepIn(layoutOf(graph, room, look), graph, selected, move, room, pan),
+    draw: (graph, selected, room, pan) => paint(laid(graph, room), graph, selected, room, pan),
+    show: (graph, selected, room, from) => showIn(laid(graph, room), selected, room, from),
+    scroll: (graph, room, from, by) => scrollIn(laid(graph, room), room, from, by),
+    step: (graph, selected, move, room, pan) => stepIn(laid(graph, room), graph, selected, move, room, pan),
   }
 }
