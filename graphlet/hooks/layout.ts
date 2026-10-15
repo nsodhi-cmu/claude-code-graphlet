@@ -10,10 +10,10 @@ import type { Graph, Piece, Slot } from './layers'
 // order that never changes, whatever window it is then seen through.
 
 /**
- * How a graph wider than its room scrolls. `pinned`: each shelf slides only
- * as far as it is long, so one that fits the room stays in view. `sheet`: the
- * shelves lie on one sheet as wide as the longest, each box by what it is
- * linked to, and the sheet moves whole.
+ * How a graph wider than its room scrolls. `pinned`: a shelf that fits the
+ * room stays in view, and the shelves longer than it lie on one sheet as wide
+ * as the longest, which slides under the window. `sheet`: every shelf lies on
+ * that sheet, each box by what it is linked to, and the sheet moves whole.
  */
 export type Scroll = 'pinned' | 'sheet'
 
@@ -638,8 +638,9 @@ export function layTracks(channel: Channel, xOf: (place: Place) => number, under
  * is dealt its ports. The longest shelf is seated first, in the middle of
  * what it is laid out across, then each other shelf against the one nearer it
  * where the two are laid out across the same columns. Pinned, that is the
- * room's for every shelf that fits it, and a longer shelf runs on alone from
- * the left edge. The channels are then given the rows their wires need.
+ * room's for every shelf that fits it, and the longest's for every shelf
+ * longer than the room. The channels are then given the rows their wires
+ * need.
  */
 export function layoutOf(graph: Graph, room: Room, look: Look, fold = false): Layout {
   const columns = Math.max(room.columns, LEAST_COLUMNS)
@@ -684,7 +685,7 @@ export function layoutOf(graph: Graph, room: Room, look: Look, fold = false): La
 
   for (const shelf of shelves) shelf.width = shelf.places.reduce((sum, place) => sum + place.width + GAP, -GAP)
   const widest = Math.max(columns, ...shelves.map(shelf => shelf.width))
-  for (const shelf of shelves) shelf.across = look.scroll === 'sheet' ? widest : Math.max(columns, shelf.width)
+  for (const shelf of shelves) shelf.across = look.scroll === 'sheet' || shelf.width > columns ? widest : columns
   const first = shelves.reduce((longest, shelf, index) => (shelf.width > (shelves[longest]?.width ?? 0) ? index : longest), 0)
   shelves.forEach((_, step) => {
     for (const index of step === 0 ? [first] : [first - step, first + step]) {

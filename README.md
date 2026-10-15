@@ -150,7 +150,7 @@ These are a person's, and hold for every graph graphlet draws, in a reply or in 
 
 | Setting | What it picks |
 | :- | :- |
-| **Scrolling** | How a graph wider than its room scrolls. `pinned` slides the long layers and keeps the ones that fit in view. `sheet` lays every layer on one sheet as wide as the longest, each box by the boxes it is linked to, and moves the sheet whole. |
+| **Scrolling** | How a graph wider than its room scrolls. `pinned` keeps the layers that fit in view, and slides the long ones together, on one sheet as wide as the longest. `sheet` lays every layer on one sheet as wide as the longest, each box by the boxes it is linked to, and moves the sheet whole. |
 | **Long labels** | What becomes of a label too long for one line of its box. `wrap` breaks it onto more lines. `clip` keeps it to one, cut in the middle. |
 | **Links** | How the links between two layers share the rows there. `separate` gives each box's links rows of their own wherever they would run into another's, and each box an arrowhead, or in an undirected graph a tick, for each set of boxes whose links reach it. `merged` runs them all along one row, into one arrowhead or tick where they reach a box, which is shorter; selecting a node shows which links are its own. A graph in a reply, which nothing selects, keeps its links separate. |
 

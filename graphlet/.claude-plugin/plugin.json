@@ -21,7 +21,7 @@
     "scroll": {
       "type": "string",
       "title": "Scrolling",
-      "description": "How a graph wider than its room scrolls: pinned slides the long layers and keeps the ones that fit in view; sheet lays every layer on one wide sheet and moves it whole.",
+      "description": "How a graph wider than its room scrolls: pinned keeps the layers that fit in view and slides the long ones together; sheet lays every layer on one wide sheet and moves it whole.",
       "options": [
         "pinned",
         "sheet"

@@ -26,7 +26,7 @@ A link that crosses a channel leaves its box straight toward the port it is boun
 - A lane then goes to the very column of the port it is joined to, and pushes aside the boxes in its way, so that a link runs straight through every shelf it passes.
 - Last, the shelf moves a column either way where that stands more of it exactly over or under what it is joined to.
 
-How wide a shelf is laid out is the `scroll` setting's to say. `pinned`: across the room's columns where it fits them, and across its own length where it is longer, alone from the left edge. `sheet`: every shelf across the longest.
+How wide a shelf is laid out is the `scroll` setting's to say. `pinned`: across the room's columns where it fits them, and where it is longer, across the longest shelf, together with every other shelf longer than the room, so that the long shelves lie on one sheet and their links run between them as laid out. `sheet`: every shelf across the longest.
 
 ## Channels
 
