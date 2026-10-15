@@ -37,6 +37,7 @@ describe('a layer longer than the room', () => {
       ' └────┬──────────┘  └────┬───────────────┘',
       '      │                  │',
       '      │                  │',
+      '      │                  │',
       '      ▼                  ▼',
       '┌───────────┐  ┌──────────────────┐  ╔══════',
       '│ ● cart.ts │  │ ● src/invoice.ts │  ║ ○ ui…',
@@ -62,11 +63,11 @@ describe('a layer longer than the room', () => {
       ' └───────┬───────┘  └──────────┬─────────┘',
       '─────────┘                     │',
       '     ┌─────────────────────────┘',
+      '     │',
       '     ▼',
       '──────────────┐  ┌─────────┐  ╔════════════╗',
       '…c/invoice.ts │  │ ○ ui.ts │  ║ ▲ email.ts ║',
       '─────┬────────┘  └────┬────┘  ╚══════╤═════╝',
-      '─────┴────────────────┼──────────────┘',
     ])
     expect(end.at(-1)).toBe('← 2 more                              html ↗')
     for (const row of [1, 12, 17]) expect(end[row]).toBe(start[row])
@@ -84,10 +85,11 @@ describe('a layer longer than the room', () => {
       ],
     })
     const room = { columns: 52, rows: 10 }
-    expect(picture(pinned.draw(graph, 'c8', room, pinned.show(graph, 'c8', room, ORIGIN))).slice(2, 6)).toEqual([
+    expect(picture(pinned.draw(graph, 'c8', room, pinned.show(graph, 'c8', room, ORIGIN))).slice(1, 6)).toEqual([
       '                  └──┬──┘  └──┬──┘',
       '            ┌────────┘        │',
       '            │        ┌────────┘',
+      '            │        │',
       '            ▼        ▼',
     ])
   })
@@ -103,7 +105,7 @@ describe('a layer longer than the room', () => {
 
   test('a window that shows the selected box whole stays where it is, though the box stands at its edge', () => {
     expect(pinned.show(SHOP, 'src/ui.ts', NARROW, { x: 4, y: 0 })).toEqual({ x: 4, y: 0 })
-    expect(picture(pinned.draw(SHOP, 'src/ui.ts', NARROW, { x: 4, y: 0 }))[7]).toBe(
+    expect(picture(pinned.draw(SHOP, 'src/ui.ts', NARROW, { x: 4, y: 0 }))[8]).toBe(
       '…art.ts │  │ ● src/invoice.ts │  ║ ○ ui.ts ║',
     )
   })
@@ -125,7 +127,7 @@ describe('a layer longer than the room', () => {
 
   test('a click on a count scrolls most of a room that way, and no farther than the graph goes', () => {
     const count = pinned.draw(SHOP, 'src/ui.ts', NARROW, ORIGIN).hits.find((hit): hit is Hit & { by: Pan } => 'by' in hit)
-    expect(count).toEqual({ x: 28, y: 19, width: 8, height: 1, by: { x: 28, y: 0 } })
+    expect(count).toEqual({ x: 28, y: 20, width: 8, height: 1, by: { x: 28, y: 0 } })
     expect(pinned.scroll(SHOP, NARROW, ORIGIN, { x: 28, y: 0 })).toEqual({ x: 20, y: 0 })
     expect(pinned.scroll(SHOP, NARROW, { x: 20, y: 0 }, { x: -28, y: 0 })).toEqual(ORIGIN)
   })

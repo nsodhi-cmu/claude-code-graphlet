@@ -36,7 +36,7 @@ graphlet is a Claude Code mod that draws graphs, nodes and the links between the
 ```
 
 - **Any graph, directed or not.** The nodes are laid out in layers down the drawing. A directed graph runs along the way its links run, and the link that closes a loop runs back up, dashed. An undirected graph spreads down from the first node it names, and its links have no arrowheads.
-- **Every link is drawn, and can be followed**, between neighboring layers, past layers, back up, and between two nodes of one layer. One box's links fan out on a row of their own, links from different boxes reach a box at arrowheads, or ticks, of their own, and a link that only crosses another passes over it.
+- **Every link is drawn, and can be followed**, between neighboring layers, past layers, back up, and between two nodes of one layer. One box's links fan out on rows of their own, links from different boxes reach a box at arrowheads, or ticks, of their own, and a link that only crosses another passes over it.
 - **It scrolls.** A graph larger than its room is seen through a window that follows the selection, and that the wheel moves.
 - **It answers the mouse and the keyboard.** A click selects a node, the arrow keys move from node to node along the links, and the mod that owns the pane hears each pick.
 - **Claude draws graphs in its replies.** Where graphlet is installed, Claude knows it can answer with a graph, as it knows it can answer with a table, and the graph is drawn in the transcript where Claude wrote it.
@@ -150,7 +150,7 @@ These are a person's, and hold for every graph graphlet draws, in a reply or in 
 | :- | :- |
 | **Scrolling** | How a graph wider than its room scrolls. `pinned` slides the long layers and keeps the ones that fit in view. `sheet` lays every layer on one sheet as wide as the longest, each box by the boxes it is linked to, and moves the sheet whole. |
 | **Long labels** | What becomes of a label too long for one line of its box. `wrap` breaks it onto more lines. `clip` keeps it to one, cut in the middle. |
-| **Links** | How the links between two layers share the rows there. `separate` gives each box's links a row of their own wherever they would run into another's, and each box an arrowhead, or in an undirected graph a tick, for each set of boxes whose links reach it. `merged` runs them all along one row, into one arrowhead or tick where they reach a box, which is shorter; selecting a node shows which links are its own. A graph in a reply, which nothing selects, keeps its links separate. |
+| **Links** | How the links between two layers share the rows there. `separate` gives each box's links rows of their own wherever they would run into another's, and each box an arrowhead, or in an undirected graph a tick, for each set of boxes whose links reach it. `merged` runs them all along one row, into one arrowhead or tick where they reach a box, which is shorter; selecting a node shows which links are its own. A graph in a reply, which nothing selects, keeps its links separate. |
 
 ## How It Works
 
@@ -190,7 +190,7 @@ It reads no file, stores nothing between sessions, calls no model, and makes no 
 - Layers run top to bottom only.
 - A graph's links are all directed or all undirected. One graph cannot mix the two.
 - A graph has at most 500 nodes and 500 links, and a pane holds one. What is past those is left out.
-- Where links between two layers must each pass over another and there is no free column to step one aside at, two of them may share a stretch of line. Selecting a node lights its own.
+- Where links between two layers must each pass over another and there is no free column to step one aside at, or a window slides two layers so that more of them need stepping aside than the rows between allow, two of them may share a stretch of line. Selecting a node lights its own.
 - A character is taken to be as wide as Unicode says a terminal draws it: two cells for the wide characters of East Asian scripts and for emoji, none for a mark on the character before it. A terminal or font that draws a character at another width pushes its row out of line.
 
 ## License

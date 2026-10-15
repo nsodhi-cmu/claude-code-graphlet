@@ -266,8 +266,8 @@ function bundlesOf(wires: Wire[], links: Links, isDirected: boolean): Wire[][] {
  * the order of where along their shelves the places at the wires' other ends
  * stand, so that wires from the left arrive on the left; of two that lead to
  * a place in common, the one with the flow is first, wherever their other
- * wires lead, so that the links two boxes have each way run side by side and
- * never cross. A wire that leaves straight keeps clear of the face's other
+ * wires lead, so that the links two boxes have each way stand in the same
+ * order on both. A wire that leaves straight keeps clear of the face's other
  * ports, and in an undirected graph, where a wire meets the box it reaches at
  * a tick too, of the columns beside them.
  */
@@ -447,15 +447,16 @@ const runOf = (stops: Stop[], jog: number | null): Run => {
 /** Whether run `a` must go above run `b`: it comes down a column that `b` goes down from its own, so below it they would run into one line. */
 const asksAbove = (a: Run, b: Run): boolean => a.fromAbove.some(column => b.below.has(column))
 
-/** Runs that ask to go above one another in a ring, each above the next: none of them can be given it. */
-function ringOf(runs: Run[]): number[] | undefined {
+/** Runs that ask to go above one another in a ring, each above the next: none of them can be given it. What is `excused` of a run is not asked of it. */
+function ringOf(runs: Run[], excused: Map<Run, Set<Run>>): number[] | undefined {
   const state = runs.map(() => 'new' as 'new' | 'open' | 'done')
   const path: number[] = []
   const follow = (a: number): number[] | undefined => {
     state[a] = 'open'
     path.push(a)
     for (let b = 0; b < runs.length; b += 1) {
-      if (b === a || !asksAbove(runs[a] as Run, runs[b] as Run)) continue
+      const [above, below] = [runs[a] as Run, runs[b] as Run]
+      if (b === a || !asksAbove(above, below) || excused.get(above)?.has(below)) continue
       if (state[b] === 'open') return path.slice(path.indexOf(b))
       const ring = state[b] === 'new' ? follow(b) : undefined
       if (ring !== undefined) return ring
@@ -512,11 +513,10 @@ function cutRing(runs: Run[], ring: number[], used: Set<number>): boolean {
  * channel. A run that comes down a column to its track goes above one that
  * goes down the same column from its own, so that the two never run into one
  * line; where runs ask that of each other in a ring, one of them is cut in two
- * at a jog, and where none can be, one of the ring is not given it; where
- * every run has a track of its own, no more are cut than `most` tracks allow.
- * Of the
- * runs that may go on a track, the ones that cross the rest least from there
- * go first.
+ * at a jog, and where none can be, one of the ring is not given it, and the
+ * rings left are cut as before. Where every run has a track of its own, no
+ * more are cut than `most` tracks allow. Of the runs that may go on a track,
+ * the ones that cross the rest least from there go first.
  */
 function tracksOf(bundles: Wire[][], xOf: (place: Place) => number, isLoose: boolean, most: number): Map<Run, number> {
   const routes = new Map(bundles.flat().map(wire => [wire, routeOf(wire, xOf)]))
@@ -532,8 +532,13 @@ function tracksOf(bundles: Wire[][], xOf: (place: Place) => number, isLoose: boo
     })
     return stops.some(stop => stop.isTurning) || isLoose ? [runOf(stops, null)] : []
   })
-  const canCut = (): boolean => !isLoose || runs.length < most
-  for (let ring = ringOf(runs); ring !== undefined && canCut() && cutRing(runs, ring, used); ring = ringOf(runs));
+  const excused = new Map<Run, Set<Run>>()
+  for (let ring = ringOf(runs, excused); ring !== undefined; ring = ringOf(runs, excused)) {
+    if ((!isLoose || runs.length < most) && cutRing(runs, ring, used)) continue
+    const [above, below] = [runs[ring[0] ?? 0], runs[ring[1 % ring.length] ?? 0]]
+    if (above === undefined || below === undefined) break
+    excused.set(above, new Set([...(excused.get(above) ?? []), below]))
+  }
 
   const laid = runs.sort((a, b) => a.start - b.start)
   const within = (columns: number[], run: Run): number => columns.filter(column => column > run.start && column < run.end).length
@@ -667,8 +672,9 @@ export function layoutOf(graph: Graph, room: Room, look: Look, fold = false): La
     if (look.links === 'merged') channel.bundles = []
     const tracks = layTracks(channel, place => place.x)
     const heads = (channel.hasUpHeads ? 1 : 0) + (channel.hasDownHeads ? 1 : 0)
+    const spare = channel.isLoose && channel.bundles.length > 1 ? 1 : 0
     channel.top = top
-    channel.rows = channel.wires.length === 0 ? (next === undefined ? 0 : 1) : heads + tracks
+    channel.rows = channel.wires.length === 0 ? (next === undefined ? 0 : 1) : heads + tracks + spare
     top += channel.rows
   })
   return { shelves, channels, columns, rows: top }

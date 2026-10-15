@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { LOOK, SHOP, cellsOf, graphOf, graphRows, numbers, picture, undirected } from './fixture'
-import { rowText } from '../hooks/draw'
 import type { Drawing, Hit, Span } from '../hooks/draw'
 import { readGraph } from '../hooks/layers'
 import type { Graph } from '../hooks/layers'
@@ -9,7 +8,7 @@ import { layoutOf } from '../hooks/layout'
 import type { Layout, Look, Place } from '../hooks/layout'
 import { paint } from '../hooks/paint'
 import { viewOf } from '../hooks/view'
-import { sightOf, slideOf, within } from '../hooks/window'
+import { sightOf, slideOf } from '../hooks/window'
 
 const ORIGIN = { x: 0, y: 0 }
 /** A room the shop fits whole, and a room as narrow as a graph is laid out for. */
@@ -670,20 +669,48 @@ function linksOf(graph: Graph, layout: Layout): string[] {
 describe('what a picture says', () => {
   const next = numbers(31)
   const pick = (below: number): number => Math.floor(next() * below)
+  const labelOf = (index: number): string => [`Validate the request ${index}`, `数据库 ${index}`, `✅ ${index}`][pick(4)] ?? `n${index}`
+  /** A graph of any shape, its links often running both ways. */
   const someGraph = (): Graph => {
     const count = 2 + pick(15)
     const links = Array.from({ length: pick(count * 2 + 2) }, () => [`n${pick(count)}`, `n${pick(count)}`])
     return readGraph({
-      nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: [`Validate the request ${index}`, `数据库 ${index}`, `✅ ${index}`][pick(4)] ?? `n${index}` })),
+      nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: labelOf(index) })),
       links: [...links, ...links.filter(() => pick(3) === 0).map(([from, to]) => [to, from])].map(([from = '', to = '']) => ({ from, to })),
       isDirected: pick(4) !== 0,
     })
   }
+  /** A graph in two or three layers it names, few nodes over many and densely linked, which is where bundles most often ask to pass over each other. */
+  const crowdedGraph = (): Graph => {
+    const count = 4 + pick(10)
+    return readGraph({
+      nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: labelOf(index), layer: index < 2 ? 0 : pick(2 + pick(2)) })),
+      links: Array.from({ length: count + pick(count) }, () => ({ from: `n${pick(count)}`, to: `n${pick(count)}` })),
+      isDirected: pick(5) !== 0,
+    })
+  }
+  /** Two layers facing each other, linked both ways. */
+  const facingGraph = (): Graph => {
+    const [top, bottom] = [2 + pick(3), 2 + pick(4)]
+    return readGraph({
+      nodes: [
+        ...Array.from({ length: top }, (_, index) => ({ id: `t${index}`, label: labelOf(index), layer: 0 })),
+        ...Array.from({ length: bottom }, (_, index) => ({ id: `b${index}`, label: labelOf(index), layer: 1 })),
+      ],
+      links: Array.from({ length: top + bottom + pick(top * bottom) }, () =>
+        pick(2) === 0 ? { from: `t${pick(top)}`, to: `b${pick(bottom)}` } : { from: `b${pick(bottom)}`, to: `t${pick(top)}` },
+      ),
+    })
+  }
+  const anyGraph = (run: number): Graph => [someGraph, crowdedGraph, facingGraph][run % 3]?.() ?? someGraph()
   const someLook = (scroll = pick(2) === 0 ? 'pinned' : 'sheet'): Look => ({ scroll: scroll as Look['scroll'], labels: pick(3) === 0 ? 'clip' : 'wrap', links: 'separate' })
 
-  test('a graph drawn whole says every link it has, in every channel the link crosses, and no link it does not have', () => {
-    for (let run = 0; run < 300; run += 1) {
-      const graph = someGraph()
+  /** How long a test that reads many pictures may take: a slow machine's while. */
+  const READING = { timeoutMs: 30_000 }
+
+  test('a graph drawn whole says every link it has, in every channel the link crosses, and no link it does not have', READING, () => {
+    for (let run = 0; run < 900; run += 1) {
+      const graph = anyGraph(run)
       const look = someLook()
       const columns = viewOf(look).measure(graph, 40 + pick(100)).columns
       const layout = layoutOf(graph, { columns, rows: 0 }, look)
@@ -694,17 +721,22 @@ describe('what a picture says', () => {
     }
   })
 
-  test('scrolled anywhere, what a window shows of a graph says no link the graph does not have', () => {
-    for (let run = 0; run < 300; run += 1) {
-      const graph = someGraph()
-      const room = { columns: 40 + pick(60), rows: 1000 }
+  test('scrolled to any column, a window lays its links within the rows each channel has, and says no link the graph does not have', READING, () => {
+    for (let run = 0; run < 60; run += 1) {
+      const graph = anyGraph(run)
+      const room = { columns: 40 + pick(30), rows: 1000 }
       const layout = layoutOf(graph, room, someLook('pinned'))
-      const at = within({ x: pick(200), y: 0 }, sightOf(layout, room).most)
-      const drawing = paint(layout, graph, null, { columns: room.columns, rows: layout.rows + 1 }, at)
-      const said = readOff(graph, layout, drawing, place => place.x - slideOf(layout, layout.shelves[place.shelf], at.x))
-      expect(said.loose).toEqual([])
       const links = new Set(linksOf(graph, layout))
-      expect(said.links.filter(link => !links.has(link))).toEqual([])
+      for (let x = 0; x <= sightOf(layout, room).most.x; x += 1) {
+        const drawing = paint(layout, graph, null, { columns: room.columns, rows: layout.rows + 1 }, { x, y: 0 })
+        for (const channel of layout.channels) {
+          const tracks = channel.rows - Number(channel.hasUpHeads) - Number(channel.hasDownHeads)
+          for (const wire of channel.wires) expect(Math.max(wire.track, wire.jog?.track ?? 0)).toBeLessThan(Math.max(1, tracks))
+        }
+        const said = readOff(graph, layout, drawing, place => place.x - slideOf(layout, layout.shelves[place.shelf], x))
+        expect(said.loose).toEqual([])
+        expect(said.links.filter(link => !links.has(link))).toEqual([])
+      }
     }
   })
 })
