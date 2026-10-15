@@ -91,9 +91,10 @@ A graph larger than its room is seen through a window, and never laid out again 
 The last row of a drawing is its foot. A graph with no nodes has no drawing, and so none.
 
 - Under a graph larger than its room, it counts the nodes out of view past each edge: `← 3 more`, `↑ 2 more · ↓ 5 more`, `12 more →`. A click on a count scrolls the graph most of a room that way.
-- In its right corner is `html ↗`. A click there opens the graph as a [web page](PAGE.md).
+- Where nodes or links were left out of a graph past the most that are read, it says how many: `12 nodes and 340 links left out`, or in a narrow room `+12 nodes +340 links`.
+- In its right corner is `html ↗`. A click there opens the graph as a [web page](PAGE.md). Where the row is too narrow for all of it, the corner says only `↗`, and what was left out keeps its place over the corner's words.
 
-A still picture in a reply keeps the counts and drops the corner, and has no foot when all of it is in view.
+A still picture in a reply keeps the counts and what was left out, and drops the corner; it has no foot when all of it is in view and nothing was left out.
 
 ## Moving The Selection
 

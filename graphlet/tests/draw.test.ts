@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { beyondRow, canvasOf, clipMiddle, reveal, rowText, sizeOf, spansOf } from '../hooks/draw'
+import { beyondRow, canvasOf, clipMiddle, footRow, reveal, rowText, sizeOf, spansOf } from '../hooks/draw'
 
 describe('a window brought to what it must show', () => {
   test('one that already shows it stays where it is', () => {
@@ -75,6 +75,18 @@ describe('the row that counts what is out of view', () => {
       [21, 4],
       [31, 9],
     ])
+  })
+})
+
+describe('the last row', () => {
+  const page = { x: 20, y: 5 }
+  test('what was left out of a graph is said before the corner, short where the row is narrow, and before the corner\'s words', () => {
+    const unread = { nodes: 12, links: 340 }
+    expect(rowText(footRow(undefined, 60, page, 9, unread).row)).toBe('12 nodes and 340 links left out  html ↗'.padStart(60))
+    expect(rowText(footRow(undefined, 40, page, 9, unread).row)).toBe('12 nodes and 340 links left out  ↗'.padStart(40))
+    expect(rowText(footRow(undefined, 30, page, 9, unread).row)).toBe('+12 nodes +340 links  html ↗'.padStart(30))
+    expect(rowText(footRow(undefined, 30, page, 9, { nodes: 1, links: 0 }).row)).toBe('1 node left out  html ↗'.padStart(30))
+    expect(rowText(footRow({ left: 3, right: 0, above: 0, below: 0 }, 60, page, 9, unread).row)).toBe(`${'← 3 more'.padEnd(21)}12 nodes and 340 links left out  html ↗`)
   })
 })
 

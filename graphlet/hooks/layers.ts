@@ -8,9 +8,11 @@ import type { GraphletGraph, GraphletLink, GraphletNode, GraphletTone } from '..
 
 /**
  * A graph as it is drawn: every node once, every link once, between two of
- * its nodes, and whether each link runs from one of them to the other.
+ * its nodes, whether each link runs from one of them to the other, and how
+ * many nodes and links it was given past the most that are read, which are
+ * left out.
  */
-export type Graph = { nodes: GraphletNode[]; links: GraphletLink[]; isDirected: boolean }
+export type Graph = { nodes: GraphletNode[]; links: GraphletLink[]; isDirected: boolean; unread: { nodes: number; links: number } }
 
 /** How many times the layers are ordered against their neighbors, down and back up, before the best ordering is kept. */
 const SWEEPS = 4
@@ -19,8 +21,8 @@ export const TONES: readonly GraphletTone[] = ['plain', 'dim', 'note', 'good', '
 /** What a node with nothing to call it by is labelled. */
 const NAMELESS = '·'
 /** The most nodes and the most links of a graph that are read. A graph past either is no picture a person can follow, and is slow to lay out. */
-const MOST_NODES = 500
-const MOST_LINKS = 500
+const MOST_NODES = 1000
+const MOST_LINKS = 2000
 
 const tidy = (text: unknown): string =>
   typeof text === 'string' ? text.replace(/[\u0000-\u001f\u007f-\u009f\s]+/g, ' ').trim() : ''
@@ -31,15 +33,16 @@ const tidy = (text: unknown): string =>
  * is kept once, where both its ends are nodes, with the label it is first
  * given; in an undirected graph, once whichever way round it names them. A
  * link from a node to itself is kept, and drawn as a sign on the node. Nodes
- * and links past the most that are read are left out. A graph is directed
- * unless it says it is not.
+ * and links past the most that are read are left out, and counted. A graph
+ * is directed unless it says it is not.
  */
 export function readGraph(graph: GraphletGraph): Graph {
   const nodes: GraphletNode[] = []
-  const ids = new Set<string>()
+  const [ids, given] = [new Set<string>(), new Set<string>()]
   for (const node of Array.isArray(graph?.nodes) ? graph.nodes : []) {
-    if (nodes.length === MOST_NODES) break
-    if (typeof node?.id !== 'string' || node.id === '' || ids.has(node.id)) continue
+    if (typeof node?.id !== 'string' || node.id === '' || given.has(node.id)) continue
+    given.add(node.id)
+    if (nodes.length === MOST_NODES) continue
     ids.add(node.id)
     const [mark, badge] = [tidy(node.mark), tidy(node.badge)]
     nodes.push({
@@ -53,16 +56,20 @@ export function readGraph(graph: GraphletGraph): Graph {
   }
   const isDirected = graph?.isDirected !== false
   const links: GraphletLink[] = []
+  const [kept, keyOf] = [new Set<string>(), (from: string, to: string): string => JSON.stringify([from, to])]
+  let unreadLinks = 0
   for (const link of Array.isArray(graph?.links) ? graph.links : []) {
-    if (links.length === MOST_LINKS) break
-    if (!ids.has(link?.from) || !ids.has(link?.to)) continue
-    const isKept = links.some(
-      one => (one.from === link.from && one.to === link.to) || (!isDirected && one.from === link.to && one.to === link.from),
-    )
+    if (!given.has(link?.from) || !given.has(link?.to)) continue
+    if (kept.has(keyOf(link.from, link.to)) || (!isDirected && kept.has(keyOf(link.to, link.from)))) continue
+    kept.add(keyOf(link.from, link.to))
+    if (links.length === MOST_LINKS || !ids.has(link.from) || !ids.has(link.to)) {
+      unreadLinks += 1
+      continue
+    }
     const label = tidy(link.label)
-    if (!isKept) links.push({ from: link.from, to: link.to, ...(label === '' ? {} : { label }) })
+    links.push({ from: link.from, to: link.to, ...(label === '' ? {} : { label }) })
   }
-  return { nodes, links, isDirected }
+  return { nodes, links, isDirected, unread: { nodes: given.size - nodes.length, links: unreadLinks } }
 }
 
 /** Whether a link runs from `from` to `to`. */

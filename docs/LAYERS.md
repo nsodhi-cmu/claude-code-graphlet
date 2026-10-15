@@ -13,7 +13,7 @@ A graph is drawn in layers: every node in a row of the drawing, and every link r
 - A link is kept where both its ends are nodes of the graph, and once however many times it is given. In an undirected graph, that is once whichever way round it names its nodes.
 - A link from a node to itself is kept. It is drawn as a sign in the node's box, not as a line.
 - What is no graph at all reads as an empty one.
-- At most `MOST_NODES` nodes and `MOST_LINKS` links are read, 500 of each, and what is past them is left out. A graph larger than that is no picture a person can follow, and is slow to lay out.
+- At most `MOST_NODES` nodes and `MOST_LINKS` links are read, 1000 and 2000, and what is past them is left out and counted: the nodes, and the links that are past the most, or that join a node left out. A graph larger than that is slow to lay out, and no picture a person can follow.
 
 ## Which Layer A Node Stands In
 

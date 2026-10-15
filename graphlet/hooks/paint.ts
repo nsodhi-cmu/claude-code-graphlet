@@ -264,6 +264,6 @@ export function paint(layout: Layout, graph: Graph, selected: string | null, roo
     below: boxes.filter(box => box.y + box.rows > sight.rows).length,
   }
   const page = { x: Math.max(1, layout.columns - PAGE_OVERLAP.x), y: Math.max(1, sight.rows - PAGE_OVERLAP.y) }
-  const foot = footRow(sight.isWhole ? undefined : beyond, layout.columns, page, rows.length)
+  const foot = footRow(sight.isWhole ? undefined : beyond, layout.columns, page, rows.length, graph.unread)
   return { rows: [...rows, foot.row], hits: [...hits, ...foot.hits] }
 }

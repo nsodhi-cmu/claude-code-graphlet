@@ -58,17 +58,22 @@ describe('reading a graph', () => {
     ])
   })
 
-  test('a graph is read up to the most nodes and the most links it may have', () => {
-    const many = Array.from({ length: 700 }, (_, index) => ({ id: `n${index}`, label: 'n' }))
-    const graph = readGraph({ nodes: many, links: many.map((node, index) => ({ from: node.id, to: `n${(index + 1) % 700}` })) })
-    expect(graph.nodes).toHaveLength(500)
-    expect(graph.nodes.at(-1)?.id).toBe('n499')
-    expect(graph.links).toHaveLength(499)
+  test('a graph is read up to the most nodes and the most links it may have, and what is left out is counted', () => {
+    const many = Array.from({ length: 1300 }, (_, index) => ({ id: `n${index}`, label: 'n' }))
+    const ring = readGraph({ nodes: [...many, many[0] ?? { id: '', label: '' }], links: many.map((node, index) => ({ from: node.id, to: `n${(index + 1) % 1300}` })) })
+    expect(ring.nodes).toHaveLength(1000)
+    expect(ring.nodes.at(-1)?.id).toBe('n999')
+    expect(ring.links).toHaveLength(999)
+    expect(ring.unread).toEqual({ nodes: 300, links: 301 })
+    const dense = readGraph({ nodes: many.slice(0, 60), links: many.slice(0, 60).flatMap(a => many.slice(0, 60).map(b => ({ from: a.id, to: b.id }))) })
+    expect(dense.links).toHaveLength(2000)
+    expect(dense.unread).toEqual({ nodes: 0, links: 3600 - 2000 })
   })
 
   test('what is no graph at all reads as an empty one', () => {
-    expect(readGraph(undefined as never)).toEqual({ nodes: [], links: [], isDirected: true })
-    expect(readGraph({ nodes: 'many', links: null } as never)).toEqual({ nodes: [], links: [], isDirected: true })
+    const empty = { nodes: [], links: [], isDirected: true, unread: { nodes: 0, links: 0 } }
+    expect(readGraph(undefined as never)).toEqual(empty)
+    expect(readGraph({ nodes: 'many', links: null } as never)).toEqual(empty)
   })
 
   test('a graph is directed unless it says it is not, and an undirected one keeps a link once whichever way round it names its nodes', () => {

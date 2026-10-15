@@ -191,7 +191,7 @@ It reads no file, stores nothing between sessions, calls no model, and makes no 
 - Where an organization manages Claude Code, the engine adds graphlet's section to the system prompt only if the organization lists graphlet in managed settings. Otherwise Claude is not told of graph blocks there, though graphlet still draws one Claude writes.
 - Layers run top to bottom only.
 - A graph's links are all directed or all undirected. One graph cannot mix the two.
-- A graph has at most 500 nodes and 500 links, and a pane holds one. What is past those is left out.
+- A graph has at most 1000 nodes and 2000 links, and a pane holds one. What is past those is left out, and the row under the graph says how much.
 - Where links between two layers must each pass over another and there is no free column to step one aside at, or a window slides two layers so that more of them need stepping aside than the rows between allow, two of them may share a stretch of line. Selecting a node lights its own.
 - A character is taken to be as wide as Unicode says a terminal draws it: two cells for the wide characters of East Asian scripts and for emoji, none for a mark on the character before it. A terminal or font that draws a character at another width pushes its row out of line.
 
