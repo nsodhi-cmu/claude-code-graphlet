@@ -268,7 +268,7 @@ function arrowOf(link: GraphletLink, from: Spot, to: Spot, spots: Spot[], isDire
   if (from === to) return loopOf(from, short)
   if (from.layer === to.layer) return arcOf(from, to, short)
   const isUp = from.layer > to.layer
-  const lanes = spots.filter(spot => 'lane' in spot.slot && spot.slot.lane === link)
+  const lanes = spots.filter(spot => 'lane' in spot.slot && spot.slot.lane.includes(link))
   if (isUp && !isDirected) return runOf(to, lanes, from, false, short)
   return runOf(from, isUp ? lanes.toReversed() : lanes, to, isUp, short)
 }

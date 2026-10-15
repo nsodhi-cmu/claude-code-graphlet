@@ -45,7 +45,7 @@ function paintShelf(canvas: Canvas, graph: Graph, shelf: Shelf, selected: string
     const left = seen.xOf(place)
     if ('lane' in place.slot) {
       const { lane, isUp } = place.slot
-      const paint = lane.from === selected || lane.to === selected ? 'accent' : 'dim'
+      const paint = lane.some(link => link.from === selected || link.to === selected) ? 'accent' : 'dim'
       for (let row = 0; row < shelf.rows; row += 1) canvas.put(left, top + row, isUp ? '┊' : '│', { paint })
       continue
     }

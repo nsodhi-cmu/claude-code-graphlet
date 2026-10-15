@@ -245,7 +245,9 @@ function wiresOf(pieces: Piece[], flats: GraphletLink[], shelf: Shelf, placeOf: 
  * nodes of the shelf is a bundle alone. Merged, it is every wire that runs
  * the one way, with the flow or against it. Either way, wires with different
  * labels are never of one bundle, so that a label is true of every wire of
- * the line it is written beside.
+ * the line it is written beside. Kept apart, a wire that leaves a box for a
+ * lane other wires reach too is a fan of its own, so that it meets the lane's
+ * others there without joining them to the box's other links.
  */
 function bundlesOf(wires: Wire[], links: Links, isDirected: boolean): Wire[][] {
   const ids = new Map<Place, number>()
@@ -254,10 +256,14 @@ function bundlesOf(wires: Wire[], links: Links, isDirected: boolean): Wire[][] {
     return `${ids.get(end.place)}${end.isAbove ? 'v' : '^'}`
   }
   const isAlone = (wire: Wire): boolean => links === 'separate' && !isDirected && wire.from.isAbove === wire.to.isAbove
+  const reaching = new Map<Place, number>()
+  for (const wire of wires) if ('lane' in wire.to.place.slot) reaching.set(wire.to.place, (reaching.get(wire.to.place) ?? 0) + 1)
+  /** Whether a wire leaves a box for a lane that other wires reach too, which it must reach on a line of its own. */
+  const isJoining = (wire: Wire): boolean => 'node' in wire.from.place.slot && (reaching.get(wire.to.place) ?? 0) > 1
   const fans = new Map<string, { way: string; wires: Wire[] }>()
   for (const wire of wires.filter(wire => !isAlone(wire))) {
     const way = JSON.stringify([wire.isUp, labelOf(wire.link)])
-    const key = links === 'merged' ? way : `${way} ${faceOf(wire.from)}`
+    const key = links === 'merged' ? way : `${way} ${faceOf(wire.from)}${isJoining(wire) ? ` into ${faceOf(wire.to)}` : ''}`
     fans.set(key, { way, wires: [...(fans.get(key)?.wires ?? []), wire] })
   }
   const bound = new Map<string, Wire[]>()

@@ -37,19 +37,19 @@ So a directed graph runs down the drawing from where it starts, and the link of 
 
 ### Folding Into A Room
 
-A graph drawn still, in a reply, cannot scroll, so its layers are folded into the room it has before anything else is laid out. `layersOf` is then given a `Fold`: the columns a layer may take, how wide each node's box is, and the gap between two neighbors. A layer's width is its boxes and the gaps between them, and a column for each lane of a link that passes through it.
+A graph drawn still, in a reply, cannot scroll, so its layers are folded into the room it has before anything else is laid out. `layersOf` is then given a `Fold`: the columns a layer may take, how wide each node's box is, and the gap between two neighbors. A layer's width is its boxes and the gaps between them, and a column for each lane that passes through it.
 
 `folded` goes down the layers from the top. A layer too wide for the room gives up a node at a time until it fits, or has one node left:
 
 - A node joined to nothing in the layer under its own sinks into that layer. Otherwise a layer is put in under its own, and the nodes it gives up go there.
-- Of the nodes that may go, the one joined to the fewest nodes above it goes first, since each such link takes a lane past the layer it leaves; and of those, the one the graph names last, so a folded layer keeps the nodes named first, in a row in the order they were named.
+- Of the nodes that may go, the one joined to the fewest nodes above it goes first, since such a link may take a lane past the layer it leaves; and of those, the one the graph names last, so a folded layer keeps the nodes named first, in a row in the order they were named.
 - In a directed graph, a node that links to a node of its own layer stays, so that no link turns back up for the fold.
 
 Each layer under a fold is then folded in turn. A node with many lanes past it, or a layer whose every node links within it, may still be wider than the room; such a picture keeps the count of what is past its edge, as a pane's does.
 
 ## Stretches And Lanes
 
-`layersOf` cuts every link into stretches, each from a slot of one layer to a slot of the next. A link between two neighboring layers is one stretch. A link between layers farther apart has a lane in each layer it passes through, a slot of its own there, and a stretch from each to the next. A stretch of a link that runs up the drawing, against the flow, says so. In an undirected graph none does: a link runs down from whichever of its nodes stands higher.
+`layersOf` cuts every link into stretches, each from a slot of one layer to a slot of the next. A link between two neighboring layers is one stretch. A link between layers farther apart passes a lane in each layer between, and has a stretch from each to the next. The links bound the same way for the same node share their lanes: a layer has one lane for all those that pass through it, which carries them all, a link joining it where it leaves its node and the lane running on down to the node they are bound for. So a node many links reach from far up is reached down one lane, not a lane a link, and a lane says nothing false, since every link it carries goes to the one node. A stretch of a link that runs up the drawing, against the flow, says so. In an undirected graph none does: a link runs down from whichever of its nodes stands higher.
 
 A link between two nodes of one layer is no stretch. Those are kept apart, by layer.
 

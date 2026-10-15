@@ -252,8 +252,8 @@ export type Fold = { columns: number; widthOf: (node: GraphletNode) => number; g
  * at a time, from the top down, until it fits or has one node left. A node
  * sinks into the layer under its own where it is joined to nothing there, and
  * else into a layer put in under its own for the nodes it gives up. Of those
- * that may go, the one joined to fewest nodes above it goes first, since each
- * such link takes a lane past the layer it leaves, and of those the one the
+ * that may go, the one joined to fewest nodes above it goes first, since such
+ * a link may take a lane past the layer it leaves, and of those the one the
  * graph names last, so that the layer keeps the nodes named first. In a
  * directed graph a node that links to a node of its own layer stays, so that
  * no link turns back up for the fold.
@@ -265,7 +265,11 @@ function folded(graph: Graph, ranks: Map<string, number>, fold: Fold): Map<strin
   const othersOf = (id: string): number[] =>
     links.flatMap(link => (link.from === id ? [rankOf(link.to)] : link.to === id ? [rankOf(link.from)] : []))
   const lanesIn = (rank: number): number =>
-    links.filter(link => Math.min(rankOf(link.from), rankOf(link.to)) < rank && rank < Math.max(rankOf(link.from), rankOf(link.to))).length
+    new Set(
+      links
+        .filter(link => Math.min(rankOf(link.from), rankOf(link.to)) < rank && rank < Math.max(rankOf(link.from), rankOf(link.to)))
+        .map(link => `${graph.isDirected && rankOf(link.from) > rankOf(link.to)} ${towardOf(graph, link, folds)}`),
+    ).size
   const nodesIn = (rank: number): GraphletNode[] => graph.nodes.filter(node => rankOf(node.id) === rank)
   const fits = (nodes: GraphletNode[], lanes: number): boolean =>
     nodes.reduce((sum, node) => sum + fold.widthOf(node), 0) + lanes + (nodes.length + lanes - 1) * fold.gap <= fold.columns
@@ -283,8 +287,16 @@ function folded(graph: Graph, ranks: Map<string, number>, fold: Fold): Map<strin
   return folds
 }
 
-/** What stands in a layer: a node, or the lane a link passes through the layer in, up it where the link runs against the flow. */
-export type Slot = { node: GraphletNode } | { lane: GraphletLink; isUp: boolean }
+/**
+ * What stands in a layer: a node, or a lane, which the links bound for one
+ * node pass through the layer in, the one way, up it where they run against
+ * the flow. A lane holds the links it carries there.
+ */
+export type Slot = { node: GraphletNode } | { lane: GraphletLink[]; isUp: boolean }
+
+/** The node a link is bound for, which the links that share its lanes are all bound for: in an undirected graph, the lower of its two. */
+const towardOf = (graph: Graph, link: GraphletLink, ranks: Map<string, number>): string =>
+  graph.isDirected || (ranks.get(link.to) ?? 0) >= (ranks.get(link.from) ?? 0) ? link.to : link.from
 
 /**
  * One stretch of a link, from a slot of one layer to a slot of the next. The
@@ -336,7 +348,8 @@ function sorted(layer: Slot[], beside: Slot[], pieces: Piece[]): Slot[] {
 
 /**
  * The graph in layers. A link between two layers that are not neighbors
- * gets a lane in each layer between them, after that layer's nodes. The
+ * passes a lane in each layer between them, after that layer's nodes, the one
+ * lane there of all the links bound the same way for the same node. The
  * layers are then ordered against the layer above on the way down and the
  * layer below on the way back up, a few times over, and the ordering whose
  * stretches cross least is the one kept; with nothing crossing, every layer
@@ -351,6 +364,7 @@ export function layersOf(graph: Graph, fold?: Fold): Layers {
   for (const node of graph.nodes) slots[ranks.get(node.id) ?? 0]?.push(slotOf.get(node.id) ?? { node })
   const pieces: Piece[][] = Array.from({ length: Math.max(0, count - 1) }, () => [])
   const flats: GraphletLink[][] = Array.from({ length: count }, () => [])
+  const lanes = new Map<string, Slot & { lane: GraphletLink[] }>()
 
   for (const link of graph.links) {
     const [from, to] = [ranks.get(link.from) ?? 0, ranks.get(link.to) ?? 0]
@@ -364,8 +378,14 @@ export function layersOf(graph: Graph, fold?: Fold): Layers {
     const bottom = slotOf.get(from > to ? link.from : link.to)
     let upper = slotOf.get(from > to ? link.to : link.from)
     for (let layer = first; layer < last && upper !== undefined && bottom !== undefined; layer += 1) {
-      const lower: Slot = layer + 1 === last ? bottom : { lane: link, isUp }
-      if (lower !== bottom) slots[layer + 1]?.push(lower)
+      const key = `${layer + 1} ${isUp} ${towardOf(graph, link, ranks)}`
+      const lane = layer + 1 === last ? undefined : (lanes.get(key) ?? { lane: [], isUp })
+      if (lane !== undefined && !lanes.has(key)) {
+        lanes.set(key, lane)
+        slots[layer + 1]?.push(lane)
+      }
+      lane?.lane.push(link)
+      const lower = lane ?? bottom
       pieces[layer]?.push({ link, upper, lower, isUp })
       upper = lower
     }

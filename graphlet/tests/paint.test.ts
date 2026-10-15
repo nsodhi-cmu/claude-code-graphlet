@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { LOOK, SHOP, cellsOf, graphOf, graphRows, numbers, picture, undirected } from './fixture'
+import type { GraphletLink } from '../types'
 import type { Drawing, Hit, Span } from '../hooks/draw'
 import { readGraph } from '../hooks/layers'
 import type { Graph } from '../hooks/layers'
@@ -594,7 +595,7 @@ function readOff(
   const at = (x: number, y: number): string => rows[y]?.[x] ?? ' '
   const isOff = (x: number): boolean => x < 0 || x >= layout.columns
   const ways = new Map<string, number>()
-  const ends = new Map<string, Said>()
+  const ends = new Map<string, Said[]>()
   const boxAt = new Map<string, { node: string; x: number; y: number; width: number; rows: number; shelf: number }>()
   const lanes = new Set<string>()
   const shelfOf = new Map<string, number>()
@@ -623,15 +624,16 @@ function readOff(
       if (!('lane' in place.slot) || isOff(x)) continue
       const { lane, isUp } = place.slot
       const [top, bottom] = [`${x},${shelf.top}`, `${x},${shelf.top + shelf.rows - 1}`]
-      const [high, low] = (shelfOf.get(lane.from) ?? 0) < (shelfOf.get(lane.to) ?? 0) ? [lane.from, lane.to] : [lane.to, lane.from]
+      const highOf = (link: GraphletLink): [string, string] =>
+        (shelfOf.get(link.from) ?? 0) < (shelfOf.get(link.to) ?? 0) ? [link.from, link.to] : [link.to, link.from]
       ways.set(top, UP)
       ways.set(bottom, DOWN)
       if (!graph.isDirected) {
-        ends.set(top, { node: low, channel: index - 1, side: 'below' })
-        ends.set(bottom, { node: high, channel: index, side: 'above' })
+        ends.set(top, lane.map(link => ({ node: highOf(link)[1], channel: index - 1, side: 'below' as const })))
+        ends.set(bottom, lane.map(link => ({ node: highOf(link)[0], channel: index, side: 'above' as const })))
       } else {
-        ends.set(top, isUp ? { node: lane.from, channel: index - 1, side: 'from' } : { node: lane.to, channel: index - 1, side: 'to' })
-        ends.set(bottom, isUp ? { node: lane.to, channel: index, side: 'to' } : { node: lane.from, channel: index, side: 'from' })
+        ends.set(top, lane.map(link => (isUp ? { node: link.from, channel: index - 1, side: 'from' as const } : { node: link.to, channel: index - 1, side: 'to' as const })))
+        ends.set(bottom, lane.map(link => (isUp ? { node: link.to, channel: index, side: 'to' as const } : { node: link.from, channel: index, side: 'from' as const })))
       }
     }
   })
@@ -644,11 +646,11 @@ function readOff(
         if (x === box.x || x === box.x + box.width - 1) return
         if (y === box.y + box.rows - 1 && '┬╤'.includes(char)) {
           ways.set(key, DOWN)
-          ends.set(key, { node: box.node, channel: box.shelf, side: graph.isDirected ? 'from' : 'above' })
+          ends.set(key, [{ node: box.node, channel: box.shelf, side: graph.isDirected ? 'from' : 'above' }])
           written.set(key, { node: box.node, text: wordsAt(x + 1, y + 1) })
         } else if (y === box.y && '┴╧'.includes(char)) {
           ways.set(key, UP)
-          ends.set(key, { node: box.node, channel: box.shelf - 1, side: graph.isDirected ? 'from' : 'below' })
+          ends.set(key, [{ node: box.node, channel: box.shelf - 1, side: graph.isDirected ? 'from' : 'below' }])
           written.set(key, { node: box.node, text: wordsAt(x + 1, y - 1) })
         }
         return
@@ -656,8 +658,8 @@ function readOff(
       if (WAYS[char] === undefined) return
       ways.set(key, WAYS[char])
       const into = boxAt.get(`${x},${char === '▼' ? y + 1 : y - 1}`)
-      if (char === '▼' && into !== undefined) ends.set(key, { node: into.node, channel: into.shelf - 1, side: 'to' })
-      if (char === '▲' && into !== undefined) ends.set(key, { node: into.node, channel: into.shelf, side: 'to' })
+      if (char === '▼' && into !== undefined) ends.set(key, [{ node: into.node, channel: into.shelf - 1, side: 'to' }])
+      if (char === '▲' && into !== undefined) ends.set(key, [{ node: into.node, channel: into.shelf, side: 'to' }])
     }),
   )
 
@@ -687,14 +689,14 @@ function readOff(
   }
 
   const lines = new Map<string, Said[]>()
-  for (const [key, end] of ends) lines.set(find(key), [...(lines.get(find(key)) ?? []), end])
+  for (const [key, said] of ends) lines.set(find(key), [...(lines.get(find(key)) ?? []), ...said])
   const isCut = new Set([...cut].map(find))
   const links = new Set<string>()
   const labels: string[] = []
   const labelsOf = (one: string, other: string): string[] =>
     graph.links.filter(link => (link.from === one && link.to === other) || (!graph.isDirected && link.from === other && link.to === one)).map(labelOf)
   for (const [key, { node, text }] of written) {
-    const own = ends.get(key)
+    const own = ends.get(key)?.[0]
     if (text === '' || own === undefined) continue
     const said = lines.get(find(key)) ?? []
     const across = said.filter(end => (graph.isDirected ? end.side === 'to' : end.side !== own.side))

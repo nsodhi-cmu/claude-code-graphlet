@@ -23,7 +23,7 @@ A link that crosses a channel leaves its box straight toward the port it is boun
 `layoutOf` seats the longest shelf first, in the middle of the columns it is laid out across, and then each other shelf against the one nearer it:
 
 - A box goes as near as it can to where its ports stand over or under the ports of the boxes it is joined to. The boxes are pushed apart where they would overlap, and slid back together toward where they wanted to be.
-- A lane then goes to the very column of the port it is joined to, and pushes aside the boxes in its way, so that a link runs straight through every shelf it passes.
+- A lane then goes to the very column of the port it is joined to, or the middle of those it is joined to, and pushes aside the boxes in its way, so that its links run straight through the shelves they pass.
 - Last, the shelf moves a column either way where that stands more of it exactly over or under what it is joined to.
 
 How wide a shelf is laid out is the `scroll` setting's to say. `pinned`: across the room's columns where it fits them, and where it is longer, across the longest shelf, together with every other shelf longer than the room, so that the long shelves lie on one sheet and their links run between them as laid out. `sheet`: every shelf across the longest.
@@ -36,7 +36,7 @@ A wire that does not go straight across turns on one row of the channel, its tra
 
 ### Tracks
 
-Wires that share a track run into one line, which says that everything on it is joined. So wires share a track only as a bundle that says nothing false: the wires that leave one face, a fan, together with the fans of every other face whose wires reach the very same faces. Several boxes' links to one box alone are such a bundle, and so are two boxes that both link to the same two.
+Wires that share a track run into one line, which says that everything on it is joined. So wires share a track only as a bundle that says nothing false: the wires that leave one face, a fan, together with the fans of every other face whose wires reach the very same faces. Several boxes' links to one box alone are such a bundle, and so are two boxes that both link to the same two. A box's link into a lane that other wires reach too is a fan of its own, so that where it meets them at the lane, it does not join them to the box's other links.
 
 In an undirected graph, a line has no arrowheads to tell the boxes it leaves from the boxes it reaches, so a link between two nodes of one shelf is a bundle alone, with a port of its own on each of its boxes. A line then joins each box whose bottom it meets to each box whose top it meets, or, meeting only the bottoms of two boxes, is the one link between them.
 

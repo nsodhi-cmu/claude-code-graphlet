@@ -4,7 +4,7 @@ import { graphOf, numbers, undirected } from './fixture'
 import { layersOf, loopLinks, ranksOf, readGraph } from '../hooks/layers'
 import type { Graph, Slot } from '../hooks/layers'
 
-const named = (slot: Slot): string => ('node' in slot ? slot.node.id : `${slot.lane.from}→${slot.lane.to}`)
+const named = (slot: Slot): string => ('node' in slot ? slot.node.id : slot.lane.map(link => `${link.from}→${link.to}`).join(' '))
 const layers = (graph: Graph): string[][] => layersOf(graph).slots.map(layer => layer.map(named))
 
 describe('reading a graph', () => {
