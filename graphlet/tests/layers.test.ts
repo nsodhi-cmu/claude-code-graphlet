@@ -212,7 +212,7 @@ describe('folding into a room', () => {
     expect(folded(graph)).toEqual([['root'], ['a', 'b', 'e', 'root→c root→d'], ['f', 'c', 'd']])
   })
 
-  test('where every node of the layer is joined to the layer under it, the nodes it gives up go to a layer put in between, and each layer under is folded in turn', () => {
+  test('where every node of the layer is joined to the layer under it, a node it gives up takes the nodes under it down a layer with it, and each layer under is folded in turn', () => {
     const graph = graphOf(
       ['root', 'a', 'b', 'c', 'd', 'a1', 'b1', 'c1', 'd1'],
       [['root', 'a'], ['root', 'b'], ['root', 'c'], ['root', 'd'], ['a', 'a1'], ['b', 'b1'], ['c', 'c1'], ['d', 'd1']],
@@ -223,6 +223,17 @@ describe('folding into a room', () => {
       ['a→a1', 'b→b1', 'c', 'd'],
       ['a1', 'b1', 'c→c1', 'd→d1'],
       ['c1', 'd1'],
+    ])
+  })
+
+  test('a node given up takes down only the nodes that must stay under it, and shares the layer under with the nodes that were there', () => {
+    const kids = ['a', 'b', 'c', 'd', 'e']
+    const graph = graphOf(['root', ...kids, ...kids.map(kid => `${kid}1`)], [...kids.map(kid => ['root', kid] as [string, string]), ...kids.map(kid => [kid, `${kid}1`] as [string, string])])
+    expect(folded(graph)).toEqual([
+      ['root'],
+      ['a', 'b', 'c', 'root→d root→e'],
+      ['a1', 'b→b1', 'c→c1', 'd', 'e'],
+      ['b1', 'c1', 'd1', 'e1'],
     ])
   })
 

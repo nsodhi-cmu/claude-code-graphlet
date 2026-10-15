@@ -53,7 +53,7 @@ export const LEAST_COLUMNS = 40
 /** How many times a folded layout that its boxes' ports still make wider than its room is folded again, narrower by as much as it overflowed. */
 const REFOLDS = 2
 /** The most nodes a graph is folded into its room for: folding more takes long, and makes a picture longer than a reply can hold. */
-const FOLDED_NODES = 150
+const FOLDED_NODES = 60
 /** How far apart two ports of one face of a box are. */
 const PORT_STEP = 2
 /** The characters a long word may be broken after with nothing lost. */

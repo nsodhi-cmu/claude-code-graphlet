@@ -88,7 +88,7 @@ A reply that opens with a graph has no text before it for the engine to draw, an
 - **Its width.** The room is the reply's width: the columns the surface measured, less the bullet's, or `REPLY_COLUMNS` less the bullet's where it measured none. A layer too wide for it is folded onto more layers, as [LAYERS.md](LAYERS.md#folding-into-a-room) tells, so the graph fits the reply where it can and is not cut off at its edge. The graph is laid out once, in the reply's width, and the columns blank down the whole of its left side are cut away, so a small graph stands at the reply's left edge, as the text does.
 - **Its height.** As tall as the graph needs, up to the most rows a room has, `MOST_CELLS`.
 - **It is still.** Nothing is selected or lit, no key or wheel moves it, and nothing in it answers a click. Its rows are plain `Text`, with no `Client` around them to take the pointer or the keyboard.
-- **Its foot.** There is no `html ↗` corner. A graph still wider than the reply, where a layer cannot fold far enough, or the reply is narrower than the narrowest room a graph is laid out for, is seen from its top left corner, as a pane's is before it is scrolled, and its foot keeps the counts of the nodes past the edge, `3 more →`. A graph that is all in view has no foot.
+- **Its foot.** There is no `html ↗` corner. A graph still wider than the reply, where a layer cannot fold far enough, the graph has more nodes than `FOLDED_NODES`, or the reply is narrower than the narrowest room a graph is laid out for, is seen from its top left corner, as a pane's is before it is scrolled, and its foot keeps the counts of the nodes past the edge, `3 more →`. A graph that is all in view has no foot.
 
 ## On Other Surfaces
 

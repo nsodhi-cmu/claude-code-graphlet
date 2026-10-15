@@ -276,26 +276,47 @@ export type Fold = { columns: number; widthOf: (node: GraphletNode) => number; g
  * The layers folded into a room: each layer too wide for it gives up a node
  * at a time, from the top down, until it fits, has one node left, or giving
  * up none of those left would make it narrower, the lanes its links would
- * take past the layer being as wide as the box. A node sinks into the layer
- * under its own where it is joined to nothing there, and else into a layer
- * put in under its own for the nodes it gives up; a node that may sink goes
- * before one that may not, then the one joined to fewest nodes above it,
- * since such a link may take a lane past the layer it leaves, and of those
- * the one the graph names last, so that the layer keeps the nodes named
- * first. In a directed graph a node that links to a node of its own layer
- * stays, so that no link turns back up for the fold.
+ * take past the layer being as wide as the box. A node given up goes into the
+ * layer under its own, and takes down with it every node that must stay
+ * under it: one it is joined to that stood lower than it, and so on from
+ * there; where the layers were named, every node of the layers under its
+ * own. The node given up first is the one whose links would add fewest lanes
+ * past the layer, then the one joined to fewest nodes above it, then one that
+ * takes no node down with it, then the one the graph names last, so that the
+ * layer keeps the nodes named first. In a directed graph a node that links
+ * to a node of its own layer stays, so that no link turns back up for the
+ * fold.
  */
 function folded(graph: Graph, ranks: Map<string, number>, fold: Fold): Map<string, number> {
-  const folds = new Map(ranks)
+  let folds = new Map(ranks)
   const links = graph.links.filter(link => link.from !== link.to)
+  const isNamed = graph.nodes.every(node => node.layer !== undefined)
   const rankOf = (id: string): number => folds.get(id) ?? 0
-  const [joined, outward] = [new Map<string, string[]>(), new Map<string, string[]>()]
+  const [joined, outward, under] = [new Map<string, string[]>(), new Map<string, string[]>(), new Map<string, string[]>()]
+  const add = (map: Map<string, string[]>, key: string, value: string): void => void map.set(key, [...(map.get(key) ?? []), value])
   for (const link of links) {
-    joined.set(link.from, [...(joined.get(link.from) ?? []), link.to])
-    joined.set(link.to, [...(joined.get(link.to) ?? []), link.from])
-    outward.set(link.from, [...(outward.get(link.from) ?? []), link.to])
+    add(joined, link.from, link.to)
+    add(joined, link.to, link.from)
+    add(outward, link.from, link.to)
+    const [from, to] = [ranks.get(link.from) ?? 0, ranks.get(link.to) ?? 0]
+    if (from < to) add(under, link.from, link.to)
+    if (to < from) add(under, link.to, link.from)
   }
-  const othersOf = (id: string): number[] => (joined.get(id) ?? []).map(rankOf)
+  /** The layers after a node of `rank` goes into the one under it, with the nodes that must stay under it. */
+  const sunk = (id: string, rank: number): Map<string, number> => {
+    const isFree = !(under.get(id) ?? []).some(other => rankOf(other) === rank + 1)
+    if (isNamed) return new Map([...folds].map(([other, at]) => [other, other === id || (at > rank && !isFree) ? at + 1 : at]))
+    const moved = new Map(folds).set(id, rank + 1)
+    const queue = [id]
+    for (const at of queue) {
+      for (const other of under.get(at) ?? []) {
+        if ((moved.get(other) ?? 0) > (moved.get(at) ?? 0)) continue
+        moved.set(other, (moved.get(at) ?? 0) + 1)
+        queue.push(other)
+      }
+    }
+    return moved
+  }
   /** How many lanes the links passing a layer take there, shared as they are when the graph is laid in layers, but by this layer's links alone. */
   const lanesIn = (ranks: Map<string, number>, rank: number): number => {
     const passing = links.filter(link => Math.min(ranks.get(link.from) ?? 0, ranks.get(link.to) ?? 0) < rank && rank < Math.max(ranks.get(link.from) ?? 0, ranks.get(link.to) ?? 0))
@@ -311,24 +332,29 @@ function folded(graph: Graph, ranks: Map<string, number>, fold: Fold): Map<strin
     const [nodes, lanes] = [nodesIn(ranks, rank), lanesIn(ranks, rank)]
     return nodes.reduce((sum, node) => sum + fold.widthOf(node), 0) + lanes + (nodes.length + lanes - 1) * fold.gap
   }
+  const order = new Map(graph.nodes.map((node, index) => [node.id, index]))
   for (let rank = 0; rank <= Math.max(...folds.values()); rank += 1) {
     const kept = new Set<string>()
     for (let width = widthIn(folds, rank); nodesIn(folds, rank).length > 1 && width > fold.columns; ) {
+      const passing = new Set(links.flatMap(link => (Math.min(rankOf(link.from), rankOf(link.to)) < rank && rank < Math.max(rankOf(link.from), rankOf(link.to)) ? [link.from, link.to] : [])))
       const going = nodesIn(folds, rank)
         .filter(node => !kept.has(node.id) && (!graph.isDirected || !(outward.get(node.id) ?? []).some(to => rankOf(to) === rank)))
-        .map(node => ({ node, above: othersOf(node.id).filter(other => other < rank).length, isFree: !othersOf(node.id).includes(rank + 1) }))
-        .sort((a, b) => Number(b.isFree) - Number(a.isFree) || a.above - b.above || graph.nodes.indexOf(b.node) - graph.nodes.indexOf(a.node))[0]
+        .map(node => {
+          const above = (joined.get(node.id) ?? []).filter(other => rankOf(other) < rank)
+          const lanes = above.length > 1 ? 1 : above.filter(other => !passing.has(other)).length
+          return { node, lanes, above: above.length, isFree: !(under.get(node.id) ?? []).some(other => rankOf(other) === rank + 1) }
+        })
+        .sort((a, b) => a.lanes - b.lanes || a.above - b.above || Number(b.isFree) - Number(a.isFree) || (order.get(b.node.id) ?? 0) - (order.get(a.node.id) ?? 0))[0]
       if (going === undefined) break
-      const moved = new Map([...folds].map(([id, at]) => [id, !going.isFree && at > rank ? at + 1 : at]))
-      moved.set(going.node.id, rank + 1)
+      const moved = sunk(going.node.id, rank)
       const narrower = widthIn(moved, rank)
       if (narrower < width) {
-        for (const [id, at] of moved) folds.set(id, at)
+        folds = moved
         width = narrower
       } else kept.add(going.node.id)
     }
   }
-  return folds
+  return packed(folds)
 }
 
 /**

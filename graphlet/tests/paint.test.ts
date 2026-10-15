@@ -782,14 +782,15 @@ describe('what a picture says', () => {
   /** How long a test that reads many pictures may take: a slow machine's while. */
   const READING = { timeoutMs: 30_000 }
 
-  test('a graph drawn whole says every link it has, in every channel the link crosses, and no link it does not have', READING, () => {
+  test('a graph drawn whole, or folded into a room, says every link it has, in every channel the link crosses, and no link it does not have', READING, () => {
     for (let run = 0; run < 900; run += 1) {
       const graph = anyGraph(run)
       const look = someLook()
-      const columns = viewOf(look).measure(graph, 40 + pick(100)).columns
-      const layout = layoutOf(graph, { columns, rows: 0 }, look)
+      const laid = layoutOf(graph, { columns: 40 + pick(100), rows: 0 }, look, pick(2) === 0)
+      const columns = Math.max(laid.columns, ...laid.shelves.map(shelf => shelf.across))
+      const layout = { ...laid, columns }
       const drawing = paint(layout, graph, null, { columns, rows: layout.rows + 1 }, ORIGIN)
-      const said = readOff(graph, layout, drawing, place => place.x)
+      const said = readOff(graph, layout, drawing, place => place.x - slideOf(layout, layout.shelves[place.shelf], 0))
       expect(said.loose).toEqual([])
       expect(said.labels).toEqual([])
       expect(said.links).toEqual([...new Set(linksOf(graph, layout))])
