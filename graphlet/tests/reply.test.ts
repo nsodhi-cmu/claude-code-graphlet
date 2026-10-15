@@ -166,12 +166,12 @@ test('a graph in a reply is drawn still, as narrow as its widest layer and again
     '    ▼      ┊',
     '┌───────┐  ┊',
     '│ check │  ┊',
-    '└───┬───┘  ┊',
-    '    │ ┌┈┈┈┈┘',
-    '    ▼ ┊',
-    ' ┌────┴─┐',
-    ' │ emit │',
-    ' └──────┘',
+    '└─────┬─┘  ┊',
+    '      │ ┌┈┈┘',
+    '      ▼ ┊',
+    '   ┌────┴─┐',
+    '   │ emit │',
+    '   └──────┘',
   ])
   expect(drawing.hits).toEqual([])
 })

@@ -217,17 +217,17 @@ describe('laid on one sheet', () => {
 describe('a room too short for every layer', () => {
   test('the window shows the selected layer with its links, and the row under it counts the nodes above and below', () => {
     expect(picture(pinned.draw(SHOP, 'src/money.ts', SHORT, pinned.show(SHOP, 'src/money.ts', SHORT, ORIGIN)))).toEqual([
-      '             └─────┬─────┘  └─────────┬────────┘  └────┬────┘  └──────┬─────┘',
-      '                   └──────────────────┴───────┬────────┴──────────────┘',
-      '                                              ▼',
-      '                                       ┌────────────┐',
-      '                                       │ ◆ price.ts │',
-      '                                       └──────┬─────┘',
-      '                                              │',
-      '                                              ▼',
-      '                                      ╔═══════════════╗',
-      '                                      ║ → money.ts  2 ║',
-      '                                      ╚═══════════════╝',
+      '               └─────┬─────┘  └────────────────┬─┘  └────┬────┘  └──────┬─────┘',
+      '                     └─────────────────────────┼─────────┴──────────────┘',
+      '                                               ▼',
+      '                                        ┌────────────┐',
+      '                                        │ ◆ price.ts │',
+      '                                        └──────┬─────┘',
+      '                                               │',
+      '                                               ▼',
+      '                                       ╔═══════════════╗',
+      '                                       ║ → money.ts  2 ║',
+      '                                       ╚═══════════════╝',
       '                                     ↑ 6 more                                       html ↗',
     ])
     const top = picture(pinned.draw(SHOP, 'src/pages/checkout.ts', SHORT, ORIGIN))

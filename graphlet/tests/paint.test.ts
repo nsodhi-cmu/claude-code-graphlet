@@ -33,22 +33,22 @@ describe('the drawing', () => {
     expect(graphRows(drawn(SHOP, null, WHOLE))).toEqual([
       '           ┌───────────────┐  ┌────────────────────┐',
       '           │ ○ checkout.ts │  │ ○ pages/invoice.ts │',
-      '           └───────┬───────┘  └───────┬────────────┘',
-      '                   │                  │',
-      '                   ▼                  ▼',
-      '             ┌───────────┐  ┌──────────────────┐  ┌─────────┐  ┌────────────┐',
-      '             │ ● cart.ts │  │ ● src/invoice.ts │  │ ○ ui.ts │  │ ▲ email.ts │',
-      '             └─────┬─────┘  └─────────┬────────┘  └────┬────┘  └──────┬─────┘',
-      '                   └──────────────────┴───────┬────────┴──────────────┘',
-      '                                              ▼',
-      '                                       ┌────────────┐',
-      '                                       │ ◆ price.ts │',
-      '                                       └──────┬─────┘',
-      '                                              │',
-      '                                              ▼',
-      '                                      ┌───────────────┐',
-      '                                      │ → money.ts  2 │',
-      '                                      └───────────────┘',
+      '           └─────────┬─────┘  └─────────┬──────────┘',
+      '                     │                  │',
+      '                     ▼                  ▼',
+      '               ┌───────────┐  ┌──────────────────┐  ┌─────────┐  ┌────────────┐',
+      '               │ ● cart.ts │  │ ● src/invoice.ts │  │ ○ ui.ts │  │ ▲ email.ts │',
+      '               └─────┬─────┘  └────────────────┬─┘  └────┬────┘  └──────┬─────┘',
+      '                     └─────────────────────────┼─────────┴──────────────┘',
+      '                                               ▼',
+      '                                        ┌────────────┐',
+      '                                        │ ◆ price.ts │',
+      '                                        └──────┬─────┘',
+      '                                               │',
+      '                                               ▼',
+      '                                       ┌───────────────┐',
+      '                                       │ → money.ts  2 │',
+      '                                       └───────────────┘',
     ])
   })
 
@@ -147,17 +147,17 @@ describe('the drawing', () => {
       ],
     })
     expect(graphRows(drawn(graph, null, { columns: 50, rows: 60 }))).toEqual([
-      '                 ┌──────┐',
-      '                 │ Read │',
-      '                 └──┬───┘',
-      '                    │ ▲',
-      '                    │ └┈┈┈┈┐',
-      '                    ▼      ┊',
-      '               ┌────────┐  ┊',
-      '               │ Valid? │  ┊',
-      '               └┬────┬──┘  ┊',
-      '                │yes │no   ┊',
-      '                └┐   └───┐ ┊',
+      '                  ┌──────┐',
+      '                  │ Read │',
+      '                  └──┬───┘',
+      '                     │ ▲',
+      '                     │ └┈┈┈┈┐',
+      '                     ▼      ┊',
+      '                ┌────────┐  ┊',
+      '                │ Valid? │  ┊',
+      '                └┬────┬──┘  ┊',
+      '                 │yes │no   ┊',
+      '                 │    └──┐ ┌┘',
       '                 ▼       ▼ ┊retry',
       '             ┌──────┐  ┌───┴───────┐',
       '             │ Save │  │ Ask again │',
@@ -170,24 +170,24 @@ describe('the drawing', () => {
   test('links past a layer from one node run down one lane beside that layer\'s boxes, which branches where each of them leaves it', () => {
     const graph = graphOf(['A', 'B', 'C', 'D', 'E'], [['A', 'B'], ['B', 'C'], ['A', 'C'], ['C', 'D'], ['A', 'D'], ['B', 'E'], ['E', 'D']])
     expect(graphRows(drawn(graph))).toEqual([
-      '              ┌─────┐',
-      '              │  A  │',
-      '              └──┬──┘',
-      '                 ├────────┐',
-      '                 ▼        │',
-      '              ┌─────┐     │',
-      '              │  B  │     │',
-      '              └──┬──┘     │',
-      '             ┌───┴───┐ ┌──┴─┐',
-      '             ▼       ▼ ▼    │',
-      '          ┌─────┐  ┌─────┐  │',
-      '          │  E  │  │  C  │  │',
-      '          └──┬──┘  └──┬──┘  │',
-      '             └────┬───┴─────┘',
-      '                  ▼',
-      '               ┌─────┐',
-      '               │  D  │',
-      '               └─────┘',
+      '                       ┌─────┐',
+      '                       │  A  │',
+      '                       └──┬──┘',
+      '                    ┌─────┤',
+      '                    ▼     │',
+      '                 ┌─────┐  │',
+      '                 │  B  │  │',
+      '                 └──┬──┘  │',
+      '            ┌───────┤ ┌───┴┐',
+      '            ▼       ▼ ▼    │',
+      '         ┌─────┐  ┌─────┐  │',
+      '         │  E  │  │  C  │  │',
+      '         └──┬──┘  └──┬──┘  │',
+      '            └────────┼─────┘',
+      '                     ▼',
+      '                  ┌─────┐',
+      '                  │  D  │',
+      '                  └─────┘',
     ])
   })
 
@@ -291,22 +291,21 @@ describe('the drawing', () => {
     const tall = 'a-file-with-a-very-long-name.component.ts'
     const graph = graphOf(['top', 'short', tall, 'end'], [['top', 'short'], ['top', tall], ['short', 'end'], [tall, 'end'], ['end', 'short']])
     expect(graphRows(drawn(graph, null, { columns: 60, rows: 60 }))).toEqual([
-      '                      ┌─────┐',
-      '                      │ top │',
-      '                      └──┬──┘',
-      '              ┌──────────┴─────────┐',
+      '                     ┌─────┐',
+      '                     │ top │',
+      '                     └──┬──┘',
+      '              ┌─────────┴──────────┐',
       '              ▼                    ▼',
       '          ┌───────┐  ┌──────────────────────────┐',
       '          │ short │  │ a-file-with-a-very-long- │',
       '          └──┬────┘  │ name.component.ts        │',
       '             │ ▲     └─────────────┬────────────┘',
       '             │ ┊                   │',
-      '             │ └┈┈┈┈┈┈┐            │',
-      '             └──────┬─┊────────────┘',
-      '                    ▼ ┊',
-      '                  ┌───┴─┐',
-      '                  │ end │',
-      '                  └─────┘',
+      '             ├─┊───────────────────┘',
+      '             ▼ ┊',
+      '           ┌───┴─┐',
+      '           │ end │',
+      '           └─────┘',
     ])
     const hits = boxes(drawn(graph, null, { columns: 60, rows: 60 }))
     expect(hits.map(hit => [hit.node, hit.height])).toEqual([
@@ -363,30 +362,32 @@ describe('the drawing', () => {
   test('one node\'s links turn on a row of their own where they would run into another node\'s; merged, they share one', () => {
     const graph = readGraph({
       nodes: [
-        ...['u0', 'u1', 'u2'].map(id => ({ id, label: id, layer: 0 })),
+        ...['u0', 'u1'].map(id => ({ id, label: id, layer: 0 })),
         ...['d0', 'd1', 'd2'].map(id => ({ id, label: id, layer: 1 })),
       ],
       links: [
         { from: 'u0', to: 'd0' },
+        { from: 'u0', to: 'd1' },
+        { from: 'u0', to: 'd2' },
         { from: 'u1', to: 'd0' },
         { from: 'u1', to: 'd2' },
       ],
     })
     expect(graphRows(drawn(graph, null, { columns: 70, rows: 60 }))).toEqual([
+      '                              ┌─────┐  ┌─────┐',
+      '                              │ u0  │  │ u1  │',
+      '                              └──┬──┘  └──┬──┘',
+      '                                 │ ┌──────┴─┐',
+      '                         ┌───────┼─│──────┐ │',
+      '                         ▼       ▼ ▼      ▼ ▼',
       '                      ┌─────┐  ┌─────┐  ┌─────┐',
-      '                      │ u0  │  │ u1  │  │ u2  │',
-      '                      └──┬──┘  └──┬──┘  └─────┘',
-      '                      ┌──┘        │',
-      '                      │ ┌─────────┴──────┐',
-      '                      ▼ ▼                ▼',
-      '                    ┌─────┐  ┌─────┐  ┌─────┐',
-      '                    │ d0  │  │ d1  │  │ d2  │',
-      '                    └─────┘  └─────┘  └─────┘',
+      '                      │ d1  │  │ d0  │  │ d2  │',
+      '                      └─────┘  └─────┘  └─────┘',
     ])
     expect(graphRows(drawn(graph, null, { columns: 70, rows: 60 }, { ...LOOK, links: 'merged' })).slice(2, 5)).toEqual([
-      '                      └──┬──┘  └──┬──┘  └─────┘',
-      '                       ┌─┴────────┴──────┐',
-      '                       ▼                 ▼',
+      '                               └──┬──┘  └──┬──┘',
+      '                         ┌────────┼────────┤',
+      '                         ▼        ▼        ▼',
     ])
   })
 
@@ -431,17 +432,17 @@ describe('the drawing', () => {
   test('an undirected graph is laid out from the node it names first, a link meets both its boxes at ticks with no arrowhead, and the link that closes a loop runs under a layer', () => {
     const graph = undirected(graphOf(['a', 'b', 'c', 'd'], [['b', 'a'], ['a', 'c'], ['c', 'b'], ['d', 'c'], ['c', 'd'], ['d', 'd']]))
     expect(graphRows(drawn(graph))).toEqual([
-      '                 ┌─────┐',
-      '                 │  a  │',
-      '                 └──┬──┘',
-      '               ┌────┴───┐',
-      '            ┌──┴──┐  ┌──┴──┐',
-      '            │  b  │  │  c  │',
-      '            └──┬──┘  └─┬─┬─┘',
-      '               └───────┘ │',
-      '                     ┌───┴──┐',
-      '                     │ d  ↺ │',
-      '                     └──────┘',
+      '                ┌─────┐',
+      '                │  a  │',
+      '                └──┬──┘',
+      '              ┌────┴───┐',
+      '           ┌──┴──┐  ┌──┴──┐',
+      '           │  b  │  │  c  │',
+      '           └──┬──┘  └─┬─┬─┘',
+      '              └───────┘ │',
+      '                    ┌───┴──┐',
+      '                    │ d  ↺ │',
+      '                    └──────┘',
     ])
   })
 
@@ -470,14 +471,14 @@ describe('the drawing', () => {
       ],
     })
     expect(graphRows(drawn(home, null, { columns: 60, rows: 40 }))).toEqual([
-      '                         ┌───────┐',
-      '                         │ Modem │',
-      '                         └───┬───┘',
-      '                             │',
-      '                        ┌────┴───┐',
-      '                        │ Router │',
-      '                        └────┬───┘',
-      '                        ┌────┴────┬─────┐',
+      '                              ┌───────┐',
+      '                              │ Modem │',
+      '                              └───┬───┘',
+      '                                  │',
+      '                             ┌────┴───┐',
+      '                             │ Router │',
+      '                             └────┬───┘',
+      '                        ┌─────────┼─────┐',
       '                   ┌────┴───┐  ┌──┴──┐  │',
       '                   │ Laptop │  │ TV  │  │',
       '                   └┬───────┘  └─────┘  │',
@@ -528,9 +529,9 @@ describe('what is selected', () => {
 
   test('the selected box has a double frame, and its label is bold and inverse in its own tone', () => {
     expect(graphRows(drawing).slice(5, 8)).toEqual([
-      '             ┌───────────┐  ╔══════════════════╗  ┌─────────┐  ┌────────────┐',
-      '             │ ● cart.ts │  ║ ● src/invoice.ts ║  │ ○ ui.ts │  │ ▲ email.ts │',
-      '             └─────┬─────┘  ╚═════════╤════════╝  └────┬────┘  └──────┬─────┘',
+      '               ┌───────────┐  ╔══════════════════╗  ┌─────────┐  ┌────────────┐',
+      '               │ ● cart.ts │  ║ ● src/invoice.ts ║  │ ○ ui.ts │  │ ▲ email.ts │',
+      '               └─────┬─────┘  ╚════════════════╤═╝  └────┬────┘  └──────┬─────┘',
     ])
     expect(spansWith(drawing, '● src/invoice.ts')).toEqual([
       { text: '● src/invoice.ts', paint: 'bad', isBold: true, isInverse: true },
@@ -542,9 +543,9 @@ describe('what is selected', () => {
     expect(drawing.rows[4]?.filter(span => span.text.trim() === '▼').map(span => span.paint)).toEqual(['dim', 'accent'])
     expect(drawing.rows[5]?.filter(span => span.text.trim() !== '').map(span => span.paint)).toEqual(['bad', 'accent', 'dim', 'warn'])
     expect(drawing.rows[8]?.filter(span => span.text.trim() !== '').map(span => [span.text.trim().length, span.paint])).toEqual([
-      [19, 'dim'],
-      [9, 'accent'],
-      [24, 'dim'],
+      [26, 'dim'],
+      [1, 'accent'],
+      [25, 'dim'],
     ])
     expect(spansWith(drawing, '┌────────────┐').at(-1)?.paint).toBe('accent')
     expect(spansWith(drawing, '● cart.ts').map(span => span.paint)).toEqual(['bad'])

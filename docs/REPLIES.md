@@ -52,22 +52,22 @@ A reply that opens with a graph has no text before it for the engine to draw, an
 ```
 ● Here is how a request flows:
 
-               ┌───────┐
-               │ Start │
-               └───┬───┘
-                   │
-                   ▼
-         ┌──────────────────┐
-         │ Read the request │
-         └────────┬─────────┘
-                  │ ▲
-                  │ └┈┈┈┈┈┈┈┐
-                  ▼         ┊
-             ┌────────┐     ┊
-             │ Valid? │     ┊
-             └┬────┬──┘     ┊
-              │yes │no      ┊
-       ┌──────┘    └──────┐ ┊
+                    ┌───────┐
+                    │ Start │
+                    └───┬───┘
+                        │
+                        ▼
+              ┌──────────────────┐
+              │ Read the request │
+              └──────┬───────────┘
+                     │   ▲
+                     │   └┈┈┐
+                     ▼      ┊
+                ┌────────┐  ┊
+                │ Valid? │  ┊
+                └┬────┬──┘  ┊
+                 │yes │no   ┊
+       ┌─────────┘    └───┐ ┊
        ▼                  ▼ ┊
   ┌─────────┐  ┌────────────┴─────────┐
   │ Save it │  │ Ask for a correction │

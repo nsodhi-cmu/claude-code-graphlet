@@ -156,14 +156,16 @@ describe('the rows between two shelves', () => {
     expect(tracks(laid(graphOf(['a', 'b', 'c', 'd'], [['a', 'c'], ['a', 'd'], ['b', 'c'], ['b', 'd']])))).toBe(1)
   })
 
-  /** Two nodes whose links reach one node from either side, the one's reaching on past it. */
+  /** Two nodes whose links fan out across the same nodes, the one's to one more of them, so that wherever the two stand their fans overlap. */
   const APART = readGraph({
     nodes: [
-      ...['u0', 'u1', 'u2'].map(id => ({ id, label: id, layer: 0 })),
+      ...['u0', 'u1'].map(id => ({ id, label: id, layer: 0 })),
       ...['d0', 'd1', 'd2'].map(id => ({ id, label: id, layer: 1 })),
     ],
     links: [
       { from: 'u0', to: 'd0' },
+      { from: 'u0', to: 'd1' },
+      { from: 'u0', to: 'd2' },
       { from: 'u1', to: 'd0' },
       { from: 'u1', to: 'd2' },
     ],

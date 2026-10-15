@@ -3,35 +3,35 @@
 graphlet is a Claude Code mod that draws graphs, nodes and the links between them, inside Claude Code. Claude draws them in its replies, and other mods build on it: a mod hands it a graph, and graphlet draws the graph in that mod's pane, scrolls it, and says which node the person picked.
 
 ```
-                             ┌───────┐
-                             │ Start │
-                             └───┬───┘
-                                 │
-                                 ▼
-                       ┌──────────────────┐
-                       │ Read the request │
-                       └────────┬─────────┘
-                                │ ▲
-                                │ └┈┈┈┈┈┈┈┈┈┈┈┐
-                                ▼             ┊
-                        ╔══════════════╗      ┊
-                        ║ Is it valid? ║      ┊
-                        ╚═══════╤══════╝      ┊
-                   ┌────────────┴───────────┐ ┊
-                   ▼                        ▼ ┊
-       ┌──────────────────────┐  ┌────────────┴─────────┐
+                                    ┌───────┐
+                                    │ Start │
+                                    └───┬───┘
+                                        │
+                                        ▼
+                              ┌──────────────────┐
+                              │ Read the request │
+                              └────┬─────────────┘
+                                   │     ▲
+                                   │     └┈┈┈┐
+                                   ▼         ┊
+                           ╔══════════════╗  ┊
+                           ║ Is it valid? ║  ┊
+                           ╚═══════╤══════╝  ┊
+                   ┌───────────────┴────────┐┊
+                   ▼                        ▼┊
+       ┌──────────────────────┐  ┌───────────┴──────────┐
        │ Save to the database │  │ Ask for a correction │
-       └─┬───────────┬────────┘  └──────────────────────┘
-         │           │
-         ▼           │
-┌─────────────────┐  │
-│ Notify the team │  │
-└────────┬────────┘  │
-         ├───────────┘
-         ▼
-     ┌──────┐
-     │ Done │
-     └──────┘
+       └────────┬───────────┬─┘  └──────────────────────┘
+                │           │
+                ▼           │
+       ┌─────────────────┐  │
+       │ Notify the team │  │
+       └──────────────┬──┘  │
+                      ├─────┘
+                      ▼
+                  ┌──────┐
+                  │ Done │
+                  └──────┘
                                                           html ↗
 ```
 

@@ -26,6 +26,13 @@ A link that crosses a channel leaves its box straight toward the port it is boun
 - A lane then goes to the very column of the port it is joined to, or the middle of those it is joined to, and pushes aside the boxes in its way, so that its links run straight through the shelves they pass.
 - Last, the shelf moves a column either way where that stands more of it exactly over or under what it is joined to.
 
+The shelves are then seated again, by `reseat`, `RESEATS` times over: each time every shelf is balanced against the shelf above it, on the way down; against the shelf below it, on the way back up; and then against both, where the two are laid out across the same columns.
+
+- Balancing a shelf seats its places where their wires to the shelves beside it run least sideways, all told, of the seatings that keep the places in their order, a gap apart, and within the shelf. Each place wants the median of the columns its wires would have it at, and places that would then stand out of order are pooled into one run at the median of all their wires. Where a place's wires split evenly, it stands halfway between, so a box over two others stands centered over them.
+- A lane's wires weigh `LANE_WEIGHT` times a box's, so that a link through lanes keeps straight, and a wire with the flow weighs `FLOW_WEIGHT` times one against it, so that the link that closes a loop bends before the links it runs back past.
+- Of the first seating and the seating after each pass, the one kept is the one whose channels' rows and bent links weigh least, a row as much as `ROW_BENDS` bent links; a bent link with the flow between two boxes weighs one, one against the flow half, and a wire to or from a lane half again. Of those that weigh the same, the one kept is the one whose wires run least sideways.
+- Last, where every shelf is laid out across the room's columns, the shelves are set together in the middle of them.
+
 How wide a shelf is laid out is the `scroll` setting's to say. `pinned`: across the room's columns where it fits them, and where it is longer, across the longest shelf, together with every other shelf longer than the room, so that the long shelves lie on one sheet and their links run between them as laid out. `sheet`: every shelf across the longest.
 
 ## Channels
