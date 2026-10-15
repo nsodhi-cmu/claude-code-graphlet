@@ -85,4 +85,4 @@ A click on one of the counts under a graph larger than its room scrolls it a pag
 
 ## What Graphlet Keeps
 
-For each pane `show` has named, graphlet keeps what it was last given, the node last picked there, and where the person scrolled the window to. A window the person scrolled stays where they left it until another node is selected, and then follows the selection again. None of it outlives the session, or a reload of the mod.
+For each pane `show` has named, graphlet keeps what it was last given, the node last picked there, and where the person scrolled the window to. A window the person scrolled stays where they left it until another node is selected, and then follows the selection again. It also keeps the layouts it last made, `KEPT_LAYOUTS` of them, each by what its graph holds and how wide its room is, so that a key press, a click, or a render of the same graph in the same room does not lay the graph out again. None of it outlives the session, or a reload of the mod.

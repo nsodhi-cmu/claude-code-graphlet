@@ -226,7 +226,8 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
  * Paints a layout through a window at `pan`. Every shelf slides under the
  * window together, each as far as its own end, and the wires between two
  * shelves that have slid apart are given their tracks again as they now
- * stand. The last row is the foot: it
+ * stand. A channel the window shows nothing of, nor of either shelf beside
+ * it, is passed over. The last row is the foot: it
  * counts the nodes out of view of a graph larger than the room, and holds
  * the corner a click opens the graph as a web page by.
  */
@@ -243,10 +244,14 @@ export function paint(layout: Layout, graph: Graph, selected: string | null, roo
   }
 
   const hits = layout.shelves.flatMap(shelf => paintShelf(canvas, graph, shelf, selected, seen))
-  for (const channel of layout.channels) {
+  const isInView = (top: number, rows: number): boolean => seen.yOf(top) < seen.rows && seen.yOf(top + rows) > 0
+  layout.channels.forEach((channel, index) => {
+    const [above, below] = [layout.shelves[index], layout.shelves[index + 1]]
+    const isNear = [above, below].some(shelf => shelf !== undefined && isInView(shelf.top, shelf.rows))
+    if (!isInView(channel.top, channel.rows) && !isNear) return
     if (channel.isLoose) layTracks(channel, seen.xOf, channel.rows - Number(channel.hasTopRow) - Number(channel.hasBottomRow))
     paintChannel(canvas, graph, layout, channel, selected, seen)
-  }
+  })
 
   const rows = canvas.cells.map(spansOf)
   const boxes = layout.shelves.flatMap(shelf =>

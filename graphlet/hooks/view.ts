@@ -2,12 +2,15 @@ import type { GraphletMove, GraphletSize } from '../types'
 import type { Drawing, Pan, Room } from './draw'
 import type { Graph } from './layers'
 import { LEAST_COLUMNS, layoutOf } from './layout'
-import type { Look } from './layout'
+import type { Layout, Look } from './layout'
 import { paint } from './paint'
 import { scrollIn, showIn, stepIn } from './window'
 
 // A graph as a person looks at it: laid out for a room, seen through a
 // window, with one node selected.
+
+/** How many layouts a view keeps, the last it laid out, so that a graph drawn again in the same room is not laid out again. */
+const KEPT_LAYOUTS = 8
 
 /** The keys that move the selection: the arrows, and the letters under them. */
 export const MOVES: Readonly<Record<string, GraphletMove>> = {
@@ -39,10 +42,20 @@ export type View = {
  * A view that draws graphs as `look` says. One that is to `fold` folds a
  * graph's layers into its room, and measures a graph by the columns its
  * longest layer then takes; one that is not lays a layer longer than the room
- * across more than it, for a window to scroll over.
+ * across more than it, for a window to scroll over. A view keeps the layouts
+ * it last made, each by what its graph holds and the columns of its room, and
+ * hands the same one back for the same graph in a room as wide.
  */
 export function viewOf(look: Look, fold = false): View {
-  const laid = (graph: Graph, room: Room) => layoutOf(graph, room, look, fold)
+  const kept = new Map<string, Layout>()
+  const laid = (graph: Graph, room: Room): Layout => {
+    const key = `${room.columns} ${JSON.stringify(graph)}`
+    const layout = kept.get(key) ?? layoutOf(graph, room, look, fold)
+    kept.delete(key)
+    kept.set(key, layout)
+    for (const old of [...kept.keys()].slice(0, Math.max(0, kept.size - KEPT_LAYOUTS))) kept.delete(old)
+    return layout
+  }
   return {
     measure: (graph, columns) => {
       const layout = laid(graph, { columns, rows: 0 })
