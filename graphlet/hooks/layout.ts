@@ -258,12 +258,14 @@ function bundlesOf(wires: Wire[], links: Links, isDirected: boolean): Wire[][] {
  * into one port. A face's ports stand `PORT_STEP` apart across its middle, in
  * the order of where along their shelves the places at the wires' other ends
  * stand, so that wires from the left arrive on the left; of two that lead to
- * the same place, the one with the flow is first. A wire that leaves straight
- * keeps clear of the face's other ports, and in an undirected graph, where a
- * wire meets the box it reaches at a tick too, of the columns beside them.
+ * a place in common, the one with the flow is first, wherever their other
+ * wires lead, so that the links two boxes have each way run side by side and
+ * never cross. A wire that leaves straight keeps clear of the face's other
+ * ports, and in an undirected graph, where a wire meets the box it reaches at
+ * a tick too, of the columns beside them.
  */
 function dealPorts(shelves: Shelf[], channels: Channel[], isDirected: boolean): void {
-  type Group = { ends: End[]; leaving: Wire[]; heading: number; isUp: boolean }
+  type Group = { ends: End[]; leaving: Wire[]; heading: number; isUp: boolean; far: Set<Place> }
   const faces = new Map<Place, { top: Group[]; bottom: Group[] }>()
   const alongOf = (place: Place): number =>
     ((shelves[place.shelf]?.places.indexOf(place) ?? 0) + 0.5) / (shelves[place.shelf]?.places.length ?? 1)
@@ -273,7 +275,17 @@ function dealPorts(shelves: Shelf[], channels: Channel[], isDirected: boolean): 
     const face = faces.get(first.place) ?? { top: [], bottom: [] }
     faces.set(first.place, face)
     const heading = far.reduce((sum, end) => sum + alongOf(end.place), 0) / far.length
-    ;(first.isAbove ? face.bottom : face.top).push({ ends, leaving, heading, isUp })
+    ;(first.isAbove ? face.bottom : face.top).push({ ends, leaving, heading, isUp, far: new Set(far.map(end => end.place)) })
+  }
+  /** A face's groups by their heading, each against the flow moved past every group with the flow that leads to a place it does. */
+  const ordered = (groups: Group[]): Group[] => {
+    const order = [...groups].sort((a, b) => a.heading - b.heading || Number(a.isUp) - Number(b.isUp))
+    for (const up of order.filter(group => group.isUp)) {
+      const from = order.indexOf(up)
+      const past = order.findLastIndex(group => !group.isUp && [...group.far].some(place => up.far.has(place)))
+      if (past > from) order.splice(past, 0, ...order.splice(from, 1))
+    }
+    return order
   }
   const byPlace = <T>(items: T[], endOf: (item: T) => End): T[][] => {
     const groups = new Map<string, T[]>()
@@ -297,8 +309,7 @@ function dealPorts(shelves: Shelf[], channels: Channel[], isDirected: boolean): 
     if ('lane' in place.slot) continue
     const most = Math.max(face.top.length, face.bottom.length)
     place.width = Math.max(place.width, PORT_STEP * most + 1)
-    for (const groups of [face.top, face.bottom]) {
-      groups.sort((a, b) => a.heading - b.heading || Number(a.isUp) - Number(b.isUp))
+    for (const groups of [ordered(face.top), ordered(face.bottom)]) {
       const ports = groups.map((_, index) => Math.floor(place.width / 2) + PORT_STEP * index - (groups.length - 1))
       groups.forEach((group, index) => {
         const own = ports[index] ?? 0

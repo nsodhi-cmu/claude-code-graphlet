@@ -80,6 +80,31 @@ describe('the drawing', () => {
     ])
   })
 
+  test('the two links between two nodes stay side by side, though a link from farther up reaches the lower one too', () => {
+    const graph = graphOf(['Home', 'Glider', 'Building', 'Writings'], [['Home', 'Glider'], ['Glider', 'Building'], ['Building', 'Writings'], ['Writings', 'Building'], ['Home', 'Writings']])
+    expect(graphRows(drawn(graph, null, { columns: 60, rows: 60 }))).toEqual([
+      '                        ┌──────┐',
+      '                        │ Home │',
+      '                        └───┬──┘',
+      '                            ├───────┐',
+      '                            ▼       │',
+      '                       ┌────────┐   │',
+      '                       │ Glider │   │',
+      '                       └────┬───┘   │',
+      '                            │       │',
+      '                            ▼       │',
+      '                      ┌──────────┐  │',
+      '                      │ Building │  │',
+      '                      └────┬─────┘  │',
+      '                           │ ▲      │',
+      '                           ├─┊──────┘',
+      '                           ▼ ┊',
+      '                      ┌──────┴───┐',
+      '                      │ Writings │',
+      '                      └──────────┘',
+    ])
+  })
+
   test('a link past a layer runs straight down a lane beside that layer\'s boxes, to an arrowhead of its own on the node it reaches', () => {
     const graph = graphOf(['A', 'B', 'C', 'D', 'E'], [['A', 'B'], ['B', 'C'], ['A', 'C'], ['C', 'D'], ['A', 'D'], ['B', 'E'], ['E', 'D']])
     expect(graphRows(drawn(graph))).toEqual([
@@ -195,10 +220,10 @@ describe('the drawing', () => {
       '          └──┬────┘  │ name.component.ts        │',
       '             │ ▲     └─────────────┬────────────┘',
       '             │ ┊                   │',
-      '             └─┊──────┬────────────┘',
-      '               └┈┈┈┈┐ │',
-      '                    ┊ ▼',
-      '                  ┌─┴───┐',
+      '             │ └┈┈┈┈┈┈┐            │',
+      '             └──────┬─┊────────────┘',
+      '                    ▼ ┊',
+      '                  ┌───┴─┐',
       '                  │ end │',
       '                  └─────┘',
     ])
