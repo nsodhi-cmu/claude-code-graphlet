@@ -19,7 +19,11 @@ const held = new Map<string, Held>()
 const picked = new Map<string, string>()
 /** Where the person scrolled each pane's window to. A pane is missing while its window follows the selection. */
 const scrolled = new Map<string, Pan>()
-/** How graphs are drawn: as the plugin's options say, in a pane and, folded into the room it has, in a reply. */
+/**
+ * How graphs are drawn: as the plugin's options say, in a pane, and in a
+ * reply folded into the room it has, with its links kept separate, since
+ * nothing in a reply can be selected to tell merged links apart.
+ */
 let view = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate' })
 let still = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate' }, true)
 
@@ -80,7 +84,7 @@ export const register: Register = (on, options) => {
     links: options.links === 'merged' ? ('merged' as const) : ('separate' as const),
   }
   view = viewOf(look)
-  still = viewOf(look, true)
+  still = viewOf({ ...look, links: 'separate' }, true)
 
   on('engine.create', async ($, e, next) => {
     const built = await next(e)

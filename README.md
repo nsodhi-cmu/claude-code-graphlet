@@ -65,7 +65,7 @@ Ask for a correction -> Read the request
 ```
 ````
 
-The block is drawn in its place in the reply, with the person's settings. A tone in brackets colors its node. The picture fits the reply: a layer too wide for it is folded onto more rows. The picture is still: it does not scroll or take a selection, and a graph that cannot be folded narrow enough counts the nodes past its edge. Where graphlet draws no picture, the block becomes the same picture as plain text. The conversation keeps the block as Claude wrote it.
+The block is drawn in its place in the reply, with the person's settings, its links always kept separate. A tone in brackets colors its node. The picture fits the reply: a layer too wide for it is folded onto more rows. The picture is still: it does not scroll or take a selection, and a graph that cannot be folded narrow enough counts the nodes past its edge. Where graphlet draws no picture, the block becomes the same picture as plain text. The conversation keeps the block as Claude wrote it.
 
 [docs/REPLIES.md](docs/REPLIES.md) has the block's syntax, what the model is told, and why it is a block and not a tool.
 
@@ -150,7 +150,7 @@ These are a person's, and hold for every graph graphlet draws, in a reply or in 
 | :- | :- |
 | **Scrolling** | How a graph wider than its room scrolls. `pinned` slides the long layers and keeps the ones that fit in view. `sheet` lays every layer on one sheet as wide as the longest, each box by the boxes it is linked to, and moves the sheet whole. |
 | **Long labels** | What becomes of a label too long for one line of its box. `wrap` breaks it onto more lines. `clip` keeps it to one, cut in the middle. |
-| **Links** | How the links between two layers share the rows there. `separate` gives each box's links a row of their own wherever they would run into another's, and each box an arrowhead, or in an undirected graph a tick, for each set of boxes whose links reach it. `merged` runs them all along one row, into one arrowhead or tick where they reach a box, which is shorter; selecting a node shows which links are its own. |
+| **Links** | How the links between two layers share the rows there. `separate` gives each box's links a row of their own wherever they would run into another's, and each box an arrowhead, or in an undirected graph a tick, for each set of boxes whose links reach it. `merged` runs them all along one row, into one arrowhead or tick where they reach a box, which is shorter; selecting a node shows which links are its own. A graph in a reply, which nothing selects, keeps its links separate. |
 
 ## How It Works
 

@@ -3,7 +3,8 @@ import type { Engine, Plugin } from 'claude-code/testing'
 import type { On, RenderPropsOf, RenderSurface } from 'claude-code'
 
 import { LOOK, SHOP, graphOf, picture, undirected } from './fixture'
-import { GUIDE } from '../hooks/reply'
+import { readGraph } from '../hooks/layers'
+import { GUIDE, graphOf as graphLines, pictureOf } from '../hooks/reply'
 import { viewOf } from '../hooks/view'
 
 // The mod through the engine, as another mod uses it: a host says what its
@@ -492,6 +493,17 @@ test('on every other surface, a graph block becomes its picture as plain text, f
     ])
     await reply.unmount()
   }
+})
+
+test('a graph in a reply keeps its links separate whatever the setting, since nothing in a reply can be selected to tell merged links apart', { options: { links: 'merged' } }, async ($, on) => {
+  replies(on)
+  const block = ['A -> C', 'B -> C', 'B -> D']
+  const graph = readGraph(graphLines(block))
+  const drawnAs = (links: 'separate' | 'merged'): string[] => picture(pictureOf(viewOf({ ...LOOK, links }, true), graph, { columns: 78, rows: 1000 }))
+  expect(drawnAs('separate')).not.toEqual(drawnAs('merged'))
+  const reply = await say($, 'desktop', ['```graphlet', ...block, '```'].join('\n'))
+  expect(screenOf(await reply.drawn())).toEqual(['● ```text', ...drawnAs('separate'), '```'])
+  await reply.unmount()
 })
 
 test('the model is told of graph blocks wherever the session draws, and not in a run that draws nowhere', async ($, on) => {
