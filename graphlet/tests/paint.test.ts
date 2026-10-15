@@ -554,7 +554,7 @@ describe('lines that flow', () => {
     graphRows({
       ...drawing,
       rows: drawing.rows.map(row =>
-        row.flatMap(span => piecesOf(span, step).map(piece => ({ ...span, text: piece.isBead === true ? '•'.repeat(cellsOf(piece.text).length) : piece.text }))),
+        row.flatMap(span => piecesOf(span, step).map(piece => ({ ...span, text: piece.glow === 'bright' ? '•'.repeat(cellsOf(piece.text).length) : piece.text }))),
       ),
     })
   const loop = graphOf(['A', 'B', 'C'], [['A', 'B'], ['B', 'C'], ['C', 'A']])
@@ -597,12 +597,22 @@ describe('lines that flow', () => {
     expect(beadsAt(drawing, BEATS)).toEqual(beadsAt(drawing, 0))
   })
 
-  test('nothing flows that is not lit, nor anything in an undirected graph, nor with the lines still', () => {
-    const beats = (drawing: Drawing): number => drawing.rows.flat().filter(span => span.beat !== undefined).length
-    expect(beats(flowing.draw(loop, null, SMALL, ORIGIN))).toBe(0)
-    expect(beats(flowing.draw(undirected(loop), 'C', SMALL, ORIGIN))).toBe(0)
-    expect(beats(drawn(loop, 'C'))).toBe(0)
-    expect(flowing.draw(loop, 'A', SMALL, ORIGIN).rows.flat().every(span => span.beat === undefined || span.paint === 'accent')).toBe(true)
+  test('a lit link with no direction, and a lit link with another running back, pulse whole instead, brightening and fading at once', () => {
+    const glows = (drawing: Drawing, step: number): string[] => drawing.rows.flatMap(row => row.filter(span => span.isPulsing).flatMap(span => piecesOf(span, step).map(piece => piece.glow)))
+    const friends = flowing.draw(undirected(loop), 'C', SMALL, ORIGIN)
+    expect(friends.rows.flat().some(span => span.beat !== undefined)).toBe(false)
+    expect([0, 1, 2, 3].map(step => [...new Set(glows(friends, step))])).toEqual([['dim'], ['plain'], ['bright'], ['plain']])
+    const both = flowing.draw(graphOf(['A', 'B', 'C'], [['A', 'B'], ['B', 'A'], ['B', 'C']]), 'B', SMALL, ORIGIN)
+    expect(both.rows.flat().some(span => span.isPulsing)).toBe(true)
+    expect(both.rows.flat().some(span => span.beat !== undefined)).toBe(true)
+  })
+
+  test('nothing moves that is not lit, nor with the lines still', () => {
+    const moving = (drawing: Drawing): number => drawing.rows.flat().filter(span => span.beat !== undefined || span.isPulsing).length
+    expect(moving(flowing.draw(loop, null, SMALL, ORIGIN))).toBe(0)
+    expect(moving(drawn(loop, 'C'))).toBe(0)
+    expect(moving(drawn(undirected(loop), 'C'))).toBe(0)
+    expect(flowing.draw(loop, 'A', SMALL, ORIGIN).rows.flat().every(span => (span.beat === undefined && !span.isPulsing) || span.paint === 'accent')).toBe(true)
   })
 })
 

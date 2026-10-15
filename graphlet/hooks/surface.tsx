@@ -17,13 +17,13 @@ const isFlowing = new WeakMap<object, boolean>()
 const grips = new WeakMap<object, { x: number; y: number; grab: number }>()
 
 /**
- * Paints the drawing. Where its lines flow, the instance counts the steps of
- * the flow in its state, a step every `STEP_MS`, and paints each step's beads;
- * while they do not, a step paints nothing new and is not taken.
+ * Paints the drawing. Where its lines move, the instance counts the steps of
+ * the flow in its state, a step every `STEP_MS`, and paints each step's beads
+ * and pulse; while they do not, a step paints nothing new and is not taken.
  */
 const Surface: ClientModule<Drawing, number> = (drawing, surface) => {
   const { Box, Text } = surface.elements
-  isFlowing.set(surface, drawing.rows.some(row => row.some(span => span.beat !== undefined)))
+  isFlowing.set(surface, drawing.rows.some(row => row.some(span => span.beat !== undefined || span.isPulsing === true)))
   if (isFlowing.get(surface) === true && surface.state === undefined) {
     surface.setState(0)
     surface.every(STEP_MS, () => {
@@ -54,8 +54,8 @@ const Surface: ClientModule<Drawing, number> = (drawing, surface) => {
           {row.length === 0
             ? ' '
             : row.flatMap(span =>
-                (surface.state === undefined ? [{ text: span.text }] : piecesOf(span, surface.state)).map(piece => (
-                  <Text {...styleOf(span, piece.isBead)}>{piece.text}</Text>
+                (surface.state === undefined ? [{ text: span.text, glow: 'plain' as const }] : piecesOf(span, surface.state)).map(piece => (
+                  <Text {...styleOf(span, piece.glow)}>{piece.text}</Text>
                 )),
               )}
         </Text>

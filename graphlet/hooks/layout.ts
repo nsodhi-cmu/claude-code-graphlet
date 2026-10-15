@@ -29,9 +29,10 @@ export type Labels = 'wrap' | 'clip'
 export type Links = 'separate' | 'merged'
 
 /**
- * Whether the selected node's links show the way they run. `still`: they are
- * lit lines. `flowing`: beads run along each, from the node it leaves to the
- * node it reaches. A link that runs no way never flows.
+ * Whether the selected node's links move. `still`: they are lit lines.
+ * `flowing`: beads run along each link that runs one way, from the node it
+ * leaves to the node it reaches; a link with no direction, and links that run
+ * both ways between two nodes, pulse instead.
  */
 export type Motion = 'still' | 'flowing'
 

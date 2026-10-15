@@ -51,7 +51,7 @@
     "motion": {
       "type": "string",
       "title": "Motion",
-      "description": "Whether the selected node's links show the way they run: still lights them as lines; flowing runs beads along each, from the node it leaves to the node it reaches.",
+      "description": "Whether the selected node's links move: still lights them as lines; flowing runs beads along each link that runs one way, toward the node it reaches, and pulses the links that run no way or both ways.",
       "options": [
         "still",
         "flowing"

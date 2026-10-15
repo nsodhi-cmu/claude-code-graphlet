@@ -525,6 +525,20 @@ test('a graph its owner says is undirected reaches graphlet as one, and is drawn
   await pane.unmount()
 })
 
+test('flowing, the lit links of an undirected graph pulse together on the surface\'s clock, dim, then bright, and round again', { plugins: [RING_HOST], options: { motion: 'flowing' } }, async ($, on) => {
+  world(on)
+  const pane = await mount($, 'ring')
+  /** How the accent's runs that are not the selected label glow: dim, bright, or neither. */
+  const glows = async (): Promise<string[]> =>
+    [...new Set((await pane.findAll({ type: 'Text', in: 'graph' })).filter(text => text.props.color === 'claude' && text.props.inverse !== true).map(text => (text.props.dimColor === true ? 'dim' : text.props.bold === true ? 'bright' : 'plain')))].sort()
+  expect(await glows()).toEqual(['dim', 'plain'])
+  await pane.advance(300)
+  expect(await glows()).toEqual(['bright', 'plain'])
+  await pane.advance(300)
+  expect(await glows()).toEqual(['dim', 'plain'])
+  await pane.unmount()
+})
+
 const REPLY = [
   'Here is how a request flows:',
   '',
