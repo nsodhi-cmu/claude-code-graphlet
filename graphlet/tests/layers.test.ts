@@ -125,6 +125,13 @@ describe('layers', () => {
     expect(layers(graphOf(['b', 'c', 'a'], [['a', 'b'], ['b', 'c'], ['c', 'a']]))).toEqual([['b'], ['c', 'a→b'], ['a']])
   })
 
+  test('of the two ways the links that close loops are found, the one that leaves links passing fewer layers is kept', () => {
+    const tangle = graphOf(['A', 'B', 'C', 'D'], [['C', 'A'], ['B', 'C'], ['D', 'B'], ['A', 'C'], ['A', 'D'], ['D', 'A']])
+    expect(layers(tangle)).toEqual([['D'], ['A', 'B'], ['C']])
+    const returns = graphOf(['A', 'B', 'C', 'D'], [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'A'], ['C', 'A'], ['B', 'A']])
+    expect(layers(returns).map(layer => layer.filter(slot => !slot.includes('→')))).toEqual([['A'], ['B'], ['C'], ['D']])
+  })
+
   test('a node with more links below it than above moves down toward them, so fewer links run long', () => {
     const graph = graphOf(['a', 'b', 'c', 'late'], [['a', 'b'], ['b', 'c'], ['late', 'c']])
     expect(layers(graph)).toEqual([['a'], ['b', 'late'], ['c']])

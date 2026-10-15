@@ -76,11 +76,11 @@ export function isJoined(graph: Graph, a: string, b: string): boolean {
 }
 
 /**
- * The links that close a loop: followed from the nodes nothing links to, and
- * then from any node not yet reached, each link that leads back to a node
- * still being followed. With these turned around, the graph has no loop.
+ * Links that close the loops, found by following the links from the nodes
+ * nothing links to, and then from any node not yet reached: each link that
+ * leads back to a node still being followed.
  */
-export function loopLinks(graph: Graph): Set<GraphletLink> {
+function followedLoops(graph: Graph): Set<GraphletLink> {
   const closing = new Set<GraphletLink>()
   const state = new Map<string, 'open' | 'done'>()
   const follow = (id: string): void => {
@@ -95,6 +95,61 @@ export function loopLinks(graph: Graph): Set<GraphletLink> {
   const sources = graph.nodes.filter(node => !graph.links.some(link => link.to === node.id && link.from !== node.id))
   for (const node of [...sources, ...graph.nodes]) if (!state.has(node.id)) follow(node.id)
   return closing
+}
+
+/**
+ * Links that close the loops, found by putting the nodes in a row, first to
+ * last, so that as few links as can run backward along it, in Eades, Lin and
+ * Smyth's order: over and over, each node that links to nothing left goes to the end
+ * of the row, and each node nothing left links to goes next at its front;
+ * where none of either is left, the node that links out to the most nodes
+ * left over those that link into it goes next, and of two that tie, the one a
+ * walk from the nodes nothing links to reaches first, so that a loop is
+ * entered where the walk enters it. A link that runs backward along the row
+ * closes a loop; with these turned around, the graph has no loop.
+ */
+function orderedLoops(graph: Graph): Set<GraphletLink> {
+  const links = graph.links.filter(link => link.from !== link.to)
+  const outOf = new Map<string, GraphletLink[]>(graph.nodes.map(node => [node.id, []]))
+  const into = new Map<string, GraphletLink[]>(graph.nodes.map(node => [node.id, []]))
+  for (const link of links) {
+    outOf.get(link.from)?.push(link)
+    into.get(link.to)?.push(link)
+  }
+  const reached = new Map<string, number>()
+  const walk = (id: string): void => {
+    if (reached.has(id)) return
+    reached.set(id, reached.size)
+    for (const link of outOf.get(id) ?? []) walk(link.to)
+  }
+  for (const node of graph.nodes) if ((into.get(node.id) ?? []).length === 0) walk(node.id)
+  for (const node of graph.nodes) walk(node.id)
+
+  const left = new Set(graph.nodes.map(node => node.id))
+  const outs = (id: string): number => (outOf.get(id) ?? []).filter(link => left.has(link.to)).length
+  const ins = (id: string): number => (into.get(id) ?? []).filter(link => left.has(link.from)).length
+  const [front, back]: [string[], string[]] = [[], []]
+  while (left.size > 0) {
+    for (let isPeeled = true; isPeeled; ) {
+      isPeeled = false
+      for (const id of [...left].filter(one => outs(one) === 0)) {
+        back.unshift(id)
+        left.delete(id)
+        isPeeled = true
+      }
+      for (const id of [...left].filter(one => ins(one) === 0)) {
+        front.push(id)
+        left.delete(id)
+        isPeeled = true
+      }
+    }
+    const next = [...left].sort((a, b) => outs(b) - ins(b) - (outs(a) - ins(a)) || (reached.get(a) ?? 0) - (reached.get(b) ?? 0))[0]
+    if (next === undefined) break
+    front.push(next)
+    left.delete(next)
+  }
+  const at = new Map([...front, ...back].map((id, index) => [id, index]))
+  return new Set(links.filter(link => (at.get(link.from) ?? 0) > (at.get(link.to) ?? 0)))
 }
 
 /** Layers numbered from 0 with none left empty, in the order they were in. */
@@ -126,20 +181,12 @@ function distancesOf(graph: Graph): Map<string, number> {
 }
 
 /**
- * The layer of each node, 0 the top. Where every node names its layer, those
- * are kept, in their order. Else, in an undirected graph, a node stands as
- * many layers down as it is links away from the first node the graph names
- * of those it is joined to. In a directed graph, a node stands one layer
- * under the lowest node that links to it, the links that close a loop read
- * the other way around, and is then moved down toward what it links to
- * wherever that makes more links shorter than longer.
+ * The layer of each node of a directed graph, 0 the top, with the links that
+ * close a loop read the other way around: a node stands one layer under the
+ * lowest node that links to it, and is then moved down toward what it links
+ * to wherever that makes more links shorter than longer.
  */
-export function ranksOf(graph: Graph): Map<string, number> {
-  if (graph.nodes.every(node => node.layer !== undefined)) {
-    return packed(new Map(graph.nodes.map(node => [node.id, node.layer ?? 0])))
-  }
-  if (!graph.isDirected) return distancesOf(graph)
-  const closing = loopLinks(graph)
+function ranksWith(graph: Graph, closing: Set<GraphletLink>): Map<string, number> {
   const down = graph.links
     .filter(link => link.from !== link.to)
     .map(link => (closing.has(link) ? { from: link.to, to: link.from } : link))
@@ -165,6 +212,36 @@ export function ranksOf(graph: Graph): Map<string, number> {
   }
   for (const node of graph.nodes) settle(node.id)
   return packed(ranks)
+}
+
+/** How many layers a graph's links pass by, laid out in these layers: the lanes they take. */
+const passedBy = (graph: Graph, ranks: Map<string, number>): number =>
+  graph.links.reduce((sum, link) => sum + Math.max(0, Math.abs((ranks.get(link.from) ?? 0) - (ranks.get(link.to) ?? 0)) - 1), 0)
+
+/**
+ * The links that close a loop: found both by following the links from where
+ * the graph starts and in Eades, Lin and Smyth's order, and of the two, those
+ * whose layers leave the links passing fewest layers by; where they tie,
+ * those followed. With these turned around, the graph has no loop.
+ */
+export function loopLinks(graph: Graph): Set<GraphletLink> {
+  const [followed, ordered] = [followedLoops(graph), orderedLoops(graph)]
+  return passedBy(graph, ranksWith(graph, ordered)) < passedBy(graph, ranksWith(graph, followed)) ? ordered : followed
+}
+
+/**
+ * The layer of each node, 0 the top. Where every node names its layer, those
+ * are kept, in their order. Else, in an undirected graph, a node stands as
+ * many layers down as it is links away from the first node the graph names
+ * of those it is joined to. A directed graph is laid in layers with the links
+ * that close a loop turned around.
+ */
+export function ranksOf(graph: Graph): Map<string, number> {
+  if (graph.nodes.every(node => node.layer !== undefined)) {
+    return packed(new Map(graph.nodes.map(node => [node.id, node.layer ?? 0])))
+  }
+  if (!graph.isDirected) return distancesOf(graph)
+  return ranksWith(graph, loopLinks(graph))
 }
 
 /** The room a graph is folded into: the columns a layer may take, how wide a node's box is, and the room between two neighbors in a layer. A lane takes a column. */

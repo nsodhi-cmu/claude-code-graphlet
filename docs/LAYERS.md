@@ -25,11 +25,15 @@ An undirected graph has no flow to follow. A node stands as many layers down as 
 
 A directed graph runs down the way its links do:
 
-1. The links that close a loop are found by following the links from the nodes nothing links to, and then from any node not yet reached, in the order the graph names them. A link that leads back to a node still being followed closes a loop. Read the other way around, those links leave a graph with no loop.
+1. The links that close a loop are found two ways, and of the two, the links are kept whose layers, laid out as the next steps say, leave the links passing fewest layers by; where the two tie, those found the first way.
+   - Following the links from the nodes nothing links to, and then from any node not yet reached, in the order the graph names them: a link that leads back to a node still being followed closes a loop.
+   - Eades, Lin and Smyth's order: the nodes are put in a row so that as few links as can run backward along it. Over and over, each node that links to nothing left goes to the end of the row, and each node nothing left links to goes next at its front; where neither is left, the node that links out to most over what links into it goes next, and of two that tie, the one the following reaches first. A link that runs backward along the row closes a loop.
+
+   Read the other way around, either set of links leaves a graph with no loop. Following keeps a flow that returns to its start drawn from its start; the order keeps a graph of many loops from running its links long.
 2. A node then stands one layer under the lowest node that links to it.
 3. A node with more links below it than above it moves down to stand just over the nearest node it links to, which makes more links shorter than longer.
 
-So a directed graph runs down the drawing from where it starts, and the one link of a loop that runs back up is the one that returns to where the loop was entered.
+So a directed graph runs down the drawing from where it starts, and the link of a loop that runs back up is, where the loop is simple, the one that returns to where the loop was entered.
 
 ### Folding Into A Room
 
