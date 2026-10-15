@@ -65,14 +65,16 @@ const FOLDED_NODES = 60
 const FOLDED_LINKS = 120
 /** How far apart two ports of one face of a box are. */
 const PORT_STEP = 2
-/** How many times the shelves are seated again, after they are first seated, each time down, back up, and against both neighbors at once. */
-const RESEATS = 2
+/** How many times the shelves are seated again, after they are first seated, each time down, back up, and against both neighbors at once; each seating tried lays every track again. */
+const RESEATS = 1
 /** How much more a lane's wire weighs than a box's where a shelf is balanced, so that a link through lanes keeps straight before a box sits square. */
 const LANE_WEIGHT = 2
 /** How many bent links a row of height is worth, where seatings are weighed against each other. */
 const ROW_BENDS = 2
 /** How much more a wire with the flow weighs than one against it, where a shelf is balanced and where seatings are weighed, so that a link that closes a loop bends before the links it runs back past. */
 const FLOW_WEIGHT = 2
+/** How much less a bend in a wire to or from a lane weighs than one between two boxes, where seatings are weighed, so that a link through lanes bends before the links between neighbors do. */
+const LANE_BEND = 2
 /** The characters a long word may be broken after with nothing lost. */
 const BREAKS = '/-_.'
 /** The sign in the box of a node that links to itself. */
@@ -173,9 +175,9 @@ export type End = { place: Place; isAbove: boolean; at: number }
  * does not go straight across, it turns on the row of the channel that is its
  * `track`, and where its bundle runs on two tracks, steps across to the
  * other at its `jog`. It keeps `clearOf` the other ports of the face it
- * leaves, of the columns next to its own where it leaves with others, and on
- * a face where a link with no direction meets its box at a tick, of the
- * columns next to the other ports, so that two ticks never touch.
+ * leaves and the columns next to them, and of the columns next to its own
+ * where it leaves with others, so that it never runs beside another's tick
+ * or arrowhead.
  */
 export type Wire = {
   link: Link
@@ -318,22 +320,21 @@ function bundlesOf(wires: Wire[], links: Links): Wire[][] {
  * a place in common, the one with the flow is first, wherever their other
  * wires lead, so that the links two boxes have each way stand in the same
  * order on both. A wire that leaves straight keeps clear of the face's other
- * ports and labels, and on a face where a link with no direction meets its
- * box at a tick, of the columns beside the ports.
+ * ports and the columns beside them, and of their labels.
  */
 function dealPorts(shelves: Shelf[], channels: Channel[]): void {
-  type Group = { ends: End[]; leaving: Wire[]; heading: number; isUp: boolean; isTicked: boolean; far: Set<Place>; label: string }
+  type Group = { ends: End[]; leaving: Wire[]; heading: number; isUp: boolean; far: Set<Place>; label: string }
   const faces = new Map<Place, { top: Group[]; bottom: Group[] }>()
   const indexOf = new Map(shelves.flatMap(shelf => shelf.places.map((place, index) => [place, index] as const)))
   const alongOf = (place: Place): number => ((indexOf.get(place) ?? 0) + 0.5) / (shelves[place.shelf]?.places.length ?? 1)
-  const groupOf = (ends: End[], far: End[], leaving: Wire[], isUp: boolean, isTicked: boolean): void => {
+  const groupOf = (ends: End[], far: End[], leaving: Wire[], isUp: boolean): void => {
     const [first] = ends
     if (first === undefined) return
     const face = faces.get(first.place) ?? { top: [], bottom: [] }
     faces.set(first.place, face)
     const heading = far.reduce((sum, end) => sum + alongOf(end.place), 0) / far.length
     const label = leaving[0] === undefined ? '' : labelOf(leaving[0].link)
-    ;(first.isAbove ? face.bottom : face.top).push({ ends, leaving, heading, isUp, isTicked, far: new Set(far.map(end => end.place)), label })
+    ;(first.isAbove ? face.bottom : face.top).push({ ends, leaving, heading, isUp, far: new Set(far.map(end => end.place)), label })
   }
   /** A face's groups by their heading, each against the flow moved past every group with the flow that leads to a place it does. */
   const ordered = (groups: Group[]): Group[] => {
@@ -355,11 +356,11 @@ function dealPorts(shelves: Shelf[], channels: Channel[]): void {
   }
   for (const channel of channels) {
     for (const leaving of channel.bundles.flatMap(bundle => byPlace(bundle, wire => wire.from))) {
-      groupOf(leaving.map(wire => wire.from), leaving.map(wire => wire.to), leaving, leaving[0]?.isUp ?? false, leaving[0]?.link.isDirected === false)
+      groupOf(leaving.map(wire => wire.from), leaving.map(wire => wire.to), leaving, leaving[0]?.isUp ?? false)
     }
     for (const bundle of channel.bundles) {
       for (const reaching of byPlace(bundle, wire => wire.to)) {
-        groupOf(reaching.map(wire => wire.to), reaching.map(wire => wire.from), [], bundle[0]?.isUp ?? false, bundle[0]?.link.isDirected === false)
+        groupOf(reaching.map(wire => wire.to), reaching.map(wire => wire.from), [], bundle[0]?.isUp ?? false)
       }
     }
   }
@@ -386,7 +387,7 @@ function dealPorts(shelves: Shelf[], channels: Channel[]): void {
         const beside = group.leaving.length > 1 ? [own - 1, own + 1] : []
         for (const end of group.ends) end.at = own
         const others = ports.filter((_, other) => other !== index)
-        const clear = groups.some(one => one.isTicked) ? others.flatMap(port => [port - 1, port, port + 1]) : others
+        const clear = others.flatMap(port => [port - 1, port, port + 1])
         for (const wire of group.leaving) wire.clearOf = [...clear, ...beside, ...written]
       })
     }
@@ -510,7 +511,8 @@ function medianOf(wishes: Wish[]): number | undefined {
  * place with no such wire stands where its neighbors let it, and a shelf with
  * none is left where it was. The best seating is found by pooling: places in
  * order, each at its wires' median, and any two that would stand out of
- * order merged into one run at the median of all their wires. A wire with
+ * order merged into one run at the median of all their wires; a place with
+ * no wires joins the run before it. A wire with
  * the flow weighs `FLOW_WEIGHT` times one against it.
  */
 function balance(shelf: Shelf, columns: number, beside: Place[], wires: Wire[]): void {
@@ -529,6 +531,11 @@ function balance(shelf: Shelf, columns: number, beside: Place[], wires: Wire[]):
   }
   const runs: Array<{ first: number; last: number; wishes: Wish[]; at: number | undefined }> = []
   places.forEach((_, index) => {
+    const before = runs.at(-1)
+    if ((wishes[index] ?? []).length === 0 && before !== undefined) {
+      before.last = index
+      return
+    }
     let run = { first: index, last: index, wishes: wishes[index] ?? [], at: medianOf(wishes[index] ?? []) }
     for (let before = runs.at(-1); before?.at !== undefined && run.at !== undefined && before.at > run.at; before = runs.at(-1)) {
       runs.pop()
@@ -556,14 +563,15 @@ function balance(shelf: Shelf, columns: number, beside: Place[], wires: Wire[]):
  * then against both, where they are laid out across the same columns. The
  * seating kept, of the first and each after a pass, is the one whose
  * channels' rows and bent links weigh least, a row as much as `ROW_BENDS`
- * bent links, and of those, whose wires run least sideways; a bent link with
- * the flow between two boxes weighs one, one against the flow half, and a
- * wire to or from a lane half again. A layout whose shelves are all laid out
+ * bent links, and of those, whose wires run least sideways, each sideways
+ * cell weighing as its wire's bend does: a bent link with the flow between
+ * two boxes weighs one, one against the flow `FLOW_WEIGHT` times less, and a
+ * wire to or from a lane `LANE_BEND` times less again. A layout whose shelves are all laid out
  * across its columns is then set in their middle.
  */
 function reseat(shelves: Shelf[], channels: Channel[], columns: number): void {
-  /** How much a wire's bend weighs: a link with the flow between two boxes one, and half for a link against the flow, and half again for a wire to or from a lane. */
-  const bendOf = (wire: Wire): number => (wire.isUp ? 0.5 : 1) * ('lane' in wire.from.place.slot || 'lane' in wire.to.place.slot ? 0.5 : 1)
+  /** How much a wire's bend weighs: one for a link with the flow between two boxes, less by `FLOW_WEIGHT` against the flow, and less again by `LANE_BEND` to or from a lane. */
+  const bendOf = (wire: Wire): number => (wire.isUp ? 1 / FLOW_WEIGHT : 1) / ('lane' in wire.from.place.slot || 'lane' in wire.to.place.slot ? LANE_BEND : 1)
   const costOf = (): [number, number] => {
     let [weight, sideways] = [0, 0]
     for (const channel of channels.filter(one => one.wires.length > 0)) {
