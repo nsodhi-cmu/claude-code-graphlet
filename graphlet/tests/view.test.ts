@@ -9,7 +9,7 @@ import { FOCUS_NODES, MOVES, focusOf, viewOf } from '../hooks/view'
 
 const LABELS = ['a', 'node', 'src/some/long/path/to/file.component.ts', 'Validate the incoming request', 'x-y_z.w', '', '数据库连接池', '✅ 完成']
 const LOOKS: Look[] = (['pinned', 'sheet'] as const).flatMap(scroll =>
-  (['wrap', 'clip'] as const).flatMap(labels => (['separate', 'merged'] as const).map(links => ({ scroll, labels, links }))),
+  (['wrap', 'clip'] as const).flatMap(labels => (['separate', 'merged'] as const).map(links => ({ scroll, labels, links, motion: 'still' as const }))),
 )
 
 test('any graph, in any room, under any settings, is drawn inside its room with no two boxes on one cell, and every move and scroll has an answer', () => {
@@ -28,7 +28,7 @@ test('any graph, in any room, under any settings, is drawn inside its room with 
       links: Array.from({ length: pick(count * 2 + 1) }, () => ({ from: `n${pick(count)}`, to: `n${pick(count)}` })),
       isDirected: run % 3 !== 1,
     })
-    const view = viewOf(LOOKS[pick(LOOKS.length)] ?? { scroll: 'pinned', labels: 'wrap', links: 'separate' })
+    const view = viewOf(LOOKS[pick(LOOKS.length)] ?? { scroll: 'pinned', labels: 'wrap', links: 'separate', motion: 'still' })
     const room = { columns: 40 + pick(140), rows: 2 + pick(50) }
     const selected = pick(5) === 0 ? null : `n${pick(count)}`
 

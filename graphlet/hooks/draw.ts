@@ -18,16 +18,25 @@ export const COLORS: Readonly<Record<Paint, string | undefined>> = {
   accent: 'claude',
 }
 
-/** A run of text in one paint. */
-export type Span = { text: string; paint: Paint; isBold?: true; isInverse?: true }
+/** How many cells apart the beads run on a line that flows: a cell of a line flows with the beat its place along the line gives it, one of this many. */
+export const BEATS = 4
 
-/** How a surface's `Text` paints a run. */
-export function styleOf(span: Span): { color?: string; dimColor?: true; bold?: true; inverse?: true } {
+/**
+ * A run of text in one paint. A run of a line that flows has its `beat`: at
+ * each step of the flow, the runs whose beat it is are its beads, bright, and
+ * the rest of the line is dim.
+ */
+export type Span = { text: string; paint: Paint; isBold?: true; isInverse?: true; beat?: number }
+
+/** How a surface's `Text` paints a run, at `step` of the flow where its lines flow. */
+export function styleOf(span: Span, step?: number): { color?: string; dimColor?: true; bold?: true; inverse?: true } {
   const color = COLORS[span.paint]
+  const isFlowing = span.beat !== undefined && step !== undefined
+  const isBead = isFlowing && span.beat === step % BEATS
   return {
     ...(color === undefined ? {} : { color }),
-    ...(span.paint === 'dim' ? { dimColor: true } : {}),
-    ...(span.isBold ? { bold: true } : {}),
+    ...(span.paint === 'dim' || (isFlowing && !isBead) ? { dimColor: true } : {}),
+    ...(span.isBold || isBead ? { bold: true } : {}),
     ...(span.isInverse ? { inverse: true } : {}),
   }
 }
@@ -186,7 +195,7 @@ export function clipMiddle(label: string, max: number): string {
 }
 
 /** One cell of a canvas. The cell after a character two cells wide holds nothing, `''`, for the character covers it. */
-export type Cell = { char: string; paint: Paint; isBold?: true; isInverse?: true }
+export type Cell = { char: string; paint: Paint; isBold?: true; isInverse?: true; beat?: number }
 
 /**
  * The cells a window is painted on, and the one way they are written: what
@@ -237,7 +246,7 @@ export function spansOf(cells: Cell[]): Span[] {
   const spans: Span[] = []
   for (const cell of cells.slice(0, end)) {
     const last = spans.at(-1)
-    if (last !== undefined && last.paint === cell.paint && last.isBold === cell.isBold && last.isInverse === cell.isInverse) {
+    if (last !== undefined && last.paint === cell.paint && last.isBold === cell.isBold && last.isInverse === cell.isInverse && last.beat === cell.beat) {
       last.text += cell.char
     } else {
       spans.push({
@@ -245,6 +254,7 @@ export function spansOf(cells: Cell[]): Span[] {
         paint: cell.paint,
         ...(cell.isBold ? { isBold: true as const } : {}),
         ...(cell.isInverse ? { isInverse: true as const } : {}),
+        ...(cell.beat === undefined ? {} : { beat: cell.beat }),
       })
     }
   }

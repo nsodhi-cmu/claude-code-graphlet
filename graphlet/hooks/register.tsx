@@ -32,8 +32,8 @@ const foundIn = (graph: Graph, query: string): string[] =>
  * reply folded into the room it has, with its links kept separate, since
  * nothing in a reply can be selected to tell merged links apart.
  */
-let view = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate' })
-let still = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate' }, true)
+let view = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate', motion: 'still' })
+let still = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate', motion: 'still' }, true)
 
 /** The programs that open a file as the person's system would, each tried in turn: Linux's, macOS's, and Windows's. */
 const OPENERS: ReadonlyArray<(path: string) => string[]> = [
@@ -90,6 +90,7 @@ export const register: Register = (on, options) => {
     scroll: options.scroll === 'sheet' ? ('sheet' as const) : ('pinned' as const),
     labels: options.labels === 'clip' ? ('clip' as const) : ('wrap' as const),
     links: options.links === 'merged' ? ('merged' as const) : ('separate' as const),
+    motion: options.motion === 'flowing' ? ('flowing' as const) : ('still' as const),
   }
   view = viewOf(look)
   still = viewOf({ ...look, links: 'separate' }, true)

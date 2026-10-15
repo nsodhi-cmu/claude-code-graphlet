@@ -2,6 +2,7 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import { LOOK, SHOP, cellsOf, graphOf, graphRows, numbers, picture, undirected } from './fixture'
 import type { GraphletLink } from '../types'
+import { BEATS } from '../hooks/draw'
 import type { Drawing, Hit, Span } from '../hooks/draw'
 import { readGraph } from '../hooks/layers'
 import type { Graph } from '../hooks/layers'
@@ -515,6 +516,59 @@ describe('what is selected', () => {
   })
 })
 
+describe('lines that flow', () => {
+  /** The picture with each cell that is a bead at `step` of the flow drawn as `•`. */
+  const beadsAt = (drawing: Drawing, step: number): string[] =>
+    graphRows({ ...drawing, rows: drawing.rows.map(row => row.map(span => (span.beat === step % BEATS ? { ...span, text: '•'.repeat(cellsOf(span.text).length) } : span))) })
+  const loop = graphOf(['A', 'B', 'C'], [['A', 'B'], ['B', 'C'], ['C', 'A']])
+  const flowing = viewOf({ ...LOOK, motion: 'flowing' })
+
+  test('flowing, a lit line has a bead every few cells, and at each step of the flow the beads move on a cell the way the link runs: down, along, and back up', () => {
+    const drawing = flowing.draw(loop, 'C', SMALL, ORIGIN)
+    expect(beadsAt(drawing, 0)).toEqual([
+      '                ┌─────┐',
+      '                │  A  │',
+      '                └─┬───┘',
+      '                  │ ▲',
+      '                  │ •┈┈┈•',
+      '                  ▼     ┊',
+      '               ┌─────┐  ┊',
+      '               │  B  │  ┊',
+      '               └──┬──┘  •',
+      '                  │ ┌┈┈┈┘',
+      '                  ▼ ┊',
+      '                ╔═══╧═╗',
+      '                ║  C  ║',
+      '                ╚═════╝',
+    ])
+    expect(beadsAt(drawing, 1)).toEqual([
+      '                ┌─────┐',
+      '                │  A  │',
+      '                └─┬───┘',
+      '                  │ ▲',
+      '                  │ └┈┈•┐',
+      '                  ▼     ┊',
+      '               ┌─────┐  ┊',
+      '               │  B  │  •',
+      '               └──┬──┘  ┊',
+      '                  • ┌•┈┈┘',
+      '                  ▼ ┊',
+      '                ╔═══╧═╗',
+      '                ║  C  ║',
+      '                ╚═════╝',
+    ])
+    expect(beadsAt(drawing, BEATS)).toEqual(beadsAt(drawing, 0))
+  })
+
+  test('nothing flows that is not lit, nor anything in an undirected graph, nor with the lines still', () => {
+    const beats = (drawing: Drawing): number => drawing.rows.flat().filter(span => span.beat !== undefined).length
+    expect(beats(flowing.draw(loop, null, SMALL, ORIGIN))).toBe(0)
+    expect(beats(flowing.draw(undirected(loop), 'C', SMALL, ORIGIN))).toBe(0)
+    expect(beats(drawn(loop, 'C'))).toBe(0)
+    expect(flowing.draw(loop, 'A', SMALL, ORIGIN).rows.flat().every(span => span.beat === undefined || span.paint === 'accent')).toBe(true)
+  })
+})
+
 describe('what the window does not show', () => {
   const graph = graphOf(
     ['Checkout', 'Cart', 'Payments', 'Shipping', 'Receipts', 'Ledger'],
@@ -820,7 +874,7 @@ describe('what a picture says', () => {
     })
   }
   const anyGraph = (run: number): Graph => [someGraph, crowdedGraph, facingGraph][run % 3]?.() ?? someGraph()
-  const someLook = (scroll = pick(2) === 0 ? 'pinned' : 'sheet'): Look => ({ scroll: scroll as Look['scroll'], labels: pick(3) === 0 ? 'clip' : 'wrap', links: 'separate' })
+  const someLook = (scroll = pick(2) === 0 ? 'pinned' : 'sheet'): Look => ({ scroll: scroll as Look['scroll'], labels: pick(3) === 0 ? 'clip' : 'wrap', links: 'separate', motion: 'still' })
 
   /** How long a test that reads many pictures may take: a slow machine's while. */
   const READING = { timeoutMs: 30_000 }

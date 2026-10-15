@@ -1,4 +1,4 @@
-import { canvasOf, clipMiddle, footRow, leftOut, sizeOf, spansOf } from './draw'
+import { BEATS, canvasOf, clipMiddle, footRow, leftOut, sizeOf, spansOf } from './draw'
 import type { Canvas, Drawing, Hit, Paint, Pan, Room } from './draw'
 import { isJoined } from './layers'
 import type { Graph } from './layers'
@@ -30,6 +30,9 @@ type Box = { place: Place; x: number; y: number; rows: number }
 
 const idOf = (place: Place): string | null => ('node' in place.slot ? place.slot.node.id : null)
 
+/** The beat of a cell of a flowing line, by how far along the way the line runs the cell stands: its row or column, counted the way the line goes. */
+const beatOf = (along: number): number => ((along % BEATS) + BEATS) % BEATS
+
 /** What is being looked for in a graph, and the nodes whose labels hold it, in the graph's order. */
 export type Finding = { query: string; found: string[] }
 
@@ -48,15 +51,19 @@ function borderOf(graph: Graph, place: Place, selected: string | null, found: Se
  * box as the window shows. A box the window's edge cuts ends there in an
  * ellipsis.
  */
-function paintShelf(canvas: Canvas, graph: Graph, shelf: Shelf, selected: string | null, seen: Seen, found: Set<string>): Hit[] {
+function paintShelf(canvas: Canvas, graph: Graph, shelf: Shelf, selected: string | null, seen: Seen, found: Set<string>, isFlowing: boolean): Hit[] {
   const hits: Hit[] = []
   const top = seen.yOf(shelf.top)
   for (const place of shelf.places) {
     const left = seen.xOf(place)
     if ('lane' in place.slot) {
       const { lane, isUp } = place.slot
-      const paint = lane.some(link => link.from === selected || link.to === selected) ? 'accent' : 'dim'
-      for (let row = 0; row < shelf.rows; row += 1) canvas.put(left, top + row, isUp ? '┊' : '│', { paint })
+      const isLit = lane.some(link => link.from === selected || link.to === selected)
+      const flows = isLit && isFlowing && graph.isDirected
+      for (let row = 0; row < shelf.rows; row += 1) {
+        const y = top + row
+        canvas.put(left, y, isUp ? '┊' : '│', { paint: isLit ? 'accent' : 'dim', ...(flows ? { beat: beatOf(isUp ? -y : y) } : {}) })
+      }
       continue
     }
     const { node } = place.slot
@@ -120,8 +127,8 @@ const JUNCTIONS: Record<number, string> = {
 /** How a straight run of wire is drawn where every wire in the cell runs against the flow. */
 const DASHED: Record<string, string> = { '│': '┊', '─': '┈' }
 
-/** What the wires of one bundle make of one cell: the ways they leave it, whether any is lit, and whether any runs with the flow. */
-type Mark = { ways: number; isLit: boolean; isSolid: boolean }
+/** What the wires of one bundle make of one cell: the ways they leave it, whether any is lit, whether any runs with the flow, and the beat of the first lit one that flows. */
+type Mark = { ways: number; isLit: boolean; isSolid: boolean; beat?: number }
 
 /**
  * Paints the wires of one channel. A wire goes from the border it leaves to
@@ -135,7 +142,7 @@ type Mark = { ways: number; isLit: boolean; isSolid: boolean }
  * it crosses. A wire's label is written just past its box, beside the port it
  * leaves by.
  */
-function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Channel, selected: string | null, seen: Seen): void {
+function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Channel, selected: string | null, seen: Seen, isFlowing: boolean): void {
   const first = seen.yOf(channel.top)
   const below = first + channel.rows
   const cells = new Map<string, Map<number, Mark>>()
@@ -151,29 +158,31 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
     const jog = wire.jog === null ? null : { x: seen.xOf(wire.from.place) + wire.jog.at, turn: tracks + wire.jog.track }
     const { out, into } = routeOf(wire, seen.xOf)
     const isLit = selected !== null && (wire.link.from === selected || wire.link.to === selected)
+    const flows = isLit && isFlowing && graph.isDirected
     const [start, end] = [borderOfEnd(wire.from), borderOfEnd(wire.to)]
-    const draw = (x: number, y: number, ways: number): void => {
+    const draw = (x: number, y: number, ways: number, along: number): void => {
       if (x < 0 || x >= seen.columns) return
       const marks = cells.get(`${x},${y}`) ?? new Map<number, Mark>()
       const mark = marks.get(wire.bundle) ?? { ways: 0, isLit: false, isSolid: false }
-      cells.set(`${x},${y}`, marks.set(wire.bundle, { ways: mark.ways | ways, isLit: mark.isLit || isLit, isSolid: mark.isSolid || !wire.isUp }))
+      const beat = mark.beat ?? (flows ? beatOf(along) : undefined)
+      cells.set(`${x},${y}`, marks.set(wire.bundle, { ways: mark.ways | ways, isLit: mark.isLit || isLit, isSolid: mark.isSolid || !wire.isUp, ...(beat === undefined ? {} : { beat }) }))
     }
-    /** Marks a column of the wire from row `from` to row `to`, leaving out row `skip`: a border's own row is the box's. */
+    /** Marks a column of the wire, as it runs from row `from` to row `to`, leaving out row `skip`: a border's own row is the box's. */
     const upright = (x: number, from: number, to: number, skip?: number): void => {
       const [high, low] = [Math.min(from, to), Math.max(from, to)]
       for (let y = Math.max(high, 0); y <= Math.min(low, seen.rows - 1); y += 1) {
-        if (y !== skip) draw(x, y, (y > high ? UP : 0) | (y < low ? DOWN : 0))
+        if (y !== skip) draw(x, y, (y > high ? UP : 0) | (y < low ? DOWN : 0), Math.sign(to - from) * y)
       }
     }
-    /** Marks a row of the wire from column `from` to column `to`. */
+    /** Marks a row of the wire, as it runs from column `from` to column `to`. */
     const across = (from: number, to: number, y: number): void => {
       const [left, right] = [Math.min(from, to), Math.max(from, to)]
       for (let x = Math.max(left, 0); x <= Math.min(right, seen.columns - 1); x += 1) {
-        draw(x, y, (x > left ? LEFT : 0) | (x < right ? RIGHT : 0))
+        draw(x, y, (x > left ? LEFT : 0) | (x < right ? RIGHT : 0), Math.sign(to - from) * x)
       }
     }
     upright(out, start, turn, start)
-    upright(into, end, jog?.turn ?? turn, end)
+    upright(into, jog?.turn ?? turn, end, end)
     if (jog === null) {
       across(out, into, turn)
     } else {
@@ -211,7 +220,8 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
     const shown = upright.length > 0 ? upright : [...marks.values()]
     const line = JUNCTIONS[shown.reduce((ways, mark) => ways | mark.ways, 0)] ?? ' '
     const isSolid = shown.some(mark => mark.isSolid)
-    canvas.put(x, y, isSolid ? line : (DASHED[line] ?? line), { paint: shown.some(mark => mark.isLit) ? 'accent' : 'dim' })
+    const beat = shown.find(mark => mark.beat !== undefined)?.beat
+    canvas.put(x, y, isSolid ? line : (DASHED[line] ?? line), { paint: shown.some(mark => mark.isLit) ? 'accent' : 'dim', ...(beat === undefined ? {} : { beat }) })
   }
   for (const [key, head] of heads) {
     const [x = 0, y = 0] = key.split(',').map(Number)
@@ -310,13 +320,14 @@ function paintSigns(canvas: Canvas, graph: Graph, boxes: Box[], selected: string
  * stand. A channel the window shows nothing of, nor of either shelf beside
  * it, is passed over. Where something is being found, the boxes of the nodes
  * found have their borders in `note`. The nodes joined to the selected one
- * that the window does not show are named at its edge. The last row is the
+ * that the window does not show are named at its edge. Where the lines are to
+ * flow, in a directed graph, each cell of a lit line has its beat. The last row is the
  * foot: it counts the nodes out of view of a graph larger than the room, says
  * what is being found and which of the found the selected node is, or else
  * what was left out of the graph, and holds the corner a click opens the
  * graph as a web page by.
  */
-export function paint(layout: Layout, graph: Graph, selected: string | null, room: Room, pan: Pan, finding?: Finding): Drawing {
+export function paint(layout: Layout, graph: Graph, selected: string | null, room: Room, pan: Pan, finding?: Finding, isFlowing = false): Drawing {
   if (layout.shelves.length === 0) return { rows: [], hits: [] }
   const sight = sightOf(layout, room)
   const at = within(pan, sight.most)
@@ -329,14 +340,14 @@ export function paint(layout: Layout, graph: Graph, selected: string | null, roo
   }
 
   const found = new Set(finding?.found)
-  const hits = layout.shelves.flatMap(shelf => paintShelf(canvas, graph, shelf, selected, seen, found))
+  const hits = layout.shelves.flatMap(shelf => paintShelf(canvas, graph, shelf, selected, seen, found, isFlowing))
   const isInView = (top: number, rows: number): boolean => seen.yOf(top) < seen.rows && seen.yOf(top + rows) > 0
   layout.channels.forEach((channel, index) => {
     const [above, below] = [layout.shelves[index], layout.shelves[index + 1]]
     const isNear = [above, below].some(shelf => shelf !== undefined && isInView(shelf.top, shelf.rows))
     if (!isInView(channel.top, channel.rows) && !isNear) return
     if (channel.isLoose) layTracks(channel, seen.xOf, channel.rows - Number(channel.hasTopRow) - Number(channel.hasBottomRow))
-    paintChannel(canvas, graph, layout, channel, selected, seen)
+    paintChannel(canvas, graph, layout, channel, selected, seen, isFlowing)
   })
 
   const boxes: Box[] = layout.shelves.flatMap(shelf =>

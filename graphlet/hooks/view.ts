@@ -97,7 +97,7 @@ export function viewOf(look: Look, fold = false): View {
         : Math.max(layout.columns, ...layout.shelves.map(shelf => shelf.across))
       return { columns: across, rows: layout.shelves.length === 0 ? 0 : layout.rows + 1 }
     },
-    draw: (graph, selected, room, pan, finding) => paint(laid(graph, room), graph, selected, room, pan, finding),
+    draw: (graph, selected, room, pan, finding) => paint(laid(graph, room), graph, selected, room, pan, finding, look.motion === 'flowing'),
     show: (graph, selected, room, from) => showIn(laid(graph, room), selected, room, from),
     scroll: (graph, room, from, by) => scrollIn(laid(graph, room), room, from, by),
     step: (graph, selected, move, room, pan) => stepIn(laid(graph, room), graph, selected, move, room, pan),

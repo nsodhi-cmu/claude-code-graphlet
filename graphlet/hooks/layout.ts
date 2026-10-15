@@ -28,8 +28,15 @@ export type Labels = 'wrap' | 'clip'
  */
 export type Links = 'separate' | 'merged'
 
+/**
+ * Whether the selected node's links show the way they run. `still`: they are
+ * lit lines. `flowing`: beads run along each, from the node it leaves to the
+ * node it reaches. An undirected graph's links run no way, and never flow.
+ */
+export type Motion = 'still' | 'flowing'
+
 /** How graphs are drawn: the person's settings. */
-export type Look = { scroll: Scroll; labels: Labels; links: Links }
+export type Look = { scroll: Scroll; labels: Labels; links: Links; motion: Motion }
 
 /**
  * The most cells a line of a wrapped label takes, the most a word may take

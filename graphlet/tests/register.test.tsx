@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 import type { Engine, Plugin } from 'claude-code/testing'
 import type { On, RenderPropsOf, RenderSurface } from 'claude-code'
 
-import { LOOK, SHOP, graphOf, picture, undirected } from './fixture'
+import { LOOK, SHOP, cellsOf, graphOf, picture, undirected } from './fixture'
 import { readGraph } from '../hooks/layers'
 import { GUIDE, graphOf as graphLines, pictureOf } from '../hooks/reply'
 import { viewOf } from '../hooks/view'
@@ -360,10 +360,48 @@ test('a pane graphlet was told nothing of is left as it is, and so is every surf
 test('graphs are drawn as the person\'s settings say', { ...WITH_HOST, options: { scroll: 'sheet', labels: 'clip', links: 'merged' } }, async ($, on) => {
   world(on)
   const pane = await mount($, 'free', NARROW)
-  const sheet = viewOf({ scroll: 'sheet', labels: 'clip', links: 'merged' })
+  const sheet = viewOf({ scroll: 'sheet', labels: 'clip', links: 'merged', motion: 'still' })
   const rows = await rowsOf(pane)
   expect(rows).toEqual(picture(sheet.draw(SHOP, 'src/price.ts', { columns: 44, rows: 40 }, sheet.show(SHOP, 'src/price.ts', { columns: 44, rows: 40 }, ORIGIN))))
   expect(rows).not.toEqual(picture(view.draw(SHOP, 'src/price.ts', { columns: 44, rows: 40 }, ORIGIN)))
+  await pane.unmount()
+})
+
+test('flowing, the beads of the selected node\'s links move on at each step of the surface\'s clock, and come round again; still, nothing moves', { ...WITH_HOST, options: { motion: 'flowing' } }, async ($, on) => {
+  world(on)
+  const pane = await mount($, 'free')
+  /** Where the bright cells of lit lines stand, as `row:column`. */
+  const beads = async (): Promise<string[]> => {
+    const drawn = (await pane.drawn({ in: 'graph' })) as { children?: Array<{ children?: unknown[] }> }
+    return (drawn.children ?? []).flatMap((row, y) => {
+      let x = 0
+      return (row.children ?? []).flatMap(span => {
+        const { props = {}, children = [] } = typeof span === 'string' ? {} : (span as { props?: Record<string, unknown>; children?: string[] })
+        const text = typeof span === 'string' ? span : children.join('')
+        const at = x
+        x += cellsOf(text).length
+        return props.color === 'claude' && props.bold === true && props.inverse !== true ? [`${y}:${at}`] : []
+      })
+    })
+  }
+  const first = await beads()
+  expect(first.length).toBeGreaterThan(0)
+  await pane.advance(150)
+  const second = await beads()
+  expect(second.length).toBeGreaterThan(0)
+  expect(second).not.toEqual(first)
+  await pane.advance(450)
+  expect(await beads()).toEqual(first)
+  await pane.unmount()
+})
+
+test('still, the lit lines are drawn once and the clock moves nothing', WITH_HOST, async ($, on) => {
+  world(on)
+  const pane = await mount($, 'free')
+  const before = await pane.drawn({ in: 'graph' })
+  await pane.advance(600)
+  expect(await pane.drawn({ in: 'graph' })).toEqual(before)
+  expect((await pane.findAll({ type: 'Text', in: 'graph' })).some(text => text.props.color === 'claude' && text.props.dimColor === true)).toBe(false)
   await pane.unmount()
 })
 

@@ -6,7 +6,7 @@ import type { Graph } from '../hooks/layers'
 import type { Look } from '../hooks/layout'
 
 /** How graphs are drawn unless a person's settings say otherwise. */
-export const LOOK: Look = { scroll: 'pinned', labels: 'wrap', links: 'separate' }
+export const LOOK: Look = { scroll: 'pinned', labels: 'wrap', links: 'separate', motion: 'still' }
 
 /** A graph of nodes labelled by their ids, with a link for each pair. */
 export const graphOf = (ids: string[], links: Array<[from: string, to: string]>, rest: Partial<GraphletNode> = {}): Graph =>

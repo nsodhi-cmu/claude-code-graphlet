@@ -1,6 +1,6 @@
 # The Drawing
 
-A drawing is rows of painted text, and the rectangles of them that answer a click. Painting one is `graphlet/hooks/paint.ts`, the window it is painted through is `graphlet/hooks/window.ts`, and what both are made of is `graphlet/hooks/draw.ts`. The surface module `graphlet/hooks/surface.tsx` puts a pane's rows on the terminal and posts what a click lands on. A graph in a reply is drawn as a [still picture](REPLIES.md#the-picture), its rows put on the terminal by the hook itself.
+A drawing is rows of painted text, and the rectangles of them that answer a click. Painting one is `graphlet/hooks/paint.ts`, the window it is painted through is `graphlet/hooks/window.ts`, and what both are made of is `graphlet/hooks/draw.ts`. The surface module `graphlet/hooks/surface.tsx` puts a pane's rows on the terminal, moves the beads of lines that flow, and posts what a click lands on. A graph in a reply is drawn as a [still picture](REPLIES.md#the-picture), its rows put on the terminal by the hook itself.
 
 ## Reading The Picture
 
@@ -76,6 +76,10 @@ A link's label is written beside its line, just past the box it leaves, in the p
 The selected node's box has a double frame, and its label is bold and inverse in the node's own tone. Every link that touches the selected node is lit along its whole way, in the theme's accent color, and so are its label and the borders of the boxes at the other ends. Everything else keeps its own paint: a box's border takes its node's tone, and a link is dim.
 
 Lit is painted over unlit. Where links share a stretch of line, selecting a node shows which of them are its own.
+
+### Flowing
+
+With the `motion` setting at `flowing`, the lit lines of a directed graph flow. Each cell of a lit line has a beat, one of `BEATS`, from where it stands along the way its link runs there: its row on a stretch that runs down, its row counted upward on one that runs up, and its column counted the way a stretch across runs. The beat is a span's `beat`. At each step of the flow, the cells whose beat it is are beads, bright and bold in the accent, and the rest of the lit lines are dim; at the next step the beads stand a cell farther along, so they move on from the node a link leaves to the node it reaches, and every `BEATS` steps they come round again. A cell several lit lines share has the beat of the first. Arrowheads, ticks and labels stay as they are. The surface module takes a step every `STEP_MS`, and only while its drawing has lines that flow.
 
 ## The Window
 
