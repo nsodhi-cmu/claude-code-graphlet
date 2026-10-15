@@ -1,19 +1,11 @@
 import { expect, test } from 'claude-code/testing'
 
+import { numbers } from './fixture'
 import type { GraphletMove } from '../types'
 import { rowText } from '../hooks/draw'
 import { readGraph } from '../hooks/layers'
 import type { Look } from '../hooks/layout'
 import { MOVES, viewOf } from '../hooks/view'
-
-/** A source of numbers from 0 up to 1 that gives the same ones every run. */
-const numbers = (seed: number): (() => number) => {
-  let state = seed
-  return () => {
-    state = (state * 1103515245 + 12345) & 0x7fffffff
-    return state / 0x7fffffff
-  }
-}
 
 const LABELS = ['a', 'node', 'src/some/long/path/to/file.component.ts', 'Validate the incoming request', 'x-y_z.w', '']
 const LOOKS: Look[] = (['pinned', 'sheet'] as const).flatMap(scroll =>

@@ -1,11 +1,15 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { LOOK, SHOP, graphOf, graphRows, picture, undirected } from './fixture'
+import { LOOK, SHOP, graphOf, graphRows, numbers, picture, undirected } from './fixture'
+import { rowText } from '../hooks/draw'
 import type { Drawing, Hit, Span } from '../hooks/draw'
 import { readGraph } from '../hooks/layers'
 import type { Graph } from '../hooks/layers'
-import type { Look } from '../hooks/layout'
+import { layoutOf } from '../hooks/layout'
+import type { Layout, Look, Place } from '../hooks/layout'
+import { paint } from '../hooks/paint'
 import { viewOf } from '../hooks/view'
+import { sightOf, slideOf, within } from '../hooks/window'
 
 const ORIGIN = { x: 0, y: 0 }
 /** A room the shop fits whole, and a room as narrow as a graph is laid out for. */
@@ -488,5 +492,200 @@ describe('where a click lands', () => {
   test('a lane is no hit', () => {
     const graph = graphOf(['A', 'B', 'C'], [['A', 'B'], ['B', 'C'], ['A', 'C']])
     expect(boxes(drawn(graph)).map(hit => hit.node)).toEqual(['A', 'B', 'C'])
+  })
+})
+
+/** The ways a line leaves each character it is drawn in. */
+const [UP, DOWN, LEFT, RIGHT] = [1, 2, 4, 8]
+const WAYS: Readonly<Record<string, number>> = {
+  '│': UP | DOWN,
+  '┊': UP | DOWN,
+  '─': LEFT | RIGHT,
+  '┈': LEFT | RIGHT,
+  '┌': DOWN | RIGHT,
+  '┐': DOWN | LEFT,
+  '└': UP | RIGHT,
+  '┘': UP | LEFT,
+  '├': UP | DOWN | RIGHT,
+  '┤': UP | DOWN | LEFT,
+  '┬': DOWN | LEFT | RIGHT,
+  '┴': UP | LEFT | RIGHT,
+  '┼': UP | DOWN | LEFT | RIGHT,
+  '▼': UP,
+  '▲': DOWN,
+}
+
+/** One end of a line, in the channel it is drawn in: the node it stands for there, and whether the line leaves it or reaches it, or with no arrowheads, whether it is above the line or below. */
+type Said = { node: string; channel: number; side: 'from' | 'to' | 'above' | 'below' }
+
+/**
+ * What a picture says, read the way a person reads it: in each channel, the
+ * links its lines make, as `channel from to`. Where boxes and lanes stand is
+ * taken from the layout, and every line is read from its characters alone. A
+ * line joins every box it leaves at a tick to every box it reaches at an
+ * arrowhead; with no arrowheads, every box above it to every box below, or
+ * where it meets boxes on one side only, each of them to each. A lane stands
+ * for the one link it carries, and a line that meets another's side passes
+ * under it. A line the window's edge cuts says nothing of what it was bound
+ * for. Also answers where each line ends with nothing to meet it.
+ */
+function readOff(graph: Graph, layout: Layout, drawing: Drawing, xOf: (place: Place) => number): { links: string[]; loose: string[] } {
+  const rows = picture(drawing).slice(0, -1).map(row => [...row])
+  const at = (x: number, y: number): string => rows[y]?.[x] ?? ' '
+  const isOff = (x: number): boolean => x < 0 || x >= layout.columns
+  const ways = new Map<string, number>()
+  const ends = new Map<string, Said>()
+  const boxAt = new Map<string, { node: string; x: number; y: number; width: number; rows: number; shelf: number }>()
+  const lanes = new Set<string>()
+  const shelfOf = new Map<string, number>()
+  layout.shelves.forEach((shelf, index) => {
+    for (const place of shelf.places) {
+      const x = xOf(place)
+      if ('node' in place.slot) {
+        const box = { node: place.slot.node.id, x, y: shelf.top, width: place.width, rows: place.rows, shelf: index }
+        shelfOf.set(box.node, index)
+        for (let cell = 0; cell < box.width * box.rows; cell += 1) boxAt.set(`${x + (cell % box.width)},${box.y + Math.floor(cell / box.width)}`, box)
+        continue
+      }
+      for (let row = 0; row < shelf.rows; row += 1) lanes.add(`${x},${shelf.top + row}`)
+    }
+  })
+  layout.shelves.forEach((shelf, index) => {
+    for (const place of shelf.places) {
+      const x = xOf(place)
+      if (!('lane' in place.slot) || isOff(x)) continue
+      const { lane, isUp } = place.slot
+      const [top, bottom] = [`${x},${shelf.top}`, `${x},${shelf.top + shelf.rows - 1}`]
+      const [high, low] = (shelfOf.get(lane.from) ?? 0) < (shelfOf.get(lane.to) ?? 0) ? [lane.from, lane.to] : [lane.to, lane.from]
+      ways.set(top, UP)
+      ways.set(bottom, DOWN)
+      if (!graph.isDirected) {
+        ends.set(top, { node: low, channel: index - 1, side: 'below' })
+        ends.set(bottom, { node: high, channel: index, side: 'above' })
+      } else {
+        ends.set(top, isUp ? { node: lane.from, channel: index - 1, side: 'from' } : { node: lane.to, channel: index - 1, side: 'to' })
+        ends.set(bottom, isUp ? { node: lane.to, channel: index, side: 'to' } : { node: lane.from, channel: index, side: 'from' })
+      }
+    }
+  })
+  rows.forEach((row, y) =>
+    row.forEach((char, x) => {
+      const key = `${x},${y}`
+      const box = boxAt.get(key)
+      if (lanes.has(key)) return
+      if (box !== undefined) {
+        if (x === box.x || x === box.x + box.width - 1) return
+        if (y === box.y + box.rows - 1 && '┬╤'.includes(char)) {
+          ways.set(key, DOWN)
+          ends.set(key, { node: box.node, channel: box.shelf, side: graph.isDirected ? 'from' : 'above' })
+        } else if (y === box.y && '┴╧'.includes(char)) {
+          ways.set(key, UP)
+          ends.set(key, { node: box.node, channel: box.shelf - 1, side: graph.isDirected ? 'from' : 'below' })
+        }
+        return
+      }
+      if (WAYS[char] === undefined) return
+      ways.set(key, WAYS[char])
+      const into = boxAt.get(`${x},${char === '▼' ? y + 1 : y - 1}`)
+      if (char === '▼' && into !== undefined) ends.set(key, { node: into.node, channel: into.shelf - 1, side: 'to' })
+      if (char === '▲' && into !== undefined) ends.set(key, { node: into.node, channel: into.shelf, side: 'to' })
+    }),
+  )
+
+  const root = new Map([...ways.keys()].map(key => [key, key]))
+  const find = (key: string): string => {
+    const up = root.get(key) ?? key
+    if (up === key) return key
+    const top = find(up)
+    root.set(key, top)
+    return top
+  }
+  const loose: string[] = []
+  const cut = new Set<string>()
+  for (const [key, own] of ways) {
+    const [x = 0, y = 0] = key.split(',').map(Number)
+    const meet = (dx: number, dy: number, back: number): void => {
+      let [nx, ny] = [x + dx, y + dy]
+      while (dy === 0 && ways.get(`${nx},${ny}`) === (UP | DOWN) && !ends.has(`${nx},${ny}`)) nx += dx
+      if (((ways.get(`${nx},${ny}`) ?? 0) & back) !== 0) root.set(find(key), find(`${nx},${ny}`))
+      else if (isOff(nx)) cut.add(key)
+      else loose.push(`'${at(x, y)}' at ${x},${y}`)
+    }
+    if (own & RIGHT) meet(1, 0, LEFT)
+    if (own & LEFT) meet(-1, 0, RIGHT)
+    if (own & DOWN) meet(0, 1, UP)
+    if (own & UP) meet(0, -1, DOWN)
+  }
+
+  const lines = new Map<string, Said[]>()
+  for (const [key, end] of ends) lines.set(find(key), [...(lines.get(find(key)) ?? []), end])
+  const isCut = new Set([...cut].map(find))
+  const links = new Set<string>()
+  for (const [line, said] of lines) {
+    const on = (side: Said['side']): string[] => [...new Set(said.filter(end => end.side === side).map(end => end.node))]
+    const pairs = graph.isDirected
+      ? on('from').flatMap(from => on('to').map(to => [from, to]))
+      : on('above').length > 0 && on('below').length > 0
+        ? on('above').flatMap(above => on('below').map(below => [above, below].sort()))
+        : isCut.has(line)
+          ? []
+          : [...on('above'), ...on('below')].flatMap((one, index, all) => all.slice(index + 1).map(other => [one, other].sort()))
+    for (const [one, other] of pairs) links.add(`${said[0]?.channel} ${one} ${other}`)
+  }
+  return { links: [...links].sort(), loose }
+}
+
+/** The links a picture of a graph laid out so should say: each link, in every channel it crosses. */
+function linksOf(graph: Graph, layout: Layout): string[] {
+  const shelfOf = new Map(layout.shelves.flatMap((shelf, index) => shelf.places.flatMap(place => ('node' in place.slot ? [[place.slot.node.id, index] as const] : []))))
+  return graph.links
+    .filter(link => link.from !== link.to)
+    .flatMap(link => {
+      const [from, to] = [shelfOf.get(link.from) ?? 0, shelfOf.get(link.to) ?? 0]
+      const ends = graph.isDirected ? [link.from, link.to] : [link.from, link.to].sort()
+      return Array.from({ length: Math.max(1, Math.abs(from - to)) }, (_, step) => `${Math.min(from, to) + step} ${ends.join(' ')}`)
+    })
+    .sort()
+}
+
+describe('what a picture says', () => {
+  const next = numbers(31)
+  const pick = (below: number): number => Math.floor(next() * below)
+  const someGraph = (): Graph => {
+    const count = 2 + pick(15)
+    const links = Array.from({ length: pick(count * 2 + 2) }, () => [`n${pick(count)}`, `n${pick(count)}`])
+    return readGraph({
+      nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: pick(4) === 0 ? `Validate the request ${index}` : `n${index}` })),
+      links: [...links, ...links.filter(() => pick(3) === 0).map(([from, to]) => [to, from])].map(([from = '', to = '']) => ({ from, to })),
+      isDirected: pick(4) !== 0,
+    })
+  }
+  const someLook = (scroll = pick(2) === 0 ? 'pinned' : 'sheet'): Look => ({ scroll: scroll as Look['scroll'], labels: pick(3) === 0 ? 'clip' : 'wrap', links: 'separate' })
+
+  test('a graph drawn whole says every link it has, in every channel the link crosses, and no link it does not have', () => {
+    for (let run = 0; run < 300; run += 1) {
+      const graph = someGraph()
+      const look = someLook()
+      const columns = viewOf(look).measure(graph, 40 + pick(100)).columns
+      const layout = layoutOf(graph, { columns, rows: 0 }, look)
+      const drawing = paint(layout, graph, null, { columns, rows: layout.rows + 1 }, ORIGIN)
+      const said = readOff(graph, layout, drawing, place => place.x)
+      expect(said.loose).toEqual([])
+      expect(said.links).toEqual([...new Set(linksOf(graph, layout))])
+    }
+  })
+
+  test('scrolled anywhere, what a window shows of a graph says no link the graph does not have', () => {
+    for (let run = 0; run < 300; run += 1) {
+      const graph = someGraph()
+      const room = { columns: 40 + pick(60), rows: 1000 }
+      const layout = layoutOf(graph, room, someLook('pinned'))
+      const at = within({ x: pick(200), y: 0 }, sightOf(layout, room).most)
+      const drawing = paint(layout, graph, null, { columns: room.columns, rows: layout.rows + 1 }, at)
+      const said = readOff(graph, layout, drawing, place => place.x - slideOf(layout, layout.shelves[place.shelf], at.x))
+      expect(said.loose).toEqual([])
+      const links = new Set(linksOf(graph, layout))
+      expect(said.links.filter(link => !links.has(link))).toEqual([])
+    }
   })
 })

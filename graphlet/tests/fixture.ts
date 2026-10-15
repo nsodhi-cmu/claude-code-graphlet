@@ -15,6 +15,15 @@ export const graphOf = (ids: string[], links: Array<[from: string, to: string]>,
 /** A graph read again with its links undirected. */
 export const undirected = (graph: Graph): Graph => readGraph({ ...graph, isDirected: false })
 
+/** A source of numbers from 0 up to 1 that gives the same ones every run. */
+export const numbers = (seed: number): (() => number) => {
+  let state = seed
+  return () => {
+    state = (state * 1103515245 + 12345) & 0x7fffffff
+    return state / 0x7fffffff
+  }
+}
+
 /** A drawing as the text of its rows. */
 export const picture = (drawing: Drawing): string[] => drawing.rows.map(rowText)
 
