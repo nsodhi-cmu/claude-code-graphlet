@@ -34,6 +34,8 @@ const GAP = { x: 36, y: 72 }
 const MARGIN = 40
 /** How far from a box's middle the port of the links that run back up is. */
 const PORT_STEP = 12
+/** How far beside the first of them each further link between the same two boxes, of the same kind, runs. */
+const TWIN_STEP = 10
 /** How far apart two links' labels stand, one under the other, where they would stand over each other. */
 const LABEL_STEP = BADGE_SIZE + 4
 /** The length of an arrowhead, and its width. */
@@ -282,11 +284,11 @@ function headOf(tip: Point, way: Point): string {
  * straight along each lane it has in the layers it passes, stopping `short`
  * of its box. Down the page it leaves the bottom of a box and reaches the top
  * of one, by their middles; back up it does the reverse, by the ports beside
- * them.
+ * them; and either way `aside` farther left.
  */
-function runOf(from: Spot, lanes: Spot[], to: Spot, isUp: boolean, short: number): Arrow {
+function runOf(from: Spot, lanes: Spot[], to: Spot, isUp: boolean, short: number, aside: number): Arrow {
   const way = isUp ? -1 : 1
-  const port = isUp ? PORT_STEP : 0
+  const port = (isUp ? PORT_STEP : 0) - aside
   const nearOf = (spot: Spot): number => (isUp ? spot.y + spot.height : spot.y)
   const farOf = (spot: Spot): number => (isUp ? spot.y : spot.y + spot.height)
   const tip = { x: middleOf(to) + port, y: nearOf(to) }
@@ -320,20 +322,20 @@ function loopOf(spot: Spot, short: number): Arrow {
 
 /**
  * A link as it is drawn between the boxes of its two ends: a loop, an arc, or
- * a run through its lanes in the order it passes them. A link that runs one
- * way stops short of its box by the length of an arrowhead; one that runs no
- * way reaches the box, and runs down the page whichever way round it names
- * its ends.
+ * a run through its lanes in the order it passes them, `aside` from where it
+ * would run. A link that runs one way stops short of its box by the length
+ * of an arrowhead; one that runs no way reaches the box, and runs down the
+ * page whichever way round it names its ends.
  */
-function arrowOf(link: Link, from: Spot, to: Spot, spots: Spot[]): Arrow {
+function arrowOf(link: Link, from: Spot, to: Spot, spots: Spot[], aside: number): Arrow {
   const { isDirected } = link
   const short = isDirected ? HEAD.length : 0
   if (from === to) return loopOf(from, short)
   if (from.layer === to.layer) return arcOf(from, to, short)
   const isUp = from.layer > to.layer
   const lanes = spots.filter(spot => 'lane' in spot.slot && spot.slot.lane.includes(link))
-  if (isUp && !isDirected) return runOf(to, lanes, from, false, short)
-  return runOf(from, isUp ? lanes.toReversed() : lanes, to, isUp, short)
+  if (isUp && !isDirected) return runOf(to, lanes, from, false, short, aside)
+  return runOf(from, isUp ? lanes.toReversed() : lanes, to, isUp, short, aside)
 }
 
 /** A node as it is drawn: its box in its tone, and in it its mark, the lines of its label, and its badge. */
@@ -353,11 +355,12 @@ function boxOf(node: GraphletNode, spot: Spot): string {
 
 /**
  * The drawing: every link, each naming its two ends by their places in the
- * graph, with an arrowhead where the graph is directed and its label, cut as
- * the terminal cuts it, written on its first stretch, and moved down past any
+ * graph, with an arrowhead where it runs one way and its label, cut as the
+ * terminal cuts it, written on its first stretch, and moved down past any
  * label written there before it; and over them every node, in the graph's
- * order. A link from a node to itself has no label written, as in the
- * terminal.
+ * order. A link between the same two boxes as one before it, of the same
+ * kind, runs `TWIN_STEP` farther aside for each. A link from a node to
+ * itself has no label written, as in the terminal.
  */
 function drawingOf(graph: Graph): string {
   const spots = spotsOf(layersOf(graph).slots)
@@ -366,9 +369,13 @@ function drawingOf(graph: Graph): string {
     const spot = spots.find(one => 'node' in one.slot && one.slot.node.id === node.id)
     if (spot !== undefined) places.set(node.id, { index, spot })
   })
+  const twins = new Map<string, number>()
   const drawn = graph.links.flatMap(link => {
     const [from, to] = [places.get(link.from), places.get(link.to)]
-    return from === undefined || to === undefined ? [] : [{ link, from, to, arrow: arrowOf(link, from.spot, to.spot, spots) }]
+    const pair = JSON.stringify([link.isDirected, ...(link.isDirected ? [link.from, link.to] : [link.from, link.to].sort())])
+    const twin = twins.get(pair) ?? 0
+    twins.set(pair, twin + 1)
+    return from === undefined || to === undefined ? [] : [{ link, from, to, arrow: arrowOf(link, from.spot, to.spot, spots, twin * TWIN_STEP) }]
   })
   const written: Array<{ x: number; y: number; width: number }> = []
   const writtenAt = new Map<Link, Point>()

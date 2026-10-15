@@ -116,6 +116,11 @@ test('a block whose links are all dashes is an undirected graph; in any other, a
   ])
 })
 
+test('the same two nodes may be linked again under another label, and a link given again under the same label is one link', () => {
+  const graph = graphOf(['Idle ->|start| Running', 'Idle ->|resume| Running', 'Idle ->|start| Running', 'Running -> Idle'])
+  expect(readGraph(graph).links.map(link => `${link.from} -> ${link.to} ${link.label ?? ''}`.trim())).toEqual(['Idle -> Running start', 'Idle -> Running resume', 'Running -> Idle'])
+})
+
 test('dashes within a label, and a dash in prose, stay part of the label', () => {
   const graph = graphOf(['git commit --amend -> git push --force', 'Fetch — with retry -> Parse', 'npm run build --watch -> Done'])
   expect(graph.nodes.map(node => node.id)).toEqual(['git commit --amend', 'git push --force', 'Fetch — with retry', 'Parse', 'npm run build --watch', 'Done'])

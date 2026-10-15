@@ -248,6 +248,16 @@ describe('a graph of both kinds on a page', () => {
   })
 })
 
+describe('links between the same two nodes on a page', () => {
+  test('a link between the same two boxes as one before it, of the same kind, runs beside it, so the two never lie on one line', () => {
+    const page = pageOf(readGraph({ nodes: ['a', 'b'].map(id => ({ id, label: id })), links: [{ from: 'a', to: 'b', label: 'start' }, { from: 'a', to: 'b', label: 'resume' }] }), '')
+    const [first = [], second = []] = [...page.matchAll(/<g class="link"[^>]*><path d="([^"]*)"/g)].map(([, path = '']) => numbers(path))
+    expect(first).not.toEqual(second)
+    expect((first[0] ?? 0) - (second[0] ?? 0)).toBeGreaterThan(0)
+    expect([first[1], first.at(-1)]).toEqual([second[1], second.at(-1)])
+  })
+})
+
 describe('the page as a document', () => {
   test('what a graph and a title say is escaped, a tone the page does not know is drawn plain, and an id is never written', () => {
     const id = '"><img src=x>'

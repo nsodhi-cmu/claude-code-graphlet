@@ -490,6 +490,28 @@ describe('the drawing', () => {
     ])
   })
 
+  test('two links between the same two nodes with different labels are two lines, each with its label and its own arrowhead', () => {
+    const graph = readGraph({
+      nodes: ['Idle', 'Running'].map(id => ({ id, label: id })),
+      links: [
+        { from: 'Idle', to: 'Running', label: 'start' },
+        { from: 'Idle', to: 'Running', label: 'resume' },
+        { from: 'Running', to: 'Idle', label: 'done' },
+      ],
+    })
+    expect(graphRows(drawn(graph))).toEqual([
+      '           ┌────────────────┐',
+      '           │      Idle      │',
+      '           └┬──────┬────────┘',
+      '            │start │resume ▲',
+      '            └────┐ │ ┌┈┈┈┈┈┘',
+      '                 ▼ ▼ ┊done',
+      '                ┌────┴────┐',
+      '                │ Running │',
+      '                └─────────┘',
+    ])
+  })
+
   test('an empty graph draws nothing', () => {
     expect(drawn(readGraph({ nodes: [], links: [] }))).toEqual({ rows: [], hits: [] })
   })
@@ -733,10 +755,14 @@ type Said = { node: string; channel: number; side: 'from' | 'to' | 'above' | 'be
  * under it. A line the window's edge cuts says nothing of what it was bound
  * for. Also answers where each line ends with nothing to meet it, and each
  * label that is not where it should be: the words beside a tick, in the row
- * past the box, must be the label of every link that leaves there, and a
- * link's label must be written beside a tick of the node it leaves. Through a
- * window, which may cut a label or leave its box out of view, the words
- * beside a tick need only start the label.
+ * past the box, are written on that line for each node it reaches, and
+ * between any two nodes the labels written so must be the labels of the
+ * links between them, one for one, and a link's label must be written beside
+ * a tick of the node it leaves. Through a window, which may cut a label or
+ * leave its box out of view, the words beside a tick need only start the
+ * label of a link between the two, and a line the edge cuts with no
+ * arrowhead left in view, which may run either way or none, is not read
+ * for its labels.
  */
 function readOff(
   graph: Graph,
@@ -850,18 +876,31 @@ function readOff(
   const isCut = new Set([...cut].map(find))
   const links = new Set<string>()
   const labels: string[] = []
-  const labelsOf = (one: string, other: string, isDirected: boolean): string[] =>
-    graph.links
-      .filter(link => link.isDirected === isDirected && ((link.from === one && link.to === other) || (!isDirected && link.from === other && link.to === one)))
-      .map(labelOf)
+  /** Who a label stands between: the node it is written beside and the node a line from there reaches, either way round where the line runs no way. */
+  const pairOf = (node: string, other: string, isDirected: boolean): string => JSON.stringify(isDirected ? [true, node, other] : [false, ...[node, other].sort()])
+  const linkLabels = new Map<string, string[]>()
+  for (const link of graph.links.filter(one => one.from !== one.to && labelOf(one) !== '')) {
+    const pair = pairOf(link.from, link.to, link.isDirected)
+    linkLabels.set(pair, [...(linkLabels.get(pair) ?? []), labelOf(link)])
+  }
+  const writtenLabels = new Map<string, string[]>()
   for (const [key, { node, text }] of written) {
     const own = ends.get(key)?.[0]
     if (text === '' || own === undefined) continue
     const said = lines.get(find(key)) ?? []
     const isDirected = isOneWay.has(find(key))
+    if (!isDirected && isCut.has(find(key))) continue
     const across = said.filter(end => (isDirected ? end.side === 'to' : end.side !== own.side))
     for (const other of new Set((across.length > 0 || isDirected ? across : said).map(end => end.node).filter(one => one !== node))) {
-      for (const label of labelsOf(node, other, isDirected)) if (isWindow ? !label.startsWith(text) : label !== text) labels.push(`'${text}' beside ${node}, on its link to ${other} labelled '${label}'`)
+      const pair = pairOf(node, other, isDirected)
+      if (isWindow && !(linkLabels.get(pair) ?? []).some(label => label.startsWith(text))) labels.push(`'${text}' beside ${node}, on a line to ${other} with no such label`)
+      writtenLabels.set(pair, [...(writtenLabels.get(pair) ?? []), text])
+    }
+  }
+  if (!isWindow) {
+    for (const pair of new Set([...linkLabels.keys(), ...writtenLabels.keys()])) {
+      const [had, said] = [(linkLabels.get(pair) ?? []).toSorted(), (writtenLabels.get(pair) ?? []).toSorted()]
+      if (JSON.stringify(had) !== JSON.stringify(said)) labels.push(`between ${pair}, labels ${JSON.stringify(said)} are written for links labelled ${JSON.stringify(had)}`)
     }
   }
   if (!isWindow) {

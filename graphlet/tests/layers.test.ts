@@ -25,17 +25,20 @@ describe('reading a graph', () => {
     ])
   })
 
-  test('a link keeps the label it is first given, made safe to draw, and a blank label is none', () => {
+  test('a link is kept once for each label it is given between the same two nodes, the label made safe to draw, and a blank label is none', () => {
     const graph = readGraph({
       nodes: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }],
       links: [
         { from: 'a', to: 'b', label: ' yes\n  sir ' },
         { from: 'a', to: 'b', label: 'no' },
+        { from: 'a', to: 'b', label: 'yes sir' },
         { from: 'b', to: 'a', label: '   ' },
+        { from: 'b', to: 'a' },
       ],
     })
     expect(graph.links).toEqual([
       { from: 'a', to: 'b', isDirected: true, label: 'yes sir' },
+      { from: 'a', to: 'b', isDirected: true, label: 'no' },
       { from: 'b', to: 'a', isDirected: true },
     ])
   })

@@ -32,8 +32,8 @@ const tidy = (text: unknown): string =>
 /**
  * Reads a graph leniently: a node needs an id no node before it has, text is
  * made safe to draw, a tone that is none of the tones is dropped, and a link
- * is kept once, where both its ends are nodes, with the label it is first
- * given; a link that runs no way, once whichever way round it names them. A
+ * is kept where both its ends are nodes, once for each label it is given; a
+ * link that runs no way, once whichever way round it names them. A
  * link runs one way unless it says it does not, or says nothing in a graph
  * that says its links do not. A link from a node to itself is kept, and
  * drawn as a sign on the node. Nodes and links past the most that are read
@@ -63,14 +63,14 @@ export function readGraph(graph: GraphletGraph): Graph {
   for (const link of Array.isArray(graph?.links) ? graph.links : []) {
     if (!given.has(link?.from) || !given.has(link?.to)) continue
     const isDirected = typeof link.isDirected === 'boolean' ? link.isDirected : graph?.isDirected !== false
-    const key = JSON.stringify(isDirected ? [link.from, link.to] : [link.from, link.to].sort().concat('--'))
+    const label = tidy(link.label)
+    const key = JSON.stringify([...(isDirected ? [link.from, link.to] : [link.from, link.to].sort().concat('--')), label])
     if (kept.has(key)) continue
     kept.add(key)
     if (links.length === MOST_LINKS || !ids.has(link.from) || !ids.has(link.to)) {
       unreadLinks += 1
       continue
     }
-    const label = tidy(link.label)
     links.push({ from: link.from, to: link.to, isDirected, ...(label === '' ? {} : { label }) })
   }
   return { nodes, links, unread: { nodes: given.size - nodes.length, links: unreadLinks } }
