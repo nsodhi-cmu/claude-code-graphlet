@@ -88,23 +88,32 @@ test('a block\'s lines are chains of arrows, a node is known by its label, and t
 })
 
 test('a block whose links are all dashes is an undirected graph, and in any other a dash, like a two-headed arrow, is a link each way', () => {
-  const friends = graphOf(['Alice -- Bob -- Carol', 'Carol --- Dan', 'Erin — Alice', 'e-mail -- front-end'])
+  const friends = graphOf(['Alice -- Bob -- Carol', 'Carol --- Dan', 'e-mail -- front-end'])
   expect(friends.isDirected).toBe(false)
-  expect(friends.links.map(link => `${link.from} – ${link.to}`)).toEqual(['Alice – Bob', 'Bob – Carol', 'Carol – Dan', 'Erin – Alice', 'e-mail – front-end'])
-  const mixed = graphOf(['A -> B', 'B -- C', 'C <-> D', 'D ↔ A'])
+  expect(friends.links.map(link => `${link.from} – ${link.to}`)).toEqual(['Alice – Bob', 'Bob – Carol', 'Carol – Dan', 'e-mail – front-end'])
+  const mixed = graphOf(['A -> B', 'B -- C', 'C <-> D', 'D ↔ A', 'E <-- A', 'F ← E'])
   expect(mixed.isDirected).toBeUndefined()
-  expect(mixed.links.map(link => `${link.from} → ${link.to}`)).toEqual(['A → B', 'B → C', 'C → B', 'C → D', 'D → C', 'D → A', 'A → D'])
+  expect(mixed.links.map(link => `${link.from} → ${link.to}`)).toEqual(['A → B', 'B → C', 'C → B', 'C → D', 'D → C', 'D → A', 'A → D', 'A → E', 'E → F'])
   expect(picture(pictureOf(still, readGraph(friends), { columns: 80, rows: 1000 })).join('\n')).not.toMatch(/[▲▼]/)
 })
 
-test('words in pipes right after an arrow or dashes are the link\'s label', () => {
-  const graph = graphOf(['Valid? ->|yes| Save it', 'Valid? -->| no | Ask again ->|retry| Read', 'A --|by train| B'])
+test('dashes within a label, and a dash in prose, stay part of the label', () => {
+  const graph = graphOf(['git commit --amend -> git push --force', 'Fetch — with retry -> Parse', 'npm run build --watch -> Done'])
+  expect(graph.nodes.map(node => node.id)).toEqual(['git commit --amend', 'git push --force', 'Fetch — with retry', 'Parse', 'npm run build --watch', 'Done'])
+  expect(graph.links).toHaveLength(3)
+})
+
+test('words in pipes right after an arrow or dashes are the link\'s label, and so are words between dashes and an arrow, as Mermaid writes them', () => {
+  const graph = graphOf(['Valid? ->|yes| Save it', 'Valid? -->| no | Ask again ->|retry| Read', 'A --|by train| B', 'C -- on error --> D', 'E ->| F ->| G'])
   expect(graph.links).toEqual([
     { from: 'Valid?', to: 'Save it', label: 'yes' },
     { from: 'Valid?', to: 'Ask again', label: 'no' },
     { from: 'Ask again', to: 'Read', label: 'retry' },
     { from: 'A', to: 'B', label: 'by train' },
     { from: 'B', to: 'A', label: 'by train' },
+    { from: 'C', to: 'D', label: 'on error' },
+    { from: 'E', to: 'F' },
+    { from: 'F', to: 'G' },
   ])
 })
 

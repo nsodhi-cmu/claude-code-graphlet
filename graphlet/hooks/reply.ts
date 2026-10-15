@@ -24,7 +24,7 @@ Valid? ->|no| Ask for a correction [warn]
 Ask for a correction -> Read the request
 \`\`\`
 
-- A node is its label: the same label on several lines is one node. A line with no arrow is a node on its own.
+- A node is its label: the same label on several lines is one node. A line with no link is a node on its own.
 - A tone in brackets after a label colors its node: [good], [warn], [bad], [note], or [dim].
 - Words in pipes right after an arrow are written on its link, as \`->|yes|\` above. Keep them to a word or two.
 - Links have a direction and may form loops. Where links have none, as between friends or linked rooms, write each as \`--\` instead. The layers run top to bottom and are worked out from the links; there are no shapes or styles.
@@ -40,11 +40,15 @@ const OPENING = /^\s*(`{3,}(?=[^`]*$)|~{3,})\s*(\S*)/
 const CLOSING = /^\s*(`{3,}|~{3,})\s*$/
 /**
  * What joins two nodes on a line: an arrow, `->`, `-->` or `→`, a link the way
- * it points; one with a head at each end, `<->` or `↔`, a link each way; and
- * two dashes or more, `--`, or a dash `—`, a link with no direction. Words in
- * pipes right after it, `->|yes|`, are the link's label.
+ * it points, and so `<-`, `<--` or `←`; one with a head at each end, `<->` or
+ * `↔`, a link each way; and two dashes or more with a blank before them and a
+ * blank or a pipe after, ` -- `, a link with no direction, so that dashes within a label, as in
+ * `--force`, stay part of it. Words in pipes right after it, `->|yes|`, with
+ * no arrow among them, are the link's label.
  */
-const JOIN = /(<-+>|↔|-+>|→|-{2,}|—)(?:\|([^|\n]*)\|)?/
+const JOIN = /(<-+>|↔|<-+|←|-+>|→|(?<=^|\s)-{2,}(?=\s|$|\|))(?:\|((?:(?!-+>)[^|\n])*)\|)?/
+/** A label Mermaid's way, `A -- yes --> B`, which is read as `A ->|yes| B`. */
+const SAID_BETWEEN = /(?<=^|\s)-{2,}[ \t]+([^-|\n]+?)[ \t]+-+>/g
 /** A tone in brackets at the end of a label. */
 const TONE = new RegExp(`\\[(${TONES.join('|')})\\]$`, 'i')
 
@@ -106,18 +110,18 @@ export function partsOf(reply: string): Part[] {
 /**
  * The graph a block's lines say. Each line is a chain of labels joined by
  * arrows or dashes, each a link, with the words in pipes after one written on
- * it; a line with neither names a node alone. A
- * block whose links are all dashes is an undirected graph. Any other is
- * directed, and a dash in it is a link each way, as a two-headed arrow is. A
- * node is known by its label, so the same label on any line is the same node,
- * and a tone in brackets after a label is its node's, the first one given. A
- * blank label is passed over.
+ * it; a line with neither names a node alone. A block whose links are all
+ * dashes is an undirected graph. Any other is directed, and a dash in it is a
+ * link each way, as a two-headed arrow is. A node is known by its label, so
+ * the same label on any line is the same node, and a tone in brackets after a
+ * label is its node's, the first one given. A blank label is passed over, and
+ * pipes left at a label's ends are not part of it.
  */
 export function graphOf(lines: readonly string[]): GraphletGraph {
   const nodes = new Map<string, GraphletNode>()
   const joins: Array<GraphletLink & { join: string }> = []
   const nodeOf = (said: string): string[] => {
-    const words = trimmed(said)
+    const words = trimmed(trimmed(said).replace(/^\|+|\|+$/g, ''))
     const tone = TONE.exec(words)
     const id = trimmed(tone === null ? words : words.slice(0, tone.index)).replace(/\s+/g, ' ')
     if (id === '') return []
@@ -127,7 +131,7 @@ export function graphOf(lines: readonly string[]): GraphletGraph {
     return [id]
   }
   for (const line of lines) {
-    const said = line.split(JOIN)
+    const said = line.replace(SAID_BETWEEN, '->|$1|').split(JOIN)
     let from: string | undefined
     for (let at = 0; at < said.length; at += 3) {
       const [to] = nodeOf(said[at] ?? '')
@@ -137,10 +141,12 @@ export function graphOf(lines: readonly string[]): GraphletGraph {
       from = to
     }
   }
-  const isUndirected = joins.length > 0 && joins.every(({ join }) => /^(-+|—)$/.test(join))
-  const links = joins.flatMap(({ join, ...link }) =>
-    isUndirected || /^-+>$|^→$/.test(join) ? [link] : [link, { ...link, from: link.to, to: link.from }],
-  )
+  const isUndirected = joins.length > 0 && joins.every(({ join }) => /^-+$/.test(join))
+  const links = joins.flatMap(({ join, ...link }) => {
+    const back = { ...link, from: link.to, to: link.from }
+    if (isUndirected || /^-+>$|^→$/.test(join)) return [link]
+    return /^<-+$|^←$/.test(join) ? [back] : [link, back]
+  })
   return { nodes: [...nodes.values()], links, ...(isUndirected ? { isDirected: false } : {}) }
 }
 

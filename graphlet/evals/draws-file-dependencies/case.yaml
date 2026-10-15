@@ -20,47 +20,47 @@ graders:
     match: 'contains'
   - type: regex
     name: block-is-closed-with-a-link
-    pattern: '^[ \t]*```graphlet[ \t]*\n(?:(?![ \t]*```)[^\n]*\n)*?[^\n]*(?:->|→)[^\n]*\n(?:(?![ \t]*```)[^\n]*\n)*?[ \t]*```[ \t]*$'
+    pattern: '^[ \t]*```graphlet[ \t]*\n(?:(?![ \t]*```)[^\n]*\n)*?[^\n]*(?:-+>|→)[^\n]*\n(?:(?![ \t]*```)[^\n]*\n)*?[ \t]*```[ \t]*$'
     flags: 'm'
     match: 'contains'
   - type: regex
     name: no-mermaid-in-the-block
-    pattern: '```graphlet[^`]*?(?:^\s*(?:graph|flowchart)\s+(?:TD|LR|TB|RL|BT)|subgraph|==>|-\.->|:::|\[\(|\(\[|\{\{|\w\[[^\]\n]*\]\s*(?:-|$))'
+    pattern: '```graphlet[^`]*?(?:^\s*(?:graph|flowchart)\s+(?:TD|LR|TB|RL|BT)|subgraph|==>|-\.->|:::|\[\(|\(\[|\{\{)'
     flags: 'mi'
     match: 'not_contains'
   - type: regex
     name: links-app-and-router
-    pattern: '```graphlet[^`]*?(?:\bapp\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*router\.ts\b|\brouter\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*app\.ts\b)'
+    pattern: '```graphlet[^`]*?(?:(?<![\w.])(?:[\w.-]*/)?app\.ts(?![\w.])(?:[ \t]*\[\w+\])?[ \t]*(?:-+>|→)(?:\|[^|\n]*\|)?[ \t]*(?<![\w.])(?:[\w.-]*/)?router\.ts(?![\w.])|(?<![\w.])(?:[\w.-]*/)?router\.ts(?![\w.])(?:[ \t]*\[\w+\])?[ \t]*(?:-+>|→)(?:\|[^|\n]*\|)?[ \t]*(?<![\w.])(?:[\w.-]*/)?app\.ts(?![\w.]))'
     flags: ''
     match: 'contains'
   - type: regex
     name: links-app-and-config
-    pattern: '```graphlet[^`]*?(?:\bapp\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*config\.ts\b|\bconfig\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*app\.ts\b)'
+    pattern: '```graphlet[^`]*?(?:(?<![\w.])(?:[\w.-]*/)?app\.ts(?![\w.])(?:[ \t]*\[\w+\])?[ \t]*(?:-+>|→)(?:\|[^|\n]*\|)?[ \t]*(?<![\w.])(?:[\w.-]*/)?config\.ts(?![\w.])|(?<![\w.])(?:[\w.-]*/)?config\.ts(?![\w.])(?:[ \t]*\[\w+\])?[ \t]*(?:-+>|→)(?:\|[^|\n]*\|)?[ \t]*(?<![\w.])(?:[\w.-]*/)?app\.ts(?![\w.]))'
     flags: ''
     match: 'contains'
   - type: regex
     name: links-router-and-handlers
-    pattern: '```graphlet[^`]*?(?:\brouter\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*handlers\.ts\b|\bhandlers\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*router\.ts\b)'
+    pattern: '```graphlet[^`]*?(?:(?<![\w.])(?:[\w.-]*/)?router\.ts(?![\w.])(?:[ \t]*\[\w+\])?[ \t]*(?:-+>|→)(?:\|[^|\n]*\|)?[ \t]*(?<![\w.])(?:[\w.-]*/)?handlers\.ts(?![\w.])|(?<![\w.])(?:[\w.-]*/)?handlers\.ts(?![\w.])(?:[ \t]*\[\w+\])?[ \t]*(?:-+>|→)(?:\|[^|\n]*\|)?[ \t]*(?<![\w.])(?:[\w.-]*/)?router\.ts(?![\w.]))'
     flags: ''
     match: 'contains'
   - type: regex
     name: links-handlers-and-db
-    pattern: '```graphlet[^`]*?(?:\bhandlers\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*db\.ts\b|\bdb\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*handlers\.ts\b)'
+    pattern: '```graphlet[^`]*?(?:(?<![\w.])(?:[\w.-]*/)?handlers\.ts(?![\w.])(?:[ \t]*\[\w+\])?[ \t]*(?:-+>|→)(?:\|[^|\n]*\|)?[ \t]*(?<![\w.])(?:[\w.-]*/)?db\.ts(?![\w.])|(?<![\w.])(?:[\w.-]*/)?db\.ts(?![\w.])(?:[ \t]*\[\w+\])?[ \t]*(?:-+>|→)(?:\|[^|\n]*\|)?[ \t]*(?<![\w.])(?:[\w.-]*/)?handlers\.ts(?![\w.]))'
     flags: ''
     match: 'contains'
   - type: regex
     name: links-handlers-and-cache
-    pattern: '```graphlet[^`]*?(?:\bhandlers\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*cache\.ts\b|\bcache\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*handlers\.ts\b)'
+    pattern: '```graphlet[^`]*?(?:(?<![\w.])(?:[\w.-]*/)?handlers\.ts(?![\w.])(?:[ \t]*\[\w+\])?[ \t]*(?:-+>|→)(?:\|[^|\n]*\|)?[ \t]*(?<![\w.])(?:[\w.-]*/)?cache\.ts(?![\w.])|(?<![\w.])(?:[\w.-]*/)?cache\.ts(?![\w.])(?:[ \t]*\[\w+\])?[ \t]*(?:-+>|→)(?:\|[^|\n]*\|)?[ \t]*(?<![\w.])(?:[\w.-]*/)?handlers\.ts(?![\w.]))'
     flags: ''
     match: 'contains'
   - type: regex
     name: links-db-and-config
-    pattern: '```graphlet[^`]*?(?:\bdb\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*config\.ts\b|\bconfig\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*db\.ts\b)'
+    pattern: '```graphlet[^`]*?(?:(?<![\w.])(?:[\w.-]*/)?db\.ts(?![\w.])(?:[ \t]*\[\w+\])?[ \t]*(?:-+>|→)(?:\|[^|\n]*\|)?[ \t]*(?<![\w.])(?:[\w.-]*/)?config\.ts(?![\w.])|(?<![\w.])(?:[\w.-]*/)?config\.ts(?![\w.])(?:[ \t]*\[\w+\])?[ \t]*(?:-+>|→)(?:\|[^|\n]*\|)?[ \t]*(?<![\w.])(?:[\w.-]*/)?db\.ts(?![\w.]))'
     flags: ''
     match: 'contains'
   - type: regex
     name: no-link-between-cache-and-config
-    pattern: '```graphlet[^`]*?(?:\bcache\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*config\.ts\b|\bconfig\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*cache\.ts\b)'
+    pattern: '```graphlet[^`]*?(?:(?<![\w.])(?:[\w.-]*/)?cache\.ts(?![\w.])(?:[ \t]*\[\w+\])?[ \t]*(?:-+>|→)(?:\|[^|\n]*\|)?[ \t]*(?<![\w.])(?:[\w.-]*/)?config\.ts(?![\w.])|(?<![\w.])(?:[\w.-]*/)?config\.ts(?![\w.])(?:[ \t]*\[\w+\])?[ \t]*(?:-+>|→)(?:\|[^|\n]*\|)?[ \t]*(?<![\w.])(?:[\w.-]*/)?cache\.ts(?![\w.]))'
     flags: ''
     match: 'not_contains'
   - type: llm

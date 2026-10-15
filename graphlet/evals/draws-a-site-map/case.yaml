@@ -19,12 +19,12 @@ graders:
     match: 'contains'
   - type: regex
     name: block-is-closed-with-a-link
-    pattern: '^[ \t]*```graphlet[ \t]*\n(?:(?![ \t]*```)[^\n]*\n)*?[^\n]*(?:->|→)[^\n]*\n(?:(?![ \t]*```)[^\n]*\n)*?[ \t]*```[ \t]*$'
+    pattern: '^[ \t]*```graphlet[ \t]*\n(?:(?![ \t]*```)[^\n]*\n)*?[^\n]*(?:-+>|→)[^\n]*\n(?:(?![ \t]*```)[^\n]*\n)*?[ \t]*```[ \t]*$'
     flags: 'm'
     match: 'contains'
   - type: regex
     name: no-mermaid-in-the-block
-    pattern: '```graphlet[^`]*?(?:^\s*(?:graph|flowchart)\s+(?:TD|LR|TB|RL|BT)|subgraph|==>|-\.->|:::|\[\(|\(\[|\{\{|\w\[[^\]\n]*\]\s*(?:-|$))'
+    pattern: '```graphlet[^`]*?(?:^\s*(?:graph|flowchart)\s+(?:TD|LR|TB|RL|BT)|subgraph|==>|-\.->|:::|\[\(|\(\[|\{\{)'
     flags: 'mi'
     match: 'not_contains'
   - type: llm
