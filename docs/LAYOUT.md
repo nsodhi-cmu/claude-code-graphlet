@@ -41,9 +41,10 @@ In an undirected graph, a line has no arrowheads to tell the boxes it leaves fro
 `layTracks` gives each bundle a track.
 
 - Two bundles share a track only where their runs do not meet.
-- A bundle that comes down a column to its track goes above a bundle that goes down the same column from its own, so that the two never run into one line. Where bundles ask that of each other in a ring, one of them is not given it, and the two do share a stretch of that column.
+- A bundle that comes down a column to its track goes above a bundle that goes down the same column from its own, so that the two never run into one line.
+- Where bundles ask that of each other in a ring, no order of tracks gives them all it. One of the ring is then cut in two at a jog: a column between where it must go under the bundle before it and where it must go over the bundle after it, that no wire of the channel comes down or up. Each half keeps the wires on its side and takes a track of its own, and the bundle steps from one to the other down the jog, crossing what lies between. A bundle is cut once at most; where no bundle of a ring can be cut, one of the ring is not given its place, and the two share a stretch of that column.
 - Of the bundles that may go on a track, the ones that cross the rest least from there go first.
-- Where the two shelves of a channel are laid out across different columns, they slide apart under a window, and what does not meet as laid out may once they have slid. There no two bundles share a track, and each time the window moves the bundles are given their tracks again as the shelves now stand.
+- Where the two shelves of a channel are laid out across different columns, they slide apart under a window, and what does not meet as laid out may once they have slid. There no two bundles share a track as laid out, so the channel has rows enough for any window. Each time the window moves, the bundles are given their tracks again as the shelves now stand: there, bundles that do not meet share tracks again, and jogs are cut where rings now are, within the rows the channel has.
 
 Wires of different bundles that cross are painted as one passing over the other, so that a junction always means joined.
 

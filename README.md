@@ -189,7 +189,7 @@ It reads no file, stores nothing between sessions, calls no model, and makes no 
 - Layers run top to bottom only.
 - A graph's links are all directed or all undirected. One graph cannot mix the two.
 - A graph has at most 500 nodes and 500 links, and a pane holds one. What is past those is left out.
-- Where the links between two layers are too tangled to be kept apart, two of them may share a stretch of line. Selecting a node lights its own.
+- Where links between two layers must each pass over another and there is no free column to step one aside at, two of them may share a stretch of line. Selecting a node lights its own.
 - A label is drawn one cell a character, so a label written in characters two cells wide pushes its row out of line.
 
 ## License

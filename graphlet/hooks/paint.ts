@@ -134,8 +134,10 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
   const borderOfEnd = (end: End): number =>
     end.isAbove ? seen.yOf(layout.shelves[end.place.shelf]?.top ?? 0) + end.place.rows - 1 : below
 
+  const tracks = first + (channel.hasUpHeads ? 1 : 0)
   for (const wire of channel.wires) {
-    const turn = first + (channel.hasUpHeads ? 1 : 0) + wire.track
+    const turn = tracks + wire.track
+    const jog = wire.jog === null ? null : { x: seen.xOf(wire.from.place) + wire.jog.at, turn: tracks + wire.jog.track }
     const { out, into } = routeOf(wire, seen.xOf)
     const isLit = selected !== null && (wire.link.from === selected || wire.link.to === selected)
     const [start, end] = [borderOfEnd(wire.from), borderOfEnd(wire.to)]
@@ -145,18 +147,28 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
       const mark = marks.get(wire.bundle) ?? { ways: 0, isLit: false, isSolid: false }
       cells.set(`${x},${y}`, marks.set(wire.bundle, { ways: mark.ways | ways, isLit: mark.isLit || isLit, isSolid: mark.isSolid || !wire.isUp }))
     }
-    /** Marks a column of the wire between a border and its turn, the border's own row left to the box. */
-    const down = (x: number, border: number): void => {
-      const [high, low] = [Math.min(border, turn), Math.max(border, turn)]
+    /** Marks a column of the wire from row `from` to row `to`, leaving out row `skip`: a border's own row is the box's. */
+    const upright = (x: number, from: number, to: number, skip?: number): void => {
+      const [high, low] = [Math.min(from, to), Math.max(from, to)]
       for (let y = Math.max(high, 0); y <= Math.min(low, seen.rows - 1); y += 1) {
-        if (y !== border) draw(x, y, (y > high ? UP : 0) | (y < low ? DOWN : 0))
+        if (y !== skip) draw(x, y, (y > high ? UP : 0) | (y < low ? DOWN : 0))
       }
     }
-    down(out, start)
-    down(into, end)
-    const [left, right] = [Math.min(out, into), Math.max(out, into)]
-    for (let x = Math.max(left, 0); x <= Math.min(right, seen.columns - 1); x += 1) {
-      draw(x, turn, (x > left ? LEFT : 0) | (x < right ? RIGHT : 0))
+    /** Marks a row of the wire from column `from` to column `to`. */
+    const across = (from: number, to: number, y: number): void => {
+      const [left, right] = [Math.min(from, to), Math.max(from, to)]
+      for (let x = Math.max(left, 0); x <= Math.min(right, seen.columns - 1); x += 1) {
+        draw(x, y, (x > left ? LEFT : 0) | (x < right ? RIGHT : 0))
+      }
+    }
+    upright(out, start, turn, start)
+    upright(into, end, jog?.turn ?? turn, end)
+    if (jog === null) {
+      across(out, into, turn)
+    } else {
+      across(out, jog.x, turn)
+      upright(jog.x, turn, jog.turn)
+      across(jog.x, into, jog.turn)
     }
     /** Marks where the wire meets a box's border, at `x` on the border's row `y`. */
     const tick = ({ place, isAbove }: End, x: number, y: number): void => {
@@ -218,7 +230,7 @@ export function paint(layout: Layout, graph: Graph, selected: string | null, roo
 
   const hits = layout.shelves.flatMap(shelf => paintShelf(canvas, graph, shelf, selected, seen))
   for (const channel of layout.channels) {
-    if (channel.isLoose) layTracks(channel, seen.xOf)
+    if (channel.isLoose) layTracks(channel, seen.xOf, channel.rows - Number(channel.hasUpHeads) - Number(channel.hasDownHeads))
     paintChannel(canvas, graph, layout, channel, selected, seen)
   }
 

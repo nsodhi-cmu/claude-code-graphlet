@@ -136,10 +136,11 @@ export type End = { place: Place; isAbove: boolean; at: number }
  * it reaches, with an arrowhead there where that place is the link's own end
  * and the graph is directed. One that `isUp` runs against the flow. Where it
  * does not go straight across, it turns on the row of the channel that is its
- * `track`. It keeps `clearOf` the other ports of the face it leaves, of the
- * columns next to its own where it leaves with others, and in an undirected
- * graph of the columns next to the other ports, so that two ticks never
- * touch.
+ * `track`, and where its bundle runs on two tracks, steps across to the
+ * other at its `jog`. It keeps `clearOf` the other ports of the face it
+ * leaves, of the columns next to its own where it leaves with others, and in
+ * an undirected graph of the columns next to the other ports, so that two
+ * ticks never touch.
  */
 export type Wire = {
   link: GraphletLink
@@ -150,6 +151,8 @@ export type Wire = {
   /** Which of its channel's bundles it is of. */
   bundle: number
   track: number
+  /** Where it steps from its track to the one it arrives on: `at` columns along from the start of the place it leaves. */
+  jog: { at: number; track: number } | null
   clearOf: number[]
 }
 
@@ -195,7 +198,7 @@ export function routeOf(wire: Wire, xOf: (place: Place) => number): { out: numbe
 /** The wires of the channel under a shelf: the stretches that cross it, and the links between two nodes of that shelf. */
 function wiresOf(pieces: Piece[], flats: GraphletLink[], shelf: Shelf, placeOf: Map<Slot, Place>, isDirected: boolean): Wire[] {
   const wires: Wire[] = []
-  const rest = { bundle: 0, track: 0, clearOf: [] }
+  const rest = { bundle: 0, track: 0, jog: null, clearOf: [] }
   for (const piece of pieces) {
     const [upper, lower] = [placeOf.get(piece.upper), placeOf.get(piece.lower)]
     if (upper === undefined || lower === undefined) continue
@@ -412,55 +415,133 @@ function seat(shelf: Shelf, columns: number, beside: Place[], wires: Wire[]): vo
   for (const place of places) place.x += best
 }
 
+/** Where one end of a wire meets the run it turns on: its column, and whether it comes down to the run from above or up to it from below. */
+type Stop = { wire: Wire; isOut: boolean; x: number; isAbove: boolean; isTurning: boolean }
+
 /**
- * The track of each bundle, counted down from the channel's first, where
- * `xOf` puts each place. A bundle none of whose wires turns needs no track,
- * unless the channel `isLoose`: its two shelves slide apart, so what goes
- * straight as laid out may turn once they have slid. Two bundles share a
- * track only where their runs do not meet, and never in a loose channel. A
- * bundle that comes down a column to its track goes above one that goes down
- * the same column from its own, so that the two never run into one line;
- * where bundles ask that of each other in a ring, one of them is not given
- * it. Of the bundles that may go on a track, the ones that cross the rest
- * least from there go first.
+ * A stretch of track a bundle's wires turn on, from `start` to `end`: the
+ * whole bundle, or one of the two halves of it that meet at a jog. Its wires
+ * come down to it from above in the columns `fromAbove`, and up to it from
+ * below in the columns `fromBelow`.
  */
-function tracksOf(bundles: Wire[][], xOf: (place: Place) => number, isLoose: boolean): Map<Wire[], number> {
-  const laid = bundles
-    .flatMap(wires => {
-      const routes = wires.map(wire => ({ wire, ...routeOf(wire, xOf) }))
-      const turning = routes.filter(route => route.out !== route.into)
-      if (turning.length === 0 && !isLoose) return []
-      const columns = routes.flatMap(route => [route.out, route.into])
+type Run = { stops: Stop[]; start: number; end: number; jog: number | null; fromAbove: number[]; fromBelow: number[]; below: Set<number> }
+
+const runOf = (stops: Stop[], jog: number | null): Run => {
+  const columns = [...stops.map(stop => stop.x), ...(jog === null ? [] : [jog])]
+  const turning = stops.filter(stop => stop.isTurning)
+  return {
+    stops,
+    start: Math.min(...columns),
+    end: Math.max(...columns),
+    jog,
+    fromAbove: turning.filter(stop => stop.isAbove).map(stop => stop.x),
+    fromBelow: turning.filter(stop => !stop.isAbove).map(stop => stop.x),
+    below: new Set(turning.filter(stop => !stop.isAbove).map(stop => stop.x)),
+  }
+}
+
+/** Whether run `a` must go above run `b`: it comes down a column that `b` goes down from its own, so below it they would run into one line. */
+const asksAbove = (a: Run, b: Run): boolean => a.fromAbove.some(column => b.below.has(column))
+
+/** Runs that ask to go above one another in a ring, each above the next: none of them can be given it. */
+function ringOf(runs: Run[]): number[] | undefined {
+  const state = runs.map(() => 'new' as 'new' | 'open' | 'done')
+  const path: number[] = []
+  const follow = (a: number): number[] | undefined => {
+    state[a] = 'open'
+    path.push(a)
+    for (let b = 0; b < runs.length; b += 1) {
+      if (b === a || !asksAbove(runs[a] as Run, runs[b] as Run)) continue
+      if (state[b] === 'open') return path.slice(path.indexOf(b))
+      const ring = state[b] === 'new' ? follow(b) : undefined
+      if (ring !== undefined) return ring
+    }
+    path.pop()
+    state[a] = 'done'
+    return undefined
+  }
+  for (let a = 0; a < runs.length; a += 1) {
+    const ring = state[a] === 'new' ? follow(a) : undefined
+    if (ring !== undefined) return ring
+  }
+  return undefined
+}
+
+/**
+ * Breaks a ring by cutting one run of it in two at a jog: a column between
+ * where it must go below the run before it and where it must go above the run
+ * after it, that no wire of the channel comes down or up. The half on each
+ * side keeps the stops there, so the one goes above and the other below, and
+ * the jog joins them. A run already cut is not cut again. Answers whether it
+ * found a run to cut.
+ */
+function cutRing(runs: Run[], ring: number[], used: Set<number>): boolean {
+  for (const [index, at] of ring.entries()) {
+    const run = runs[at]
+    const [before, after] = [runs[ring.at(index - 1) ?? at], runs[ring[(index + 1) % ring.length] ?? at]]
+    if (run === undefined || before === undefined || after === undefined || run.jog !== null) continue
+    const unders = before.fromAbove.filter(column => run.below.has(column))
+    const overs = run.fromAbove.filter(column => after.below.has(column))
+    for (const under of unders) {
+      for (const over of overs) {
+        const middle = (under + over) / 2
+        const free = Array.from({ length: Math.abs(over - under) - 1 }, (_, step) => Math.min(under, over) + 1 + step)
+          .filter(column => !used.has(column))
+          .sort((a, b) => Math.abs(a - middle) - Math.abs(b - middle))[0]
+        if (free === undefined) continue
+        const isOverSide = (stop: Stop): boolean => (stop.x < free) === (over < free)
+        runs.splice(at, 1, runOf(run.stops.filter(isOverSide), free), runOf(run.stops.filter(stop => !isOverSide(stop)), free))
+        used.add(free)
+        return true
+      }
+    }
+  }
+  return false
+}
+
+/**
+ * The runs of a channel's bundles, each with its track counted down from the
+ * channel's first, where `xOf` puts each place. A bundle none of whose wires
+ * turns needs no track, unless the channel `isLoose`: its two shelves slide
+ * apart, so what goes straight as laid out may turn once they have slid. Two
+ * runs share a track only where they do not meet, and never in a loose
+ * channel. A run that comes down a column to its track goes above one that
+ * goes down the same column from its own, so that the two never run into one
+ * line; where runs ask that of each other in a ring, one of them is cut in two
+ * at a jog, and where none can be, one of the ring is not given it; where
+ * every run has a track of its own, no more are cut than `most` tracks allow.
+ * Of the
+ * runs that may go on a track, the ones that cross the rest least from there
+ * go first.
+ */
+function tracksOf(bundles: Wire[][], xOf: (place: Place) => number, isLoose: boolean, most: number): Map<Run, number> {
+  const routes = new Map(bundles.flat().map(wire => [wire, routeOf(wire, xOf)]))
+  const used = new Set([...routes.values()].flatMap(route => [route.out, route.into]))
+  const runs = bundles.flatMap(wires => {
+    const stops = wires.flatMap(wire => {
+      const { out, into } = routes.get(wire) ?? { out: 0, into: 0 }
+      const isTurning = out !== into
       return [
-        {
-          wires,
-          start: Math.min(...columns),
-          end: Math.max(...columns),
-          fromAbove: turning.flatMap(route => [
-            ...(route.wire.from.isAbove ? [route.out] : []),
-            ...(route.wire.to.isAbove ? [route.into] : []),
-          ]),
-          fromBelow: turning.flatMap(route => [
-            ...(route.wire.from.isAbove ? [] : [route.out]),
-            ...(route.wire.to.isAbove ? [] : [route.into]),
-          ]),
-        },
+        { wire, isOut: true, x: out, isAbove: wire.from.isAbove, isTurning },
+        { wire, isOut: false, x: into, isAbove: wire.to.isAbove, isTurning },
       ]
     })
-    .sort((a, b) => a.start - b.start)
-  type Shape = (typeof laid)[number]
-  const leaving = laid.map(shape => new Set(shape.fromBelow))
-  const within = (columns: number[], shape: Shape): number =>
-    columns.filter(column => column > shape.start && column < shape.end).length
+    return stops.some(stop => stop.isTurning) || isLoose ? [runOf(stops, null)] : []
+  })
+  const canCut = (): boolean => !isLoose || runs.length < most
+  for (let ring = ringOf(runs); ring !== undefined && canCut() && cutRing(runs, ring, used); ring = ringOf(runs));
+
+  const laid = runs.sort((a, b) => a.start - b.start)
+  const within = (columns: number[], run: Run): number => columns.filter(column => column > run.start && column < run.end).length
   /** For each pair, whether the first asks to go above the second, and how many times they cross if it does. */
-  const asks = laid.map(a => laid.map((_, b) => a.fromAbove.some(column => leaving[b]?.has(column))))
+  const asks = laid.map(a => laid.map(b => asksAbove(a, b)))
   const crossings = laid.map(a => laid.map(b => within(b.fromAbove, a) + within(a.fromBelow, b)))
   const mustFollow = (a: number, b: number): boolean => asks[b]?.[a] === true && asks[a]?.[b] !== true
 
   const waiting = new Set(laid.keys())
   const held = laid.map((_, a) => [...waiting].filter(b => b !== a && mustFollow(a, b)).length)
   const cost = laid.map((_, a) => [...waiting].reduce((sum, b) => sum + (crossings[a]?.[b] ?? 0) - (crossings[b]?.[a] ?? 0), 0))
-  const tracks = new Map<Wire[], number>()
+  const tracks = new Map<Run, number>()
   for (let track = 0; waiting.size > 0; track += 1) {
     const free = [...waiting].filter(a => held[a] === 0)
     const first = [...waiting][0]
@@ -471,8 +552,8 @@ function tracksOf(bundles: Wire[][], xOf: (place: Place) => number, isLoose: boo
       if (row.length === 0 || (isClear && !isLoose)) row.push(a)
     }
     for (const a of row) {
-      const shape = laid[a]
-      if (shape !== undefined) tracks.set(shape.wires, track)
+      const run = laid[a]
+      if (run !== undefined) tracks.set(run, track)
       waiting.delete(a)
     }
     for (const a of row) {
@@ -486,13 +567,32 @@ function tracksOf(bundles: Wire[][], xOf: (place: Place) => number, isLoose: boo
 }
 
 /**
- * Gives each of a channel's wires its track, where `xOf` puts each place,
- * and answers how many tracks the channel has: one where its wires are
- * merged.
+ * Gives each of a channel's wires its track, where `xOf` puts each place, and
+ * where its bundle was cut in two, the jog it steps to the other half's track
+ * at; answers how many tracks the channel has, one where its wires are
+ * merged. Laid again `under` a window, a loose channel has only the tracks it
+ * was laid out with, but its runs are where the window shows them, so those
+ * that do not meet share tracks again, and only where that is still too many
+ * is each given its own, with no more cut than there is room for.
  */
-export function layTracks(channel: Channel, xOf: (place: Place) => number): number {
-  const tracks = tracksOf(channel.bundles, xOf, channel.isLoose)
-  for (const [wires, track] of tracks) for (const wire of wires) wire.track = track
+export function layTracks(channel: Channel, xOf: (place: Place) => number, under?: number): number {
+  const shared = under === undefined ? undefined : tracksOf(channel.bundles, xOf, false, Infinity)
+  const tracks =
+    shared !== undefined && under !== undefined && Math.max(0, ...shared.values()) < under
+      ? shared
+      : tracksOf(channel.bundles, xOf, channel.isLoose, under ?? Infinity)
+  const onto = new Map<Wire, { out?: Run; into?: Run }>()
+  for (const run of tracks.keys()) {
+    for (const stop of run.stops) onto.set(stop.wire, { ...onto.get(stop.wire), [stop.isOut ? 'out' : 'into']: run })
+  }
+  for (const wire of channel.wires) {
+    const { out, into } = onto.get(wire) ?? {}
+    wire.track = out === undefined ? wire.track : (tracks.get(out) ?? 0)
+    wire.jog =
+      out === undefined || into === undefined || out === into || into.jog === null
+        ? null
+        : { at: into.jog - xOf(wire.from.place), track: tracks.get(into) ?? 0 }
+  }
   return Math.max(0, ...tracks.values()) + 1
 }
 

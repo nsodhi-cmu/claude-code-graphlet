@@ -105,6 +105,32 @@ describe('the drawing', () => {
     ])
   })
 
+  test('where two bundles of links must each pass over the other, they step between rows at jogs, and never run into one line', () => {
+    const at = (id: string, layer: number) => ({ id, label: id, layer })
+    const graph = readGraph({
+      nodes: [at('a', 0), at('b', 0), at('c', 0), at('x', 1), at('y', 1), at('z', 1)],
+      links: [
+        { from: 'a', to: 'y' },
+        { from: 'b', to: 'x' },
+        { from: 'b', to: 'z' },
+        { from: 'c', to: 'y' },
+      ],
+    })
+    expect(graphRows(drawn(graph, null, { columns: 60, rows: 60 }))).toEqual([
+      '                 ┌─────┐  ┌─────┐  ┌─────┐',
+      '                 │  a  │  │  b  │  │  c  │',
+      '                 └──┬──┘  └──┬──┘  └──┬──┘',
+      '                    └───┐    │        │',
+      '                    ┌───│────┴───┐    │',
+      '                    │   └────┬───│────┘',
+      '                    │        │   └────┐',
+      '                    ▼        ▼        ▼',
+      '                 ┌─────┐  ┌─────┐  ┌─────┐',
+      '                 │  x  │  │  y  │  │  z  │',
+      '                 └─────┘  └─────┘  └─────┘',
+    ])
+  })
+
   test('a link past a layer runs straight down a lane beside that layer\'s boxes, to an arrowhead of its own on the node it reaches', () => {
     const graph = graphOf(['A', 'B', 'C', 'D', 'E'], [['A', 'B'], ['B', 'C'], ['A', 'C'], ['C', 'D'], ['A', 'D'], ['B', 'E'], ['E', 'D']])
     expect(graphRows(drawn(graph))).toEqual([
