@@ -2,7 +2,7 @@
 
 # graphlet
 
-graphlet is a Claude Code mod: a plugin whose hooks are TypeScript that Claude Code loads and runs itself. It draws graphs, nodes and the links between them, in the terminal. It is a library for other mods: it adds `$.graphlet` to the engine's interface, a mod that depends on it hands it a graph, and graphlet draws the graph inside that mod's pane and says what the person did to it. And Claude draws graphs with it: graphlet tells the model, in one section of the system prompt, that a fenced `graphlet` block in a reply is drawn, and draws each such block in the transcript.
+graphlet is a Claude Code mod: a plugin whose hooks are TypeScript that Claude Code loads and runs itself. It draws graphs, nodes and the links between them, in the terminal, for two kinds of user. Claude draws them in its replies: graphlet tells the model, in one section of the system prompt, that a fenced `graphlet` block in a reply is drawn, and draws each such block in the transcript. And other mods build on it: it adds `$.graphlet` to the engine's interface, a mod that depends on it hands it a graph, and graphlet draws the graph inside that mod's pane and says what the person did to it.
 
 ## Commands
 
