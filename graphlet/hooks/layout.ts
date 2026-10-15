@@ -50,6 +50,10 @@ const BOX_COLUMNS = 7
 export const GAP = 2
 /** The narrowest room a graph is laid out for: a box of the widest kind, and a little over. */
 export const LEAST_COLUMNS = 40
+/** How many times a folded layout that its boxes' ports still make wider than its room is folded again, narrower by as much as it overflowed. */
+const REFOLDS = 2
+/** The most nodes a graph is folded into its room for: folding more takes long, and makes a picture longer than a reply can hold. */
+const FOLDED_NODES = 150
 /** How far apart two ports of one face of a box are. */
 const PORT_STEP = 2
 /** The characters a long word may be broken after with nothing lost. */
@@ -68,20 +72,25 @@ export function wrap(label: string, columns: number, rows: number, word = column
   const lines: string[] = []
   let line = ''
   for (const next of label.split(' ')) {
-    let rest = charactersOf(next)
     if (line !== '' && sizeOf(line) + 1 + sizeOf(next) <= columns) {
       line = `${line} ${next}`
       continue
     }
     if (line !== '') lines.push(line)
-    while (sizeOf(rest.join('')) > word) {
-      const fits = fitting(rest, columns)
-      const last = Math.max(...[...BREAKS].map(mark => rest.slice(0, fits).lastIndexOf(mark)))
-      const cut = last > 0 ? last + 1 : fits
-      lines.push(rest.slice(0, cut).join(''))
-      rest = rest.slice(cut)
+    const characters = charactersOf(next)
+    const sizes = characters.map(sizeOf)
+    let [at, left] = [0, sizes.reduce((sum, size) => sum + size, 0)]
+    while (left > word) {
+      let [end, used] = [at, 0]
+      while (end < characters.length && (end === at || used + (sizes[end] ?? 0) <= columns)) used += sizes[end++] ?? 0
+      const fits = characters.slice(at, end)
+      const last = Math.max(...[...BREAKS].map(mark => fits.lastIndexOf(mark)))
+      const cut = at + (last > 0 ? last + 1 : fits.length)
+      lines.push(characters.slice(at, cut).join(''))
+      left -= sizes.slice(at, cut).reduce((sum, size) => sum + size, 0)
+      at = cut
     }
-    line = rest.join('')
+    line = characters.slice(at).join('')
   }
   if (line !== '') lines.push(line)
   if (lines.length <= rows) return lines
@@ -246,7 +255,7 @@ function wiresOf(pieces: Piece[], flats: GraphletLink[], shelf: Shelf, placeOf: 
  * the one way, with the flow or against it. Either way, wires with different
  * labels are never of one bundle, so that a label is true of every wire of
  * the line it is written beside. Kept apart, a wire that leaves a box for a
- * lane other wires reach too is a fan of its own, so that it meets the lane's
+ * lane that wires from elsewhere reach too is a fan of its own, so that it meets the lane's
  * others there without joining them to the box's other links.
  */
 function bundlesOf(wires: Wire[], links: Links, isDirected: boolean): Wire[][] {
@@ -256,10 +265,10 @@ function bundlesOf(wires: Wire[], links: Links, isDirected: boolean): Wire[][] {
     return `${ids.get(end.place)}${end.isAbove ? 'v' : '^'}`
   }
   const isAlone = (wire: Wire): boolean => links === 'separate' && !isDirected && wire.from.isAbove === wire.to.isAbove
-  const reaching = new Map<Place, number>()
-  for (const wire of wires) if ('lane' in wire.to.place.slot) reaching.set(wire.to.place, (reaching.get(wire.to.place) ?? 0) + 1)
-  /** Whether a wire leaves a box for a lane that other wires reach too, which it must reach on a line of its own. */
-  const isJoining = (wire: Wire): boolean => 'node' in wire.from.place.slot && (reaching.get(wire.to.place) ?? 0) > 1
+  const reaching = new Map<Place, Set<Place>>()
+  for (const wire of wires) if ('lane' in wire.to.place.slot) reaching.set(wire.to.place, new Set([...(reaching.get(wire.to.place) ?? []), wire.from.place]))
+  /** Whether a wire leaves a box for a lane that wires from elsewhere reach too, which it must reach on a line of its own. */
+  const isJoining = (wire: Wire): boolean => 'node' in wire.from.place.slot && (reaching.get(wire.to.place)?.size ?? 0) > 1
   const fans = new Map<string, { way: string; wires: Wire[] }>()
   for (const wire of wires.filter(wire => !isAlone(wire))) {
     const way = JSON.stringify([wire.isUp, labelOf(wire.link)])
@@ -666,7 +675,10 @@ export function layTracks(channel: Channel, xOf: (place: Place) => number, under
 /**
  * Lays a graph out. Where it is to `fold`, its layers are folded first into
  * as many as it takes for each to fit the room, a box and the room beside it
- * a node and a column and the room beside it a lane. Every face of every box
+ * a node and a column and the room beside it a lane; where the boxes' ports
+ * then make a shelf wider than the room after all, it is folded again into
+ * less room, as long as that makes it narrower. A graph of more than
+ * `FOLDED_NODES` nodes is laid out unfolded. Every face of every box
  * is dealt its ports. The longest shelf is seated first, in the middle of
  * what it is laid out across, then each other shelf against the one nearer it
  * where the two are laid out across the same columns. Pinned, that is the
@@ -676,15 +688,29 @@ export function layTracks(channel: Channel, xOf: (place: Place) => number, under
  */
 export function layoutOf(graph: Graph, room: Room, look: Look, fold = false): Layout {
   const columns = Math.max(room.columns, LEAST_COLUMNS)
-  /** The least a node's box is widened to for the labels of the links it may leave by, each beside a port of its own. */
+  if (!fold || graph.nodes.length > FOLDED_NODES) return laidOut(graph, columns, look)
+  const widestOf = (layout: Layout): number => Math.max(0, ...layout.shelves.map(shelf => shelf.width))
+  let [into, layout] = [columns, laidOut(graph, columns, look, columns)]
+  for (let tries = 0; tries < REFOLDS && widestOf(layout) > columns; tries += 1) {
+    into -= widestOf(layout) - columns
+    const narrower = laidOut(graph, columns, look, into)
+    if (widestOf(narrower) >= widestOf(layout)) break
+    layout = narrower
+  }
+  return layout
+}
+
+/** A graph laid out across `columns`, its layers first folded `into` so many where they are to be. */
+function laidOut(graph: Graph, columns: number, look: Look, into?: number): Layout {
+  /** How wide a node's box is at least for the labels of the links it may leave by, each beside a port of its own, with a gap after all but the last. */
   const writtenOf = (node: GraphletNode): number => {
-    const leaving = graph.links.filter(link => link.from === node.id || (!graph.isDirected && link.to === node.id))
+    const leaving = graph.links.filter(link => link.from !== link.to && (link.from === node.id || (!graph.isDirected && link.to === node.id)))
     const labels = [...new Set(leaving.map(labelOf).filter(text => text !== ''))]
-    return labels.length === 0 ? 0 : labels.reduce((sum, text) => sum + sizeOf(text) + 2, 0) + 3
+    return labels.length === 0 ? 0 : labels.reduce((sum, text) => sum + sizeOf(text) + 2, 0) + 1
   }
   const layers = layersOf(
     graph,
-    fold ? { columns, widthOf: node => Math.max(widthOf(wordsOf(graph, node, look.labels)), writtenOf(node)), gap: GAP } : undefined,
+    into === undefined ? undefined : { columns: into, widthOf: node => Math.max(widthOf(wordsOf(graph, node, look.labels)), writtenOf(node)), gap: GAP },
   )
   const placeOf = new Map<Slot, Place>()
   const shelves: Shelf[] = layers.slots.map((slots, shelf) => {

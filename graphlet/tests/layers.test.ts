@@ -209,7 +209,7 @@ describe('folding into a room', () => {
 
   test('a layer too wide for its room gives up the nodes it names last, each into the layer under it where it is joined to nothing there', () => {
     const graph = graphOf(['root', 'a', 'b', 'c', 'd', 'e', 'f'], [['root', 'a'], ['root', 'b'], ['root', 'c'], ['root', 'd'], ['root', 'e'], ['e', 'f']])
-    expect(folded(graph)).toEqual([['root'], ['a', 'b', 'e', 'root→c', 'root→d'], ['f', 'c', 'd']])
+    expect(folded(graph)).toEqual([['root'], ['a', 'b', 'e', 'root→c root→d'], ['f', 'c', 'd']])
   })
 
   test('where every node of the layer is joined to the layer under it, the nodes it gives up go to a layer put in between, and each layer under is folded in turn', () => {
@@ -219,38 +219,38 @@ describe('folding into a room', () => {
     )
     expect(folded(graph, 20)).toEqual([
       ['root'],
-      ['a', 'b', 'root→c', 'root→d'],
+      ['a', 'b', 'root→c root→d'],
       ['a→a1', 'b→b1', 'c', 'd'],
       ['a1', 'b1', 'c→c1', 'd→d1'],
       ['c1', 'd1'],
     ])
   })
 
-  test('folded into any room, every layer fits it that has a node it may give up, and no link that ran down or along a layer runs back up', () => {
+  test('folded into any room, no layer is wider than both the room and the widest layer unfolded, and no link that ran down or along a layer runs back up', () => {
     const next = numbers(17)
     const pick = (below: number): number => Math.floor(next() * below)
     for (let run = 0; run < 300; run += 1) {
-      const count = 2 + pick(24)
+      const count = 2 + pick(30)
       const graph = readGraph({
         nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: 'x'.repeat(1 + pick(20)) })),
         links: Array.from({ length: pick(count * 2) }, () => ({ from: `n${pick(count)}`, to: `n${pick(count)}` })),
         isDirected: pick(4) !== 0,
       })
       const room = { columns: 20 + pick(80), widthOf: (node: { label: string }) => node.label.length + 4, gap: 2 }
+      const widthOf = (layer: Slot[]): number => {
+        const nodes = layer.flatMap(slot => ('node' in slot ? [slot.node] : []))
+        return nodes.reduce((sum, node) => sum + room.widthOf(node), 0) + (layer.length - nodes.length) + (layer.length - 1) * room.gap
+      }
       const layerOf = (slots: Slot[][]): Map<string, number> =>
         new Map(slots.flatMap((layer, index) => layer.flatMap(slot => ('node' in slot ? [[slot.node.id, index] as const] : []))))
-      const layers = layersOf(graph, room).slots
-      const [before, after] = [layerOf(layersOf(graph).slots), layerOf(layers)]
+      const [plain, folded] = [layersOf(graph).slots, layersOf(graph, room).slots]
+      expect(Math.max(...folded.map(widthOf))).toBeLessThanOrEqual(Math.max(room.columns, ...plain.map(widthOf)))
+      const [before, after] = [layerOf(plain), layerOf(folded)]
       for (const link of graph.isDirected ? graph.links : []) {
         const [was, is] = [(before.get(link.to) ?? 0) - (before.get(link.from) ?? 0), (after.get(link.to) ?? 0) - (after.get(link.from) ?? 0)]
         expect(Math.sign(is) === Math.sign(was) || (was === 0 && is > 0)).toBe(true)
       }
-      for (const layer of layers) {
-        const nodes = layer.flatMap(slot => ('node' in slot ? [slot.node] : []))
-        const width = nodes.reduce((sum, node) => sum + room.widthOf(node), 0) + (layer.length - nodes.length) + (layer.length - 1) * room.gap
-        const isStuck = graph.isDirected && nodes.every(node => graph.links.some(link => link.from === node.id && link.to !== node.id && after.get(link.to) === after.get(node.id)))
-        if (nodes.length > 1 && !isStuck) expect(width).toBeLessThanOrEqual(room.columns)
-      }
     }
   })
+
 })

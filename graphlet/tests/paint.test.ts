@@ -166,18 +166,18 @@ describe('the drawing', () => {
     expect([...spansWith(lit, 'yes'), ...spansWith(lit, 'no'), ...spansWith(lit, 'retry')].map(span => span.paint)).toEqual(['accent', 'accent', 'plain'])
   })
 
-  test('a link past a layer runs straight down a lane beside that layer\'s boxes, to an arrowhead of its own on the node it reaches', () => {
+  test('links past a layer from one node run down one lane beside that layer\'s boxes, which branches where each of them leaves it', () => {
     const graph = graphOf(['A', 'B', 'C', 'D', 'E'], [['A', 'B'], ['B', 'C'], ['A', 'C'], ['C', 'D'], ['A', 'D'], ['B', 'E'], ['E', 'D']])
     expect(graphRows(drawn(graph))).toEqual([
       '              ┌─────┐',
       '              │  A  │',
       '              └──┬──┘',
-      '                 ├─────┬────┐',
-      '                 ▼     │    │',
-      '              ┌─────┐  │    │',
-      '              │  B  │  │    │',
-      '              └──┬──┘  │    │',
-      '             ┌───┴───┐ │    │',
+      '                 ├────────┐',
+      '                 ▼        │',
+      '              ┌─────┐     │',
+      '              │  B  │     │',
+      '              └──┬──┘     │',
+      '             ┌───┴───┐ ┌──┴─┐',
       '             ▼       ▼ ▼    │',
       '          ┌─────┐  ┌─────┐  │',
       '          │  E  │  │  C  │  │',

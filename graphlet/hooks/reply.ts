@@ -156,15 +156,14 @@ const after = (row: Span[], count: number): Span[] => {
 }
 
 /**
- * A graph drawn as a still picture in a room: no wider than its longest layer
- * needs, as tall as it needs, from its top left corner, with nothing selected.
+ * A graph drawn as a still picture in a room: laid out once in it, as tall as
+ * it needs, from its top left corner, with nothing selected.
  * Nothing in it answers a click, so its foot keeps only the counts of what is
  * out of view, and is left off where nothing is. The columns blank down the
  * whole of its left side are cut away.
  */
 export function pictureOf(view: View, graph: Graph, room: Room): Drawing {
-  const columns = Math.min(room.columns, view.measure(graph, room.columns).columns)
-  const drawing = view.draw(graph, null, { columns, rows: room.rows }, { x: 0, y: 0 })
+  const drawing = view.draw(graph, null, room, { x: 0, y: 0 })
   const foot = drawing.rows.at(-1)
   if (foot === undefined) return { rows: [], hits: [] }
   const corner = drawing.hits.find(hit => 'page' in hit)

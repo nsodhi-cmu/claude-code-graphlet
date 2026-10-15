@@ -170,7 +170,7 @@ const UNSEEN = /^[\p{Mn}\p{Me}\p{Cf}]+$/u
 export const sizeOf = (text: string): number =>
   charactersOf(text).reduce((sum, character) => sum + (WIDE.test(character) || PICTURE.test(character) ? 2 : UNSEEN.test(character) ? 0 : 1), 0)
 
-/** How many of a text's first characters fit in `cells`, and at least one. */
+/** How many of a text's first characters fit in `cells`, and at least one where it has any. */
 export function fitting(characters: string[], cells: number): number {
   let [count, used] = [0, 0]
   for (const character of characters) {
@@ -178,7 +178,7 @@ export function fitting(characters: string[], cells: number): number {
     used += sizeOf(character)
     count += 1
   }
-  return Math.max(1, Math.min(count, characters.length))
+  return Math.min(characters.length, Math.max(1, count))
 }
 
 /** A label cut to `max` cells from its middle, so that it keeps how it starts and how it ends. */

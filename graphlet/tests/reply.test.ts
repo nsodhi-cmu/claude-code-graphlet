@@ -144,24 +144,23 @@ test('a graph in a reply is drawn still, as narrow as its widest layer and again
   expect(drawing.hits).toEqual([])
 })
 
-test('a graph wider than its reply folds the nodes it names last onto a row of their own, and fits', () => {
+test('a graph wider than its reply folds the nodes it names last onto a row of their own, the links to them down one lane, and fits', () => {
   const ids = ['root', 'one', 'two', 'three', 'four', 'five', 'six', 'seven']
   const fan = graphNamed(ids, ids.slice(1).map(id => ['root', id] as [string, string]))
   expect(picture(pictureOf(still, fan, { columns: 50, rows: 1000 }))).toEqual([
-    '              ┌──────┐',
-    '              │ root │',
-    '              └───┬──┘',
-    '   ┌────────┬─────┴───┬──────────┬─────┬──┬──┐',
-    '   ▼        ▼         ▼          ▼     │  │  │',
-    '┌─────┐  ┌─────┐  ┌───────┐  ┌──────┐  │  │  │',
-    '│ one │  │ two │  │ three │  │ four │  │  │  │',
-    '└─────┘  └─────┘  └───────┘  └──────┘  │  │  │',
-    '                      ┌────────────────┘ ┌│──┘',
-    '                      │        ┌─────────│┘',
-    '                      ▼        ▼         ▼',
-    '                  ┌──────┐  ┌─────┐  ┌───────┐',
-    '                  │ five │  │ six │  │ seven │',
-    '                  └──────┘  └─────┘  └───────┘',
+    '                  ┌──────┐',
+    '                  │ root │',
+    '                  └───┬──┘',
+    '   ┌────────┬─────────┼──────────┬─────────┬─────┐',
+    '   ▼        ▼         ▼          ▼         ▼     │',
+    '┌─────┐  ┌─────┐  ┌───────┐  ┌──────┐  ┌──────┐  │',
+    '│ one │  │ two │  │ three │  │ four │  │ five │  │',
+    '└─────┘  └─────┘  └───────┘  └──────┘  └──────┘  │',
+    '                                   ┌─────────┬───┘',
+    '                                   ▼         ▼',
+    '                                ┌─────┐  ┌───────┐',
+    '                                │ six │  │ seven │',
+    '                                └─────┘  └───────┘',
   ])
 })
 

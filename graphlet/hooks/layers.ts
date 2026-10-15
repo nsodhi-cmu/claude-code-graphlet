@@ -274,39 +274,58 @@ export type Fold = { columns: number; widthOf: (node: GraphletNode) => number; g
 
 /**
  * The layers folded into a room: each layer too wide for it gives up a node
- * at a time, from the top down, until it fits or has one node left. A node
- * sinks into the layer under its own where it is joined to nothing there, and
- * else into a layer put in under its own for the nodes it gives up. Of those
- * that may go, the one joined to fewest nodes above it goes first, since such
- * a link may take a lane past the layer it leaves, and of those the one the
- * graph names last, so that the layer keeps the nodes named first. In a
- * directed graph a node that links to a node of its own layer stays, so that
- * no link turns back up for the fold.
+ * at a time, from the top down, until it fits, has one node left, or giving
+ * up none of those left would make it narrower, the lanes its links would
+ * take past the layer being as wide as the box. A node sinks into the layer
+ * under its own where it is joined to nothing there, and else into a layer
+ * put in under its own for the nodes it gives up; a node that may sink goes
+ * before one that may not, then the one joined to fewest nodes above it,
+ * since such a link may take a lane past the layer it leaves, and of those
+ * the one the graph names last, so that the layer keeps the nodes named
+ * first. In a directed graph a node that links to a node of its own layer
+ * stays, so that no link turns back up for the fold.
  */
 function folded(graph: Graph, ranks: Map<string, number>, fold: Fold): Map<string, number> {
   const folds = new Map(ranks)
   const links = graph.links.filter(link => link.from !== link.to)
   const rankOf = (id: string): number => folds.get(id) ?? 0
-  const othersOf = (id: string): number[] =>
-    links.flatMap(link => (link.from === id ? [rankOf(link.to)] : link.to === id ? [rankOf(link.from)] : []))
-  const lanesIn = (rank: number): number =>
-    new Set(
-      links
-        .filter(link => Math.min(rankOf(link.from), rankOf(link.to)) < rank && rank < Math.max(rankOf(link.from), rankOf(link.to)))
-        .map(link => `${graph.isDirected && rankOf(link.from) > rankOf(link.to)} ${towardOf(graph, link, folds)}`),
-    ).size
-  const nodesIn = (rank: number): GraphletNode[] => graph.nodes.filter(node => rankOf(node.id) === rank)
-  const fits = (nodes: GraphletNode[], lanes: number): boolean =>
-    nodes.reduce((sum, node) => sum + fold.widthOf(node), 0) + lanes + (nodes.length + lanes - 1) * fold.gap <= fold.columns
+  const [joined, outward] = [new Map<string, string[]>(), new Map<string, string[]>()]
+  for (const link of links) {
+    joined.set(link.from, [...(joined.get(link.from) ?? []), link.to])
+    joined.set(link.to, [...(joined.get(link.to) ?? []), link.from])
+    outward.set(link.from, [...(outward.get(link.from) ?? []), link.to])
+  }
+  const othersOf = (id: string): number[] => (joined.get(id) ?? []).map(rankOf)
+  /** How many lanes the links passing a layer take there, shared as they are when the graph is laid in layers, but by this layer's links alone. */
+  const lanesIn = (ranks: Map<string, number>, rank: number): number => {
+    const passing = links.filter(link => Math.min(ranks.get(link.from) ?? 0, ranks.get(link.to) ?? 0) < rank && rank < Math.max(ranks.get(link.from) ?? 0, ranks.get(link.to) ?? 0))
+    const keyOf = (link: GraphletLink, end: 0 | 1): string =>
+      JSON.stringify([graph.isDirected && (ranks.get(link.from) ?? 0) > (ranks.get(link.to) ?? 0), link.label, end, endsOf(graph, link, ranks)[end]])
+    const bound = new Map<string, number>()
+    for (const link of passing) bound.set(keyOf(link, 1), (bound.get(keyOf(link, 1)) ?? 0) + 1)
+    const shared = [...bound.values()].filter(count => count > 1).length
+    return shared + new Set(passing.filter(link => (bound.get(keyOf(link, 1)) ?? 0) === 1).map(link => keyOf(link, 0))).size
+  }
+  const nodesIn = (ranks: Map<string, number>, rank: number): GraphletNode[] => graph.nodes.filter(node => ranks.get(node.id) === rank)
+  const widthIn = (ranks: Map<string, number>, rank: number): number => {
+    const [nodes, lanes] = [nodesIn(ranks, rank), lanesIn(ranks, rank)]
+    return nodes.reduce((sum, node) => sum + fold.widthOf(node), 0) + lanes + (nodes.length + lanes - 1) * fold.gap
+  }
   for (let rank = 0; rank <= Math.max(...folds.values()); rank += 1) {
-    for (let nodes = nodesIn(rank); nodes.length > 1 && !fits(nodes, lanesIn(rank)); nodes = nodesIn(rank)) {
-      const going = nodes
-        .filter(node => !graph.isDirected || !links.some(link => link.from === node.id && rankOf(link.to) === rank))
+    const kept = new Set<string>()
+    for (let width = widthIn(folds, rank); nodesIn(folds, rank).length > 1 && width > fold.columns; ) {
+      const going = nodesIn(folds, rank)
+        .filter(node => !kept.has(node.id) && (!graph.isDirected || !(outward.get(node.id) ?? []).some(to => rankOf(to) === rank)))
         .map(node => ({ node, above: othersOf(node.id).filter(other => other < rank).length, isFree: !othersOf(node.id).includes(rank + 1) }))
         .sort((a, b) => Number(b.isFree) - Number(a.isFree) || a.above - b.above || graph.nodes.indexOf(b.node) - graph.nodes.indexOf(a.node))[0]
       if (going === undefined) break
-      if (!going.isFree) for (const [id, at] of folds) if (at > rank) folds.set(id, at + 1)
-      folds.set(going.node.id, rank + 1)
+      const moved = new Map([...folds].map(([id, at]) => [id, !going.isFree && at > rank ? at + 1 : at]))
+      moved.set(going.node.id, rank + 1)
+      const narrower = widthIn(moved, rank)
+      if (narrower < width) {
+        for (const [id, at] of moved) folds.set(id, at)
+        width = narrower
+      } else kept.add(going.node.id)
     }
   }
   return folds
@@ -319,9 +338,46 @@ function folded(graph: Graph, ranks: Map<string, number>, fold: Fold): Map<strin
  */
 export type Slot = { node: GraphletNode } | { lane: GraphletLink[]; isUp: boolean }
 
-/** The node a link is bound for, which the links that share its lanes are all bound for: in an undirected graph, the lower of its two. */
-const towardOf = (graph: Graph, link: GraphletLink, ranks: Map<string, number>): string =>
-  graph.isDirected || (ranks.get(link.to) ?? 0) >= (ranks.get(link.from) ?? 0) ? link.to : link.from
+/** The two nodes of a link: the one it leaves and the one it is bound for; in an undirected graph, the higher and the lower. */
+const endsOf = (graph: Graph, link: GraphletLink, ranks: Map<string, number>): [string, string] =>
+  graph.isDirected || (ranks.get(link.to) ?? 0) >= (ranks.get(link.from) ?? 0) ? [link.from, link.to] : [link.to, link.from]
+
+/**
+ * The lane each link passes each layer between its ends in, as a key the
+ * links that share the lane have in common, from the layer under its higher
+ * end down. In a layer, the links that pass it the one way, with one label,
+ * bound for the same node share a lane, which carries what reaches that node
+ * from many; of the links that share no such lane anywhere, those from the
+ * same node share one, which carries what leaves it for many; and a link that
+ * shares with none has one of its own. Neither kind of lane says anything
+ * false: every link it carries goes to the one node, or comes from it; and a
+ * lane from a node feeds no lane others reach, where their lines would meet.
+ */
+function laneKeys(graph: Graph, ranks: Map<string, number>): Map<GraphletLink, string[]> {
+  const spans = graph.links.flatMap(link => {
+    const [from, to] = [ranks.get(link.from) ?? 0, ranks.get(link.to) ?? 0]
+    const layers = Array.from({ length: Math.max(0, Math.abs(from - to) - 1) }, (_, step) => Math.min(from, to) + 1 + step)
+    return link.from === link.to || layers.length === 0 ? [] : [{ link, layers, isUp: graph.isDirected && from > to, ends: endsOf(graph, link, ranks) }]
+  })
+  const count = (keys: string[], counts: Map<string, number>): void => {
+    for (const key of keys) counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  const [toward, from] = [new Map<string, number>(), new Map<string, number>()]
+  const towardKey = (span: (typeof spans)[number], layer: number): string => JSON.stringify([layer, span.isUp, span.link.label, 'to', span.ends[1]])
+  const fromKey = (span: (typeof spans)[number], layer: number): string => JSON.stringify([layer, span.isUp, span.link.label, 'from', span.ends[0]])
+  for (const span of spans) count(span.layers.map(layer => towardKey(span, layer)), toward)
+  const isBound = (span: (typeof spans)[number]): boolean => span.layers.some(layer => (toward.get(towardKey(span, layer)) ?? 0) > 1)
+  for (const span of spans) if (!isBound(span)) count(span.layers.map(layer => fromKey(span, layer)), from)
+  return new Map(
+    spans.map((span, index) => [
+      span.link,
+      span.layers.map(layer => {
+        const [bound, leaving] = [towardKey(span, layer), fromKey(span, layer)]
+        return (toward.get(bound) ?? 0) > 1 ? bound : !isBound(span) && (from.get(leaving) ?? 0) > 1 ? leaving : JSON.stringify([layer, index])
+      }),
+    ]),
+  )
+}
 
 /**
  * One stretch of a link, from a slot of one layer to a slot of the next. The
@@ -384,8 +440,8 @@ function sorted(layer: Slot[], beside: Slot[], pieces: Piece[]): Slot[] {
 
 /**
  * The graph in layers. A link between two layers that are not neighbors
- * passes a lane in each layer between them, after that layer's nodes, the one
- * lane there of all the links bound the same way for the same node. The
+ * passes a lane in each layer between them, after that layer's nodes, which
+ * it may share with links bound for the same node, or else from it. The
  * layers are then ordered against the layer above on the way down and the
  * layer below on the way back up, a few times over, and the ordering whose
  * stretches cross least is the one kept; with nothing crossing, every layer
@@ -401,6 +457,7 @@ export function layersOf(graph: Graph, fold?: Fold): Layers {
   const pieces: Piece[][] = Array.from({ length: Math.max(0, count - 1) }, () => [])
   const flats: GraphletLink[][] = Array.from({ length: count }, () => [])
   const lanes = new Map<string, Slot & { lane: GraphletLink[] }>()
+  const laneKeysOf = laneKeys(graph, ranks)
 
   for (const link of graph.links) {
     const [from, to] = [ranks.get(link.from) ?? 0, ranks.get(link.to) ?? 0]
@@ -413,8 +470,9 @@ export function layersOf(graph: Graph, fold?: Fold): Layers {
     const [first, last] = [Math.min(from, to), Math.max(from, to)]
     const bottom = slotOf.get(from > to ? link.from : link.to)
     let upper = slotOf.get(from > to ? link.to : link.from)
+    const keys = laneKeysOf.get(link) ?? []
     for (let layer = first; layer < last && upper !== undefined && bottom !== undefined; layer += 1) {
-      const key = `${layer + 1} ${isUp} ${towardOf(graph, link, ranks)}`
+      const key = keys[layer - first] ?? ''
       const lane = layer + 1 === last ? undefined : (lanes.get(key) ?? { lane: [], isUp })
       if (lane !== undefined && !lanes.has(key)) {
         lanes.set(key, lane)
