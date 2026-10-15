@@ -258,6 +258,37 @@ test('a click on a count scrolls the graph and selects nothing; the window stays
   await pane.unmount()
 })
 
+test('a drag from where no box is moves the graph with the pointer and selects nothing; the window stays where it is dropped', WITH_HOST, async ($, on) => {
+  world(on)
+  const pane = await mount($, 'free', NARROW)
+  const room = { columns: 44, rows: 40 }
+  const from = view.show(SHOP, 'src/price.ts', room, ORIGIN)
+  const shownAt = (x: number): string[] => picture(view.draw(SHOP, 'src/price.ts', room, view.scroll(SHOP, room, from, { x, y: 0 })))
+  const isFree = (x: number, y: number): boolean =>
+    [0, 6, 8, 10].every(by => !view.draw(SHOP, 'src/price.ts', room, view.scroll(SHOP, room, from, { x: by, y: 0 })).hits.some(hit => hit.x <= x && x < hit.x + hit.width && hit.y <= y && y < hit.y + hit.height))
+  const blank = { x: 20, y: 4 }
+  expect(isFree(blank.x, blank.y)).toBe(true)
+  await pane.pointer({ type: 'down', ...blank, button: 'left', in: 'graph' })
+  await pane.pointer({ type: 'move', x: blank.x - 6, y: blank.y, button: 'left', in: 'graph' })
+  expect(await rowsOf(pane)).toEqual(shownAt(6))
+  await pane.pointer({ type: 'move', x: blank.x - 10, y: blank.y, button: 'left', in: 'graph' })
+  await pane.pointer({ type: 'up', x: blank.x - 10, y: blank.y, button: 'left', in: 'graph' })
+  expect(await rowsOf(pane)).toEqual(shownAt(10))
+  expect((await said(pane)).heard).toEqual([])
+  await pane.redraw()
+  expect(await rowsOf(pane)).toEqual(shownAt(10))
+
+  await pane.pointer({ type: 'move', x: blank.x + 30, y: blank.y, in: 'graph' })
+  expect(await rowsOf(pane)).toEqual(shownAt(10))
+  await pane.pointer({ type: 'down', ...blank, button: 'left', in: 'graph' })
+  await pane.pointer({ type: 'move', x: blank.x + 4, y: blank.y, button: 'left', in: 'graph' })
+  await pane.pointer({ type: 'move', x: blank.x + 40, y: blank.y, in: 'graph' })
+  await pane.pointer({ type: 'down', ...blank, button: 'left', in: 'graph' })
+  await pane.pointer({ type: 'move', x: blank.x - 2, y: blank.y, button: 'left', in: 'graph' })
+  expect(await rowsOf(pane)).toEqual(shownAt(8))
+  await pane.unmount()
+})
+
 test('/ finds a node by its label as it is typed: the selection goes to the first found and return to the next, and what is typed there is not the owner\'s', WITH_HOST, async ($, on) => {
   world(on)
   const pane = await mount($, 'free')

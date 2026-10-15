@@ -143,7 +143,7 @@ A graph too large to take in has two more keys:
 
 ### A Graph Larger Than Its Room
 
-The nodes of a layer keep one order, whatever is selected. A layer longer than the room runs off its edge, a box the edge cuts ends in an ellipsis, and the last row counts the nodes out of view on each side. A node joined to the selected one that is out of view is named at the edge it lies past, `cart.ts ▸`, and a click on its name selects it. The graph scrolls when the selection moves out of view, and no farther than it takes to show the selected node and the start of the one past it. The wheel scrolls it without moving the selection, and so does a click on one of the counts.
+The nodes of a layer keep one order, whatever is selected. A layer longer than the room runs off its edge, a box the edge cuts ends in an ellipsis, and the last row counts the nodes out of view on each side. A node joined to the selected one that is out of view is named at the edge it lies past, `cart.ts ▸`, and a click on its name selects it. The graph scrolls when the selection moves out of view, and no farther than it takes to show the selected node and the start of the one past it. The wheel scrolls it without moving the selection, and so does a click on one of the counts, or a drag from where no box is.
 
 ### As A Web Page
 

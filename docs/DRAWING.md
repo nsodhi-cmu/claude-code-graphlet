@@ -88,6 +88,7 @@ A graph larger than its room is seen through a window, and never laid out again 
 - A shelf longer than the room runs off its edge, in the order it always has. A box the edge cuts ends there in an ellipsis.
 - `showIn` says where the window stands to show the selected node. A window that already shows the whole box stays where it is. One that does not moves just far enough to show the box, the wires above and below it, and the start of the boxes beside it, or as much of those as a small room leaves it.
 - `scrollIn` scrolls the window by cells, or by turns of the wheel, which go the way the graph has more rooms' worth out of view: along it, or down it.
+- A drag from a cell where no box or count is moves the window with the pointer, so the graph follows it, and the window stays where it is dropped.
 - Every shelf slides under the window together, each as far as its own end. With `scroll` at `pinned`, that leaves a shelf that fits the room where it is while a longer one slides, and the wires between the two follow. With `scroll` at `sheet`, the shelves move as one.
 
 ## Names At The Edge

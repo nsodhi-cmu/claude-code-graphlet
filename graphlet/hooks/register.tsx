@@ -23,6 +23,8 @@ const scrolled = new Map<string, Pan>()
 const focused = new Set<string>()
 /** What the person is typing to find, in each pane where they are finding a node. */
 const finding = new Map<string, string>()
+/** How far the person has dragged each pane's graph since the button went down, as far as it has scrolled the graph for, and in which drag. */
+const dragged = new Map<string, { grab: unknown; at: Pan }>()
 
 /** The nodes whose labels hold what is being found, in the graph's order: none while nothing is typed. */
 const foundIn = (graph: Graph, query: string): string[] =>
@@ -184,7 +186,16 @@ export const register: Register = (on, options) => {
     const at = held.get(e.requestId)
     if (at === undefined || typeof e.data !== 'object' || e.data === null) return next(e)
     const pane = e.requestId
-    const { node, by, key, page, isChord } = e.data as { node?: unknown; by?: unknown; key?: unknown; page?: unknown; isChord?: unknown }
+    const { node, by, drag, grab, isDropped, key, page, isChord } = e.data as {
+      node?: unknown
+      by?: unknown
+      drag?: unknown
+      grab?: unknown
+      isDropped?: unknown
+      key?: unknown
+      page?: unknown
+      isChord?: unknown
+    }
     const query = finding.get(pane)
     const typed = key === 'space' ? ' ' : typeof key === 'string' && isChord !== true && charactersOf(key).length === 1 ? key : undefined
     /** Selects a node, where it is one and not the selected one already, and draws the pane again either way. */
@@ -197,6 +208,12 @@ export const register: Register = (on, options) => {
       await $.graphlet.select({ pane, node })
     } else if (isPan(by)) {
       await $.graphlet.scroll({ pane, by })
+    } else if (isPan(drag)) {
+      const last = dragged.get(pane)
+      const before = last !== undefined && last.grab === grab ? last.at : ORIGIN
+      if (isDropped === true) dragged.delete(pane)
+      else dragged.set(pane, { grab, at: drag })
+      await $.graphlet.scroll({ pane, by: { x: before.x - drag.x, y: before.y - drag.y } })
     } else if (page === true) {
       await openPage($, pane, at.whole)
     } else if (query !== undefined && key === 'backspace' && query === '') {

@@ -79,6 +79,10 @@ The graph is drawn by a surface module, the only kind of element that receives a
 
 It calls `$.graphlet.key` with every other key, and with no key typed while finding. That method does nothing: a mod with keys of its own hooks `graphlet.key` to answer them.
 
+A drag from where no box is moves the graph with the pointer, as far as its window goes, and selects nothing; graphlet answers it itself. The surface posts how far the pointer has gone since the button went down, so a move lost when two fall in one frame is made up by the next. A move with no button held, after a release the terminal did not report, ends the drag where it is.
+
+The terminal reports the mouse only in Claude Code's fullscreen layout. On the main screen, as with `CLAUDE_CODE_NO_FLICKER=0` and in tmux by default, nothing is clicked or dragged.
+
 A turn of the wheel is not a key or a click. It reaches the pane, as `ui.scroll`, and the pane's owner passes it on:
 
 ```ts
