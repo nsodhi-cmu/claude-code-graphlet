@@ -10,6 +10,7 @@ graphlet is a Claude Code mod: a plugin whose hooks are TypeScript that Claude C
 claude plugin validate --strict ./graphlet    # what the engine would refuse to load
 claude plugin validate --strict .             # the marketplace manifest
 claude plugin test ./graphlet                 # every test, with no session and no model
+claude plugin eval ./graphlet --no-publish    # what the model writes, with the guide: calls the model, and costs
 claude --plugin-dir ./graphlet --plugin-dir <a mod that uses it>
 claude --plugin-dir ./graphlet                # Claude draws graphs in its replies
 ```

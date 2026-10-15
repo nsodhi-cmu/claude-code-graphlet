@@ -1,0 +1,24 @@
+schema_version: '1.0'
+name: writes-mermaid-when-asked
+description: 'A request for Mermaid gets Mermaid, not a graph block.'
+tags: [mermaid]
+execution:
+  prompt: |
+    Give me a Mermaid flowchart for a login flow: enter credentials, validate them, then show the dashboard or show an error.
+  max_turns: 3
+  timeout_seconds: 180
+  allowed_tools: []
+  env:
+    EVAL_GRAPHLET_GUIDE: '1'
+runs: 3
+graders:
+  - type: regex
+    name: writes-mermaid
+    pattern: '```mermaid'
+    flags: 'i'
+    match: 'contains'
+  - type: regex
+    name: writes-no-graph-block
+    pattern: '```graphlet'
+    flags: 'i'
+    match: 'not_contains'

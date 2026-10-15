@@ -6,7 +6,7 @@ Claude, the model in a session where graphlet is installed, draws a graph in a r
 
 A `prompt.compose` hook adds one section to the end of the system prompt, `graphlet:graphs`, on the session's side of the cache boundary. Its text is `GUIDE` in `reply.ts`: what a block looks like, an example, the tones, and when to write one and when not to. The example is itself a block that graphlet draws.
 
-The section is added wherever the session draws, that is, wherever `e.surfaces` names a surface. A run that draws nowhere, such as `claude -p`, gets no section, since a block there would reach the person as written.
+The section is added wherever the session draws, that is, wherever `e.surfaces` names a surface. A run that draws nowhere, such as `claude -p`, gets no section, since a block there would reach the person as written, unless the environment variable `EVAL_GRAPHLET_GUIDE` is `1`, as the evals set it, so that what the model writes with the guide can be measured.
 
 Where an organization manages Claude Code, the engine runs `prompt.compose` hooks only for the plugins the organization lists in managed settings. Unless graphlet is listed, the model there is not told, and graphlet still draws any block the model writes.
 
@@ -98,3 +98,16 @@ The engine offers the model two ways to draw. A plugin can register a tool with 
 - A block reads as what it is wherever it is not drawn: in an export, in `/copy`, and in the stored transcript, it is lines of arrows.
 
 What a tool would add is a result the model reads back, and a result in a run with no surface. The model wrote the graph it would read, and a run with no surface has nowhere to draw it.
+
+## Evaluating What The Model Writes
+
+`graphlet/evals/` is a suite for `claude plugin eval`, which runs the model on each case's prompt in a `claude -p` session with graphlet loaded, and grades its reply. Every case sets `EVAL_GRAPHLET_GUIDE` to `1`, so the session is told of graph blocks as a session that draws is. The cases are of three kinds:
+
+| Kind | Asks for | Graded on |
+| :- | :- | :- |
+| `draws-*` | something a graph answers: a flow, a state machine, files and their imports, a site map | a closed graph block with a link in it, no Mermaid in the block, and the graph being right: by a judge model's checklist, or for the imports by a pattern for each link |
+| `quiet-*` | something no graph answers: a language question, a poem, a one-line answer | no graph block |
+| `writes-mermaid-when-asked` | a Mermaid flowchart by name | a Mermaid block, and no graph block |
+
+The suite calls the model, as the person, and so costs what those calls cost. `--no-publish` keeps the report on the machine; `--runs 1` and `--max-cost-usd` keep a try small.
+

@@ -1,0 +1,19 @@
+schema_version: '1.0'
+name: quiet-on-a-one-liner
+description: 'A one-line coding answer gets no graph block.'
+tags: [quiet]
+execution:
+  prompt: |
+    How do I reverse a list in Python? One line is enough.
+  max_turns: 3
+  timeout_seconds: 180
+  allowed_tools: []
+  env:
+    EVAL_GRAPHLET_GUIDE: '1'
+runs: 3
+graders:
+  - type: regex
+    name: writes-no-graph-block
+    pattern: '```graphlet'
+    flags: 'i'
+    match: 'not_contains'

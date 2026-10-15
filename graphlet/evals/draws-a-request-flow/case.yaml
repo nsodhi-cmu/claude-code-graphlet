@@ -1,0 +1,32 @@
+schema_version: '1.0'
+name: draws-a-request-flow
+description: 'A flow through stages is answered with a graph block.'
+tags: [draw]
+execution:
+  prompt: |
+    Briefly, how does a web request move through an Express app with auth middleware, a router, a controller, and a database, and back out as a response?
+  max_turns: 3
+  timeout_seconds: 180
+  allowed_tools: []
+  env:
+    EVAL_GRAPHLET_GUIDE: '1'
+runs: 3
+graders:
+  - type: regex
+    name: writes-a-graph-block
+    pattern: '^[ \t]*```graphlet[ \t]*$'
+    flags: 'm'
+    match: 'contains'
+  - type: regex
+    name: block-is-closed-with-a-link
+    pattern: '^[ \t]*```graphlet[ \t]*\n(?:(?![ \t]*```)[^\n]*\n)*?[^\n]*(?:->|→)[^\n]*\n(?:(?![ \t]*```)[^\n]*\n)*?[ \t]*```[ \t]*$'
+    flags: 'm'
+    match: 'contains'
+  - type: regex
+    name: no-mermaid-in-the-block
+    pattern: '```graphlet[^`]*?(?:-->\||\|[^|\n]+\||^\s*(?:graph|flowchart)\s+(?:TD|LR|TB|RL|BT)|subgraph|==>|-\.->|:::|\[\(|\(\[|\{\{)'
+    flags: 'mi'
+    match: 'not_contains'
+  - type: llm
+    name: graph-answers-the-question
+    criteria: 'Judge only the graph in the ```graphlet block. PASS if all of these hold: (1) it has nodes for the auth middleware, the router, the controller and the database; (2) following its -> links from the auth step leads to the router, then to the controller, then to the database, though other nodes, such as a decision, may stand between them; (3) some link leads to a response or back to the client. FAIL if any does not hold.'

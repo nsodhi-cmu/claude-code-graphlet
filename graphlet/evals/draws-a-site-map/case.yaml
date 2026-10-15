@@ -1,0 +1,32 @@
+schema_version: '1.0'
+name: draws-a-site-map
+description: 'The pages of a website and their links are answered with a graph block.'
+tags: [draw]
+execution:
+  prompt: |
+    Sketch the structure of a small personal website: a home page linking to an about page, a projects page with two project pages under it, a blog with a couple of posts, and a contact page.
+  max_turns: 3
+  timeout_seconds: 180
+  allowed_tools: []
+  env:
+    EVAL_GRAPHLET_GUIDE: '1'
+runs: 3
+graders:
+  - type: regex
+    name: writes-a-graph-block
+    pattern: '^[ \t]*```graphlet[ \t]*$'
+    flags: 'm'
+    match: 'contains'
+  - type: regex
+    name: block-is-closed-with-a-link
+    pattern: '^[ \t]*```graphlet[ \t]*\n(?:(?![ \t]*```)[^\n]*\n)*?[^\n]*(?:->|→)[^\n]*\n(?:(?![ \t]*```)[^\n]*\n)*?[ \t]*```[ \t]*$'
+    flags: 'm'
+    match: 'contains'
+  - type: regex
+    name: no-mermaid-in-the-block
+    pattern: '```graphlet[^`]*?(?:-->\||\|[^|\n]+\||^\s*(?:graph|flowchart)\s+(?:TD|LR|TB|RL|BT)|subgraph|==>|-\.->|:::|\[\(|\(\[|\{\{)'
+    flags: 'mi'
+    match: 'not_contains'
+  - type: llm
+    name: graph-answers-the-question
+    criteria: 'Judge only the graph in the ```graphlet block. PASS if all of these hold: (1) its -> links run from the home page to the about, projects, blog and contact pages; (2) from the projects page to two project pages; (3) from the blog to at least two posts; (4) every label is a few words. Extra links, such as pages linking back home, are allowed. FAIL if any does not hold.'

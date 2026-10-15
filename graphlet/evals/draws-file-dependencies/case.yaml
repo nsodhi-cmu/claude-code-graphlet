@@ -1,0 +1,68 @@
+schema_version: '1.0'
+name: draws-file-dependencies
+description: 'Dependencies between files are answered with a graph block that has the right links.'
+tags: [draw]
+execution:
+  prompt: |
+    In my project, app.ts imports router.ts and config.ts; router.ts imports handlers.ts; handlers.ts imports db.ts and cache.ts; and db.ts imports config.ts.
+    Which files are affected if I change config.ts? Show me how they depend on each other.
+  max_turns: 3
+  timeout_seconds: 180
+  allowed_tools: []
+  env:
+    EVAL_GRAPHLET_GUIDE: '1'
+runs: 3
+graders:
+  - type: regex
+    name: writes-a-graph-block
+    pattern: '^[ \t]*```graphlet[ \t]*$'
+    flags: 'm'
+    match: 'contains'
+  - type: regex
+    name: block-is-closed-with-a-link
+    pattern: '^[ \t]*```graphlet[ \t]*\n(?:(?![ \t]*```)[^\n]*\n)*?[^\n]*(?:->|→)[^\n]*\n(?:(?![ \t]*```)[^\n]*\n)*?[ \t]*```[ \t]*$'
+    flags: 'm'
+    match: 'contains'
+  - type: regex
+    name: no-mermaid-in-the-block
+    pattern: '```graphlet[^`]*?(?:-->\||\|[^|\n]+\||^\s*(?:graph|flowchart)\s+(?:TD|LR|TB|RL|BT)|subgraph|==>|-\.->|:::|\[\(|\(\[|\{\{)'
+    flags: 'mi'
+    match: 'not_contains'
+  - type: regex
+    name: links-app-and-router
+    pattern: '```graphlet[^`]*?(?:\bapp\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*router\.ts\b|\brouter\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*app\.ts\b)'
+    flags: ''
+    match: 'contains'
+  - type: regex
+    name: links-app-and-config
+    pattern: '```graphlet[^`]*?(?:\bapp\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*config\.ts\b|\bconfig\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*app\.ts\b)'
+    flags: ''
+    match: 'contains'
+  - type: regex
+    name: links-router-and-handlers
+    pattern: '```graphlet[^`]*?(?:\brouter\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*handlers\.ts\b|\bhandlers\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*router\.ts\b)'
+    flags: ''
+    match: 'contains'
+  - type: regex
+    name: links-handlers-and-db
+    pattern: '```graphlet[^`]*?(?:\bhandlers\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*db\.ts\b|\bdb\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*handlers\.ts\b)'
+    flags: ''
+    match: 'contains'
+  - type: regex
+    name: links-handlers-and-cache
+    pattern: '```graphlet[^`]*?(?:\bhandlers\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*cache\.ts\b|\bcache\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*handlers\.ts\b)'
+    flags: ''
+    match: 'contains'
+  - type: regex
+    name: links-db-and-config
+    pattern: '```graphlet[^`]*?(?:\bdb\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*config\.ts\b|\bconfig\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*db\.ts\b)'
+    flags: ''
+    match: 'contains'
+  - type: regex
+    name: no-link-between-cache-and-config
+    pattern: '```graphlet[^`]*?(?:\bcache\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*config\.ts\b|\bconfig\.ts(?:[ \t]*\[\w+\])?[ \t]*(?:->|→)[ \t]*cache\.ts\b)'
+    flags: ''
+    match: 'not_contains'
+  - type: llm
+    name: says-what-a-change-reaches
+    criteria: 'PASS if the reply says that changing config.ts affects app.ts, router.ts, handlers.ts and db.ts, and does not affect cache.ts. FAIL otherwise.'

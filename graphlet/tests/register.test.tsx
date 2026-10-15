@@ -515,3 +515,11 @@ test('the model is told of graph blocks wherever the session draws, and not in a
   expect((await compose(['mobile'])).sections.map(section => section.id)).toEqual(['intro', 'graphlet:graphs'])
   expect((await compose([])).sections).toEqual([intro])
 })
+
+test('a run that draws nowhere is told of graph blocks where EVAL_GRAPHLET_GUIDE is 1, so what the model writes can be evaluated', async ($, on) => {
+  const intro = { id: 'intro', text: 'You are Claude Code.', scope: 'shared' as const }
+  on('prompt.compose', () => ({ sections: [intro] }))
+  on('env.get', ($, e) => ({ value: e.name === 'EVAL_GRAPHLET_GUIDE' ? '1' : undefined }))
+  const composed = await $.prompt.compose({ model: 'claude', promptModel: 'claude', surfaces: [], tools: [], outputStyle: null, traits: [] })
+  expect(composed.sections).toEqual([intro, { id: 'graphlet:graphs', text: GUIDE, scope: 'session' }])
+})

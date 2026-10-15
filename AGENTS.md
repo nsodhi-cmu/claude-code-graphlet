@@ -15,6 +15,7 @@
 - `graphlet/hooks/register.tsx` is the only file that touches the engine. `graphlet/hooks/surface.tsx` is the surface module: it paints what it is handed and posts what the person did, and decides nothing. Every other file in `graphlet/hooks/` is pure: data in, data out, with nothing awaited.
 - `graphlet/types/index.d.ts` is the mod's contract: the types of a graph, and what the mod adds to `$`. It imports nothing.
 - Tests live in `graphlet/tests/`, one file for each file of `graphlet/hooks/` it tests, beside a shared `fixture.ts`.
+- Evals live in `graphlet/evals/`, a folder a case, each with its `case.yaml`. They run the model, so they cost money and are run by hand, never by the tests. Their results, `graphlet/evals/results/`, are never committed.
 - `graphlet/.claude-plugin/types/` is written by Claude Code and is never edited or committed.
 
 # Style

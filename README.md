@@ -164,6 +164,7 @@ A graph is read leniently, put in layers, laid out, and painted through a window
 claude plugin validate --strict ./graphlet    # what the engine would refuse, before a session finds out
 claude plugin validate --strict .             # the marketplace manifest
 claude plugin test ./graphlet                 # the tests, with no session and no model
+claude plugin eval ./graphlet --no-publish    # how Claude uses graph blocks: runs the model, so it costs
 ```
 
 Each time Claude Code loads the mod from this folder it writes its own API types into `graphlet/.claude-plugin/types/`. `graphlet/tsconfig.json` includes them, so an editor or `tsc -p graphlet` checks the mod against the engine it runs on.
