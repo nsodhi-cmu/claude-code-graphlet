@@ -66,7 +66,7 @@ Ask for a correction -> Read the request
 ```
 ````
 
-The block is drawn in its place in the reply, with the person's settings, its links always kept separate. A tone in brackets colors its node, and words in pipes after an arrow, `->|yes|`, are written on its link. Where links have no direction, Claude writes them as `--`, drawn with no arrowheads, alone or among arrows. The picture fits the reply: a layer too wide for it is folded onto more rows. The picture is still: it does not scroll or take a selection, and a graph that cannot be folded narrow enough counts the nodes past its edge. Where graphlet draws no picture, the block becomes the same picture as plain text. The conversation keeps the block as Claude wrote it.
+The block is drawn in its place in the reply, with the person's settings, its links always kept separate. A tone in brackets colors its node, a label in bold, `**Valid?**`, is drawn in a heavy frame where not every label is, and words in pipes after an arrow, `->|yes|`, are written on its link. Where links have no direction, Claude writes them as `--`, drawn with no arrowheads, alone or among arrows. The picture fits the reply: a layer too wide for it is folded onto more rows. The picture is still: it does not scroll or take a selection, and a graph that cannot be folded narrow enough counts the nodes past its edge. Where graphlet draws no picture, the block becomes the same picture as plain text. The conversation keeps the block as Claude wrote it.
 
 [docs/REPLIES.md](docs/REPLIES.md) has the block's syntax, what the model is told, and why it is a block and not a tool.
 
@@ -117,7 +117,7 @@ on('graphlet.select', async ($, e, next) => {
 })
 ```
 
-A link runs from one node to the other. Given `isDirected: false`, it only joins its two nodes, whichever it names first; a graph given `isDirected: false` has every link that does not say so join its nodes that way.
+A link runs from one node to the other. Given `isDirected: false`, it only joins its two nodes, whichever it names first; a graph given `isDirected: false` has every link that does not say so join its nodes that way. A node may say how much the graph is about it with a whole number, its `priority`, 0 when left out: the nodes of the highest, where that is above 0 and above another node's, are drawn in heavy frames; the first node of the highest is selected where neither the mod nor the person has picked one; and the layout keeps the links of nodes of higher priority straighter where that leaves the drawing's rows and bent links weighing no more.
 
 While developing, load both from disk: `claude --plugin-dir ./graphlet --plugin-dir ./my-mod`.
 
@@ -132,6 +132,7 @@ While developing, load both from disk: `claude --plugin-dir ./graphlet --plugin-
 - Lines that meet are joined: they leave the same box, or reach the same box. In an undirected graph, a line joins each box whose bottom it meets to each box whose top it meets, and a line that meets the bottoms of two boxes of one layer, and nothing else, joins those two. A link that only crosses another passes over it unbroken.
 - Words written beside a line, just past the box it leaves, are its label. A label is true of every link of the line it stands beside, since links with different labels never share a line.
 - `↺` in a box says the node links to itself.
+- A box with a heavy frame, `┏━┓`, is a node the graph is about: one of the nodes its graph gives the highest priority.
 - The selected node's box has a double frame, and its links, their labels, and the boxes they reach are lit.
 
 A click on a box selects its node. Once the graph has been clicked it has the keyboard, and the arrow keys, or `h` `j` `k` `l`, move the selection: left and right along a layer, up and down along a link.

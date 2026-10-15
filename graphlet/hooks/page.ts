@@ -1,7 +1,7 @@
 import type { GraphletNode, GraphletTone } from '../types'
 import { sizeOf } from './draw'
 import { layersOf } from './layers'
-import type { Graph, Link, Slot } from './layers'
+import type { Graph, Link, Node, Slot } from './layers'
 import { labelOf, linesOf } from './layout'
 
 // The page: a graph as one HTML document that draws it in SVG, in the layers
@@ -104,6 +104,9 @@ text { text-anchor: middle; fill: var(--ink); }
 .bad { --tone: var(--bad); }
 .box { fill: var(--box); stroke: var(--tone); stroke-width: 1.25; }
 .node:hover .box, .node:focus .box { stroke-width: 2; }
+.foremost .box { stroke-width: 2.5; }
+.foremost:hover .box, .foremost:focus .box { stroke-width: 3.25; }
+.foremost text { font-weight: bold; }
 .mark { fill: var(--tone); }
 .dim text, .badge { fill: var(--soft); }
 .badge { font-size: ${BADGE_SIZE}px; }
@@ -338,8 +341,8 @@ function arrowOf(link: Link, from: Spot, to: Spot, spots: Spot[], aside: number)
   return runOf(from, isUp ? lanes.toReversed() : lanes, to, isUp, short, aside)
 }
 
-/** A node as it is drawn: its box in its tone, and in it its mark, the lines of its label, and its badge. */
-function boxOf(node: GraphletNode, spot: Spot): string {
+/** A node as it is drawn: its box in its tone, heavy and its words bold where the graph puts it foremost, and in it its mark, the lines of its label, and its badge. */
+function boxOf(node: Node, spot: Spot): string {
   const tone = TONES.find(one => one === node.tone) ?? 'plain'
   const first = spot.y + (spot.height - (spot.lines.length - 1) * LINE_HEIGHT) / 2 + BASELINE
   const lines = spot.lines.map((line, index) => {
@@ -350,7 +353,7 @@ function boxOf(node: GraphletNode, spot: Spot): string {
     return `<tspan x="${middleOf(spot)}" y="${first + index * LINE_HEIGHT}">${mark}${label}${badge}</tspan>`
   })
   const box = `<rect class="box" x="${spot.x}" y="${spot.y}" width="${spot.width}" height="${spot.height}" rx="${BOX_RADIUS}"/>`
-  return `<g class="node ${tone}" tabindex="0">${box}<text>${lines.join('')}</text></g>`
+  return `<g class="node ${tone}${node.isForemost ? ' foremost' : ''}" tabindex="0">${box}<text>${lines.join('')}</text></g>`
 }
 
 /**

@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { LOOK, graphOf } from './fixture'
+import { LOOK, graphOf, numbers } from './fixture'
 import { readGraph } from '../hooks/layers'
 import type { Graph } from '../hooks/layers'
-import { layoutOf, wordsOf, wrap } from '../hooks/layout'
-import type { Layout } from '../hooks/layout'
+import { costOf, layoutOf, wordsOf, wrap } from '../hooks/layout'
+import type { Layout, Wire } from '../hooks/layout'
 
 const ROOM = { columns: 80, rows: 40 }
 const laid = (graph: Graph, look = LOOK): Layout => layoutOf(graph, ROOM, look)
@@ -121,6 +121,30 @@ describe('boxes on their shelves', () => {
     expect(pinned.shelves.map(shelf => shelf.across)).toEqual([pinned.shelves[0]?.width, 80])
     const sheet = laid(graph, { ...LOOK, scroll: 'sheet' })
     expect(sheet.shelves.map(shelf => shelf.across)).toEqual([sheet.shelves[0]?.width, sheet.shelves[0]?.width])
+  })
+
+  test('a graph\'s priorities never leave its seating weighing more than with none, and where they change it, its links of higher priority bend less', () => {
+    const next = numbers(41)
+    const pick = (below: number): number => Math.floor(next() * below)
+    /** Whether one list of numbers comes before another, the first that differs deciding. */
+    const isEarlier = (a: number[], b: number[]): boolean => {
+      const at = a.findIndex((one, index) => one !== b[index])
+      return at !== -1 && (a[at] ?? 0) < (b[at] ?? 0)
+    }
+    const seats = (layout: Layout): string => JSON.stringify(layout.shelves.map(shelf => shelf.places.map(place => place.x)))
+    for (let run = 0; run < 300; run += 1) {
+      const count = 3 + pick(12)
+      const nodes = Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: `node ${index}` }))
+      const links = Array.from({ length: count + pick(2 * count) }, () => ({ from: `n${pick(count)}`, to: `n${pick(count)}` }))
+      const ranked = readGraph({ nodes: nodes.map(node => (pick(3) === 0 ? { ...node, priority: pick(4) - 1 } : node)), links })
+      const priority = new Map(ranked.nodes.map(node => [node.id, node.priority ?? 0]))
+      const rankOf = (wire: Wire): number => Math.max(priority.get(wire.link.from) ?? 0, priority.get(wire.link.to) ?? 0)
+      const [mine, theirs] = [laid(ranked), laid(readGraph({ nodes, links }))]
+      const ranks = [...new Set(mine.channels.flatMap(channel => channel.wires.map(rankOf)))].sort((a, b) => b - a)
+      const [after, before] = [costOf(mine.channels, ranks, rankOf), costOf(theirs.channels, ranks, rankOf)]
+      expect(after.weight).toBeLessThanOrEqual(before.weight)
+      if (seats(mine) !== seats(theirs)) expect(isEarlier(after.ranked, before.ranked)).toBe(true)
+    }
   })
 
   test('a room narrower than the narrowest a graph is laid out for is taken to be that wide', () => {

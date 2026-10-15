@@ -52,6 +52,58 @@ describe('the drawing', () => {
     ])
   })
 
+  test('a node the graph puts foremost has a heavy frame, and its links leave and reach it through it', () => {
+    const graph = readGraph({
+      nodes: [{ id: 'A', label: 'A' }, { id: 'B', label: 'Build', priority: 1 }, { id: 'C', label: 'C' }],
+      links: [{ from: 'A', to: 'B' }, { from: 'B', to: 'C' }, { from: 'B', to: 'A' }, { from: 'C', to: 'B', isDirected: false }],
+    })
+    expect(graphRows(drawn(graph))).toEqual([
+      '                ┌─────┐',
+      '                │  A  │',
+      '                └─┬───┘',
+      '                  │ ▲',
+      '                  │ ┊',
+      '                  ▼ ┊',
+      '               ┏━━━━┷━━┓',
+      '               ┃ Build ┃',
+      '               ┗━━┯━┯━━┛',
+      '                  │ │',
+      '                  ▼ │',
+      '                ┌───┴─┐',
+      '                │  C  │',
+      '                └─────┘',
+    ])
+    expect(spansWith(drawn(graph), 'Build')).toMatchObject([{ isBold: true }])
+  })
+
+  test('a node whose links pull it two ways stands between them, unless the node at one end has the higher priority: then over it, so its link runs straight', () => {
+    const graph = (priority?: number): Graph =>
+      readGraph({
+        nodes: [{ id: 'valid', label: 'Valid?' }, { id: 'save', label: 'Save it', ...(priority === undefined ? {} : { priority }) }, { id: 'ask', label: 'Ask again' }],
+        links: [{ from: 'valid', to: 'save' }, { from: 'valid', to: 'ask' }],
+      })
+    expect(graphRows(drawn(graph()))).toEqual([
+      '              ┌────────┐',
+      '              │ Valid? │',
+      '              └────┬───┘',
+      '            ┌──────┴──────┐',
+      '            ▼             ▼',
+      '       ┌─────────┐  ┌───────────┐',
+      '       │ Save it │  │ Ask again │',
+      '       └─────────┘  └───────────┘',
+    ])
+    expect(graphRows(drawn(graph(1)))).toEqual([
+      '       ┌────────┐',
+      '       │ Valid? │',
+      '       └────┬───┘',
+      '            ├─────────────┐',
+      '            ▼             ▼',
+      '       ┏━━━━━━━━━┓  ┌───────────┐',
+      '       ┃ Save it ┃  │ Ask again │',
+      '       ┗━━━━━━━━━┛  └───────────┘',
+    ])
+  })
+
   test('a link that closes a loop runs back up dashed, down a lane past the layers between, to an arrowhead beside where the node\'s own links leave', () => {
     expect(graphRows(drawn(graphOf(['A', 'B', 'C'], [['A', 'B'], ['B', 'C'], ['C', 'A']])))).toEqual([
       '                ┌─────┐',
@@ -696,6 +748,29 @@ describe('what the window does not show', () => {
     expect(rows.filter(row => row.endsWith('│ …') || row.endsWith('Receipts ▸'))).toHaveLength(2)
   })
 
+  test('of the names that want one place at the edge, those of nodes of higher priority are written first', () => {
+    const fan = (priority?: number): Graph =>
+      readGraph({
+        nodes: [{ id: 'hub', label: 'Hub' }, ...['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'].map((label, index) => ({ id: label, label, ...(index === 4 && priority !== undefined ? { priority } : {}) }))],
+        links: ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'].map(to => ({ from: 'hub', to })),
+      })
+    const names = (graph: Graph): string[] => graphRows(viewOf(LOOK).draw(graph, 'hub', { columns: 40, rows: 6 }, ORIGIN))
+    expect(names(fan())).toEqual([
+      '                ╔═════╗',
+      '                ║ Hub ║',
+      '                ╚══╤══╝',
+      '    ┌──────────┬───┴───────┬───────────┬',
+      '    ▼ ▾ Alpha  ▼ ▾ Bravo   ▼ ▾ Charlie ▼',
+    ])
+    expect(names(fan(1))).toEqual([
+      '                ╔═════╗',
+      '                ║ Hub ║',
+      '                ╚══╤══╝',
+      '    ┌──────────┬───┴───────┬───────────┬',
+      '    ▼ ▾ Alpha  ▼ ▾ Bravo   ▼    ▾ Echo ▼',
+    ])
+  })
+
   test('a node the window shows, and any node while the selected one is out of view, is not named', () => {
     expect(boxes(viewOf(LOOK).draw(graph, 'Payments', WHOLE, ORIGIN)).map(hit => hit.node)).toEqual(graph.nodes.map(node => node.id))
     expect(boxes(viewOf(LOOK).draw(graph, 'Ledger', room, ORIGIN)).map(hit => hit.node)).toEqual(['Checkout', 'Cart', 'Payments', 'Shipping', 'Receipts'])
@@ -835,11 +910,11 @@ function readOff(
       if (lanes.has(key)) return
       if (box !== undefined) {
         if (x === box.x || x === box.x + box.width - 1) return
-        if (y === box.y + box.rows - 1 && '┬╤'.includes(char)) {
+        if (y === box.y + box.rows - 1 && '┬┯╤'.includes(char)) {
           ways.set(key, DOWN)
           ends.set(key, [{ node: box.node, channel: box.shelf, side: 'above' }])
           written.set(key, { node: box.node, text: wordsAt(x + 1, y + 1) })
-        } else if (y === box.y && '┴╧'.includes(char)) {
+        } else if (y === box.y && '┴┷╧'.includes(char)) {
           ways.set(key, UP)
           ends.set(key, [{ node: box.node, channel: box.shelf - 1, side: 'below' }])
           written.set(key, { node: box.node, text: wordsAt(x + 1, y - 1) })
@@ -957,6 +1032,8 @@ describe('what a picture says', () => {
   const next = numbers(31)
   const pick = (below: number): number => Math.floor(next() * below)
   const nameOf = (index: number): string => [`Validate the request ${index}`, `数据库 ${index}`, `✅ ${index}`][pick(4)] ?? `n${index}`
+  /** A priority for a node, now and then, so that some are put foremost and some placed first. */
+  const somePriority = (): { priority?: number } => (pick(4) === 0 ? { priority: pick(5) - 2 } : {})
   /** A link's own direction, now and then, so that a graph has links of both kinds. */
   const someWay = (): { isDirected?: boolean } => (pick(4) === 0 ? { isDirected: pick(2) === 0 } : {})
   /** A label for a link, now and then. */
@@ -966,7 +1043,7 @@ describe('what a picture says', () => {
     const count = 2 + pick(15)
     const links = Array.from({ length: pick(count * 2 + 2) }, () => [`n${pick(count)}`, `n${pick(count)}`])
     return readGraph({
-      nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: nameOf(index) })),
+      nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: nameOf(index), ...somePriority() })),
       links: [...links, ...links.filter(() => pick(3) === 0).map(([from, to]) => [to, from])].map(([from = '', to = '']) => ({ from, to, ...someLabel(), ...someWay() })),
       isDirected: pick(4) !== 0,
     })
@@ -975,7 +1052,7 @@ describe('what a picture says', () => {
   const crowdedGraph = (): Graph => {
     const count = 4 + pick(10)
     return readGraph({
-      nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: nameOf(index), layer: index < 2 ? 0 : pick(2 + pick(2)) })),
+      nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: nameOf(index), layer: index < 2 ? 0 : pick(2 + pick(2)), ...somePriority() })),
       links: Array.from({ length: count + pick(count) }, () => ({ from: `n${pick(count)}`, to: `n${pick(count)}`, ...someLabel(), ...someWay() })),
       isDirected: pick(5) !== 0,
     })
@@ -985,8 +1062,8 @@ describe('what a picture says', () => {
     const [top, bottom] = [2 + pick(3), 2 + pick(4)]
     return readGraph({
       nodes: [
-        ...Array.from({ length: top }, (_, index) => ({ id: `t${index}`, label: nameOf(index), layer: 0 })),
-        ...Array.from({ length: bottom }, (_, index) => ({ id: `b${index}`, label: nameOf(index), layer: 1 })),
+        ...Array.from({ length: top }, (_, index) => ({ id: `t${index}`, label: nameOf(index), layer: 0, ...somePriority() })),
+        ...Array.from({ length: bottom }, (_, index) => ({ id: `b${index}`, label: nameOf(index), layer: 1, ...somePriority() })),
       ],
       links: Array.from({ length: top + bottom + pick(top * bottom) }, () =>
         pick(2) === 0 ? { from: `t${pick(top)}`, to: `b${pick(bottom)}`, ...someLabel() } : { from: `b${pick(bottom)}`, to: `t${pick(top)}`, ...someLabel() },

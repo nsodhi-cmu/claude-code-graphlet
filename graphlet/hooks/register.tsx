@@ -7,7 +7,7 @@ import { readGraph } from './layers'
 import type { Graph } from './layers'
 import { pageOf } from './page'
 import { GUIDE, fencedOf, partsOf, pictureOf } from './reply'
-import { MOVES, focusOf, viewOf } from './view'
+import { MOVES, focusOf, leadOf, viewOf } from './view'
 
 /** What a pane holds, as it was last drawn: the graph it was given, the graph as drawn, the room, the selected node, and where its window stood. */
 type Held = { whole: Graph; graph: Graph; room: Room; selected: string | null; pan: Pan; drawing: Drawing }
@@ -105,7 +105,7 @@ export const register: Register = (on, options) => {
         const graph = readGraph(input.graph)
         const room = { columns: cellsOf(input.columns), rows: cellsOf(input.rows) }
         const wanted = input.selected ?? picked.get(input.pane)
-        const selected = graph.nodes.find(node => node.id === wanted)?.id ?? graph.nodes[0]?.id ?? null
+        const selected = graph.nodes.find(node => node.id === wanted)?.id ?? leadOf(graph)
         const before = held.get(input.pane)
         if (before?.selected !== selected) scrolled.delete(input.pane)
         const drawn = focused.has(input.pane) ? focusOf(graph, selected) : graph

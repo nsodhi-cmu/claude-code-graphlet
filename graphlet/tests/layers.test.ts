@@ -54,11 +54,21 @@ describe('reading a graph', () => {
       links: [],
     })
     expect(graph.nodes).toEqual([
-      { id: 'a', label: 'two lines and a tab', mark: '◆', tone: 'warn' },
-      { id: 'b', label: 'b' },
-      { id: 'c\nd', label: 'c d' },
-      { id: '  ', label: '·' },
+      { id: 'a', label: 'two lines and a tab', mark: '◆', tone: 'warn', isForemost: false },
+      { id: 'b', label: 'b', isForemost: false },
+      { id: 'c\nd', label: 'c d', isForemost: false },
+      { id: '  ', label: '·', isForemost: false },
     ])
+  })
+
+  test('a graph puts foremost the nodes of its highest priority, where that is above 0 and above another node\'s, and drops a priority that is no whole number', () => {
+    const read = (priorities: unknown[]) => readGraph({ nodes: priorities.map((priority, index) => ({ id: `n${index}`, label: 'n', priority: priority as number })), links: [] }).nodes
+    const foremost = (priorities: unknown[]): string[] => read(priorities).filter(node => node.isForemost).map(node => node.id)
+    expect(foremost([0, 2, 1, 2])).toEqual(['n1', 'n3'])
+    expect(foremost([0, -1, 0])).toEqual([])
+    expect(foremost([3, 3])).toEqual([])
+    expect(foremost([undefined, 1, 'high', Infinity, NaN])).toEqual(['n1'])
+    expect(read([0, 'high', -2, 2.5, -0]).map(node => node.priority)).toEqual([undefined, undefined, -2, undefined, undefined])
   })
 
   test('a graph is read up to the most nodes and the most links it may have, and what is left out is counted', () => {

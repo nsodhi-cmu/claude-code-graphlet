@@ -1,7 +1,7 @@
 import { beatOf, bounded, canvasOf, clipMiddle, footRow, leftOut, sizeOf, spansOf } from './draw'
 import type { Canvas, Drawing, Hit, Paint, Pan, Room } from './draw'
-import { isJoined } from './layers'
-import type { Graph, Link } from './layers'
+import { isJoined, priorityOf } from './layers'
+import type { Graph, Link, Node } from './layers'
 import { labelOf, layTracks, routeOf } from './layout'
 import type { Channel, End, Layout, Place, Shelf } from './layout'
 import { sightOf, slideOf, within } from './window'
@@ -19,8 +19,13 @@ type Frame = { corners: string; across: string; down: string; exits: { above: st
 
 const FRAMES = {
   plain: { corners: '┌┐└┘', across: '─', down: '│', exits: { above: '┴', below: '┬' } },
+  foremost: { corners: '┏┓┗┛', across: '━', down: '┃', exits: { above: '┷', below: '┯' } },
   selected: { corners: '╔╗╚╝', across: '═', down: '║', exits: { above: '╧', below: '╤' } },
 } as const satisfies Record<string, Frame>
+
+/** A node's frame: doubled where it is selected, heavy where the graph puts it foremost, else plain. */
+const frameOf = (node: Node, selected: string | null): Frame =>
+  node.id === selected ? FRAMES.selected : node.isForemost ? FRAMES.foremost : FRAMES.plain
 
 /** Where a window puts things: each place's first column, and each row of the layout. */
 type Seen = { xOf: (place: Place) => number; yOf: (row: number) => number; columns: number; rows: number }
@@ -55,9 +60,10 @@ function borderOf(graph: Graph, place: Place, selected: string | null, found: Se
 
 /**
  * Paints a shelf: each node's box from the shelf's top, and each lane down
- * all of it. Answers where a click selects which node, over as much of its
- * box as the window shows. A box the window's edge cuts ends there in an
- * ellipsis.
+ * all of it. The selected node's label is bold and inverse, and a node the
+ * graph puts foremost has its label bold. Answers where a click selects
+ * which node, over as much of its box as the window shows. A box the
+ * window's edge cuts ends there in an ellipsis.
  */
 function paintShelf(canvas: Canvas, graph: Graph, shelf: Shelf, selected: string | null, seen: Seen, found: Set<string>, motion: Moving | null): Hit[] {
   const hits: Hit[] = []
@@ -79,13 +85,13 @@ function paintShelf(canvas: Canvas, graph: Graph, shelf: Shelf, selected: string
     const { node } = place.slot
     const words = place.words ?? { mark: '', lines: [], badge: '' }
     const isSelected = node.id === selected
-    const frame = isSelected ? FRAMES.selected : FRAMES.plain
+    const frame = frameOf(node, selected)
     const border = { paint: borderOf(graph, place, selected, found) }
     const [topLeft = '', topRight = '', bottomLeft = '', bottomRight = ''] = frame.corners
     const bar = frame.across.repeat(place.width - 2)
     canvas.put(left, top, `${topLeft}${bar}${topRight}`, border)
     canvas.put(left, top + place.rows - 1, `${bottomLeft}${bar}${bottomRight}`, border)
-    const text = { paint: node.tone ?? 'plain', ...(isSelected ? { isBold: true as const, isInverse: true as const } : {}) }
+    const text = { paint: node.tone ?? 'plain', ...(isSelected || node.isForemost ? { isBold: true as const } : {}), ...(isSelected ? { isInverse: true as const } : {}) }
     const inset = insetOf(place)
     for (let row = 1; row < place.rows - 1; row += 1) {
       canvas.put(left, top + row, frame.down, border)
@@ -205,7 +211,7 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
     /** Marks where the wire meets a box's border, at `x` on the border's row `y`. */
     const tick = ({ place, isAbove }: End, x: number, y: number): void => {
       if ('lane' in place.slot) return
-      const frame = place.slot.node.id === selected ? FRAMES.selected : FRAMES.plain
+      const frame = frameOf(place.slot.node, selected)
       const key = `${x},${y}`
       exits.set(key, {
         char: isAbove ? frame.exits.below : frame.exits.above,
@@ -272,11 +278,11 @@ const EDGES = { top: '▴', bottom: '▾', left: '◂', right: '▸' } as const
  * below it, along the top or bottom row, under or over the middle of the
  * box as near as the row allows. A name is written only over lines and
  * blanks that are not lit and in no box, with a blank on either side. Names
- * at the sides are written first, then those along the top and bottom; a
- * name that would cover a box, a lit line, or a name written already moves
- * along its edge to the nearest place it may be written, and one with no
- * such place is not written. Answers each name as a hit that selects its
- * node.
+ * at the sides are written first, then those along the top and bottom, and
+ * of each, those of the nodes of highest priority first; a name that would
+ * cover a box, a lit line, or a name written already moves along its edge to
+ * the nearest place it may be written, and one with no such place is not
+ * written. Answers each name as a hit that selects its node.
  */
 function paintSigns(canvas: Canvas, graph: Graph, boxes: Box[], selected: string | null, seen: Seen): Hit[] {
   /** Whether the window shows some of a box's label, apart from the first and last columns, where a box the edge cuts ends in an ellipsis. */
@@ -298,7 +304,7 @@ function paintSigns(canvas: Canvas, graph: Graph, boxes: Box[], selected: string
     const width = sizeOf(text)
     const isAcross = edge === 'top' || edge === 'bottom'
     const along = isAcross ? Math.round(box.x + (box.place.width - width) / 2) : row
-    return [{ id, edge, text, width, isAcross, along }]
+    return [{ id, edge, text, width, isAcross, along, priority: 'node' in box.place.slot ? priorityOf(box.place.slot.node) : 0 }]
   })
   const hits: Hit[] = []
   const boxed = new Set<string>()
@@ -319,7 +325,7 @@ function paintSigns(canvas: Canvas, graph: Graph, boxes: Box[], selected: string
     y < seen.rows &&
     !hits.some(hit => hit.y === y && x < hit.x + hit.width + 1 && hit.x < x + width + 1) &&
     Array.from({ length: width + 2 }, (_, index) => x - 1 + index).every(column => isCoverable(column, y))
-  for (const sign of [...signs.filter(one => !one.isAcross), ...signs.filter(one => one.isAcross)]) {
+  for (const sign of [...signs].sort((a, b) => Number(a.isAcross) - Number(b.isAcross) || b.priority - a.priority)) {
     const placeAt = (at: number): [number, number] =>
       sign.isAcross ? [at, sign.edge === 'top' ? 0 : seen.rows - 1] : [sign.edge === 'left' ? 0 : seen.columns - sign.width, at]
     const wanted = sign.isAcross ? Math.min(Math.max(sign.along, 0), seen.columns - sign.width) : sign.along

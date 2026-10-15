@@ -18,7 +18,10 @@ A link names its two nodes by their ids, and the links may run in a loop. A link
 | `mark` | A sign drawn before the label. Optional. |
 | `tone` | How the mark and the label are painted: `plain`, `dim`, `note`, `good`, `warn`, or `bad`. A tone is a meaning, and the person's theme gives each its color. Optional; `plain` when left out. |
 | `badge` | A few characters drawn dim after the label: a count, a tag. Optional. |
+| `priority` | A whole number for how much the graph is about the node, against its other nodes. Optional; 0 when left out. See below. |
 | `layer` | The layer the node stands in. The layers are drawn in the order of their numbers, the lowest at the top, and the numbers need not start anywhere or follow on. Optional: left out on any node of a graph, graphlet works every layer out from the links. |
+
+A node's `priority` matters as it compares with the priorities of the graph's other nodes, and with 0: a graph whose nodes all have one priority, or none, is drawn as one with none. The nodes of the highest priority, where it is above 0 and above another node's, are drawn with heavy frames and bold labels, in the terminal and on the web page. Where graphlet must choose between nodes, the one of higher priority goes first: it is the one a pane selects when nothing else says which, and among nodes that otherwise tie, the one kept in focus and the one named first at a window's edge. And the layout is seated again by the links of the nodes of higher priority first, and that seating is kept only where those links bend less and the drawing's rows and bent links, weighed together, weigh no more, as [LAYOUT.md](LAYOUT.md#shelves) tells. Such a seating may bend other links, or take another row for links it straightens, as any seating may that weighs no more.
 
 ## Showing A Graph
 
@@ -54,7 +57,7 @@ A room has at least one cell each way and at most a thousand, whatever is asked:
 
 ## The Selection
 
-A pane has one node selected. Either the mod says which, by giving `show` a `selected`, or graphlet keeps it: the node `select` was last called with, or the graph's first.
+A pane has one node selected. Either the mod says which, by giving `show` a `selected`, or graphlet keeps it: the node `select` was last called with, or the first the graph names of the nodes of its highest priority.
 
 Graphlet calls `$.graphlet.select` itself when the person clicks a node's box, or moves with the arrow keys or `h` `j` `k` `l` while the graph has the keyboard. Every method of the noun is also an event, so a mod hears the pick in a hook, where it may act on it and pass it on:
 

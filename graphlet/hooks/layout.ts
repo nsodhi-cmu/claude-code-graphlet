@@ -1,7 +1,7 @@
 import type { GraphletLink, GraphletNode } from '../types'
 import { charactersOf, clipMiddle, fitting, sizeOf } from './draw'
 import type { Room } from './draw'
-import { layersOf } from './layers'
+import { layersOf, priorityOf } from './layers'
 import type { Graph, Link, Piece, Slot } from './layers'
 
 // The layout: a box a node, the boxes of a layer side by side on a shelf with
@@ -483,16 +483,18 @@ function seat(shelf: Shelf, columns: number, beside: Place[], wires: Wire[]): vo
   for (const place of places) place.x += best
 }
 
-/** A column a place's wire would have it stand at, and how much the wire weighs. */
-type Wish = { at: number; weight: number }
+/** A column a place's wire would have it stand at, how much the wire weighs, and its rank. */
+type Wish = { at: number; weight: number; rank: number }
 
 /**
- * The column that half of what `wishes` weigh wants a place to stand at or
- * left of, and half at or right of; where they split evenly between two, the
- * column halfway between, so that a place wished two ways stands between.
+ * The column that half of what `wishes` of the highest rank among them weigh
+ * wants a place to stand at or left of, and half at or right of; where they
+ * split evenly between two, the column halfway between, so that a place
+ * wished two ways stands between.
  */
 function medianOf(wishes: Wish[]): number | undefined {
-  const sorted = [...wishes].sort((a, b) => a.at - b.at)
+  const top = Math.max(...wishes.map(wish => wish.rank))
+  const sorted = wishes.filter(wish => wish.rank === top).sort((a, b) => a.at - b.at)
   const half = sorted.reduce((sum, wish) => sum + wish.weight, 0) / 2
   let seen = 0
   for (const [index, wish] of sorted.entries()) {
@@ -507,15 +509,16 @@ function medianOf(wishes: Wish[]): number | undefined {
  * Balances a shelf against the places of `beside` its wires join it to: each
  * place stands where its wires to them run least sideways, all told, of the
  * seatings that keep the places in their order, a gap apart, and within the
- * shelf's `columns`; a lane's wires weigh `LANE_WEIGHT` times a box's. A
- * place with no such wire stands where its neighbors let it, and a shelf with
- * none is left where it was. The best seating is found by pooling: places in
- * order, each at its wires' median, and any two that would stand out of
- * order merged into one run at the median of all their wires; a place with
- * no wires joins the run before it. A wire with
- * the flow weighs `FLOW_WEIGHT` times one against it.
+ * shelf's `columns`; a lane's wires weigh `LANE_WEIGHT` times a box's, and a
+ * wire with the flow `FLOW_WEIGHT` times one against it. Where `rankOf` ranks
+ * the wires, only those of the highest rank count where a place, or a run of
+ * places, has wires of more than one. A place with no such wire stands where
+ * its neighbors let it, and a shelf with none is left where it was. The best
+ * seating is found by pooling: places in order, each at its wires' median,
+ * and any two that would stand out of order merged into one run at the
+ * median of all their wires; a place with no wires joins the run before it.
  */
-function balance(shelf: Shelf, columns: number, beside: Place[], wires: Wire[]): void {
+function balance(shelf: Shelf, columns: number, beside: Place[], wires: Wire[], rankOf: (wire: Wire) => number): void {
   const { places } = shelf
   const isBeside = new Set(beside)
   const offsets = places.map((_, index) => places.slice(0, index).reduce((sum, place) => sum + place.width + GAP, 0))
@@ -526,7 +529,7 @@ function balance(shelf: Shelf, columns: number, beside: Place[], wires: Wire[]):
       const index = indexOf.get(near.place)
       if (index === undefined || !isBeside.has(far.place) || isBeside.has(near.place)) continue
       const weight = ('lane' in near.place.slot ? LANE_WEIGHT : 1) * (wire.isUp ? 1 : FLOW_WEIGHT)
-      wishes[index]?.push({ at: far.place.x + far.at - near.at - (offsets[index] ?? 0), weight })
+      wishes[index]?.push({ at: far.place.x + far.at - near.at - (offsets[index] ?? 0), weight, rank: rankOf(wire) })
     }
   }
   const runs: Array<{ first: number; last: number; wishes: Wish[]; at: number | undefined }> = []
@@ -557,50 +560,79 @@ function balance(shelf: Shelf, columns: number, beside: Place[], wires: Wire[]):
   }
 }
 
+/** How much a wire's bend weighs: one for a link with the flow between two boxes, less by `FLOW_WEIGHT` against the flow, and less again by `LANE_BEND` to or from a lane. */
+const bendOf = (wire: Wire): number => (wire.isUp ? 1 / FLOW_WEIGHT : 1) / ('lane' in wire.from.place.slot || 'lane' in wire.to.place.slot ? LANE_BEND : 1)
+
+/**
+ * What a seating weighs: its channels' rows and bent links, all told, a row
+ * as much as `ROW_BENDS` bent links, each weighing as `bendOf` says; the
+ * bent links of each rank but the lowest, the highest first; and how far its
+ * wires run sideways, each cell weighing as its wire's bend does.
+ */
+export type Cost = { weight: number; ranked: number[]; sideways: number }
+
+/** What a seating of these channels weighs, with each wire's rank one of `ranks`, the highest first, as `rankOf` says. It lays every channel's tracks again. */
+export function costOf(channels: Channel[], ranks: number[], rankOf: (wire: Wire) => number): Cost {
+  let [rows, sideways] = [0, 0]
+  const bent = ranks.map(() => 0)
+  for (const channel of channels.filter(one => one.wires.length > 0)) {
+    rows += layTracks(channel, place => place.x)
+    for (const wire of channel.wires) {
+      const { out, into } = routeOf(wire, place => place.x)
+      const at = ranks.indexOf(rankOf(wire))
+      bent[at] = (bent[at] ?? 0) + (out === into ? 0 : bendOf(wire))
+      sideways += Math.abs(out - into) * bendOf(wire)
+    }
+  }
+  return { weight: rows * ROW_BENDS + bent.reduce((sum, one) => sum + one, 0), ranked: bent.slice(0, -1), sideways }
+}
+
+/** Whether one list of numbers comes before another, the first that differs deciding. */
+const isLess = (a: number[], b: number[]): boolean => {
+  const at = a.findIndex((one, index) => one !== b[index])
+  return at !== -1 && (a[at] ?? 0) < (b[at] ?? 0)
+}
+
 /**
  * Seats the shelves again, `RESEATS` times over, each time balancing every
  * shelf down against the one above it, back up against the one below, and
- * then against both, where they are laid out across the same columns. The
- * seating kept, of the first and each after a pass, is the one whose
- * channels' rows and bent links weigh least, a row as much as `ROW_BENDS`
- * bent links, and of those, whose wires run least sideways, each sideways
- * cell weighing as its wire's bend does: a bent link with the flow between
- * two boxes weighs one, one against the flow `FLOW_WEIGHT` times less, and a
- * wire to or from a lane `LANE_BEND` times less again. A layout whose shelves are all laid out
- * across its columns is then set in their middle.
+ * then against both, where they are laid out across the same columns. Of the
+ * first seating and the seating after each pass, the one kept is the one
+ * that weighs least, as `costOf` weighs it; of those that weigh the same,
+ * the one whose bent links of each rank but the lowest weigh least, the
+ * highest rank first; and of those, the one whose wires run least sideways.
+ * Where `rankOf` gives the wires more than one rank, the passes are then
+ * made again from the seating kept, balanced by the wires of the highest
+ * rank, and a seating they make is kept instead only where it weighs no
+ * more and its links of higher rank bend less. A layout whose shelves are
+ * all laid out across its columns is then set in their middle.
  */
-function reseat(shelves: Shelf[], channels: Channel[], columns: number): void {
-  /** How much a wire's bend weighs: one for a link with the flow between two boxes, less by `FLOW_WEIGHT` against the flow, and less again by `LANE_BEND` to or from a lane. */
-  const bendOf = (wire: Wire): number => (wire.isUp ? 1 / FLOW_WEIGHT : 1) / ('lane' in wire.from.place.slot || 'lane' in wire.to.place.slot ? LANE_BEND : 1)
-  const costOf = (): [number, number] => {
-    let [weight, sideways] = [0, 0]
-    for (const channel of channels.filter(one => one.wires.length > 0)) {
-      weight += layTracks(channel, place => place.x) * ROW_BENDS
-      for (const wire of channel.wires) {
-        const { out, into } = routeOf(wire, place => place.x)
-        weight += out === into ? 0 : bendOf(wire)
-        sideways += Math.abs(out - into) * bendOf(wire)
-      }
-    }
-    return [weight, sideways]
-  }
+function reseat(shelves: Shelf[], channels: Channel[], columns: number, rankOf: (wire: Wire) => number): void {
+  const ranks = [...new Set(channels.flatMap(channel => channel.wires.map(rankOf)))].sort((a, b) => b - a)
   const seating = (): number[][] => shelves.map(shelf => shelf.places.map(place => place.x))
-  let best = { cost: costOf(), seating: seating() }
-  for (let time = 0; time < RESEATS; time += 1) {
-    for (const pass of ['down', 'up', 'both'] as const) {
-      const order = shelves.map((_, index) => index)
-      for (const index of pass === 'up' ? order.reverse() : order) {
-        const shelf = shelves[index]
-        if (shelf === undefined) continue
-        const [above, below] = [shelves[index - 1], shelves[index + 1]].map(one => (one?.across === shelf.across ? one : undefined))
-        const sides = [...(pass !== 'up' && above !== undefined ? [{ shelf: above, channel: channels[index - 1] }] : []), ...(pass !== 'down' && below !== undefined ? [{ shelf: below, channel: channels[index] }] : [])]
-        if (sides.length > 0) balance(shelf, shelf.across, sides.flatMap(side => side.shelf.places), sides.flatMap(side => side.channel?.wires ?? []))
+  let best = { cost: costOf(channels, ranks, rankOf), seating: seating() }
+  const restore = (): void => shelves.forEach((shelf, index) => shelf.places.forEach((place, at) => (place.x = best.seating[index]?.[at] ?? place.x)))
+  for (const isRanked of ranks.length > 1 ? [false, true] : [false]) {
+    if (isRanked) restore()
+    for (let time = 0; time < RESEATS; time += 1) {
+      for (const pass of ['down', 'up', 'both'] as const) {
+        const order = shelves.map((_, index) => index)
+        for (const index of pass === 'up' ? order.reverse() : order) {
+          const shelf = shelves[index]
+          if (shelf === undefined) continue
+          const [above, below] = [shelves[index - 1], shelves[index + 1]].map(one => (one?.across === shelf.across ? one : undefined))
+          const sides = [...(pass !== 'up' && above !== undefined ? [{ shelf: above, channel: channels[index - 1] }] : []), ...(pass !== 'down' && below !== undefined ? [{ shelf: below, channel: channels[index] }] : [])]
+          if (sides.length > 0) balance(shelf, shelf.across, sides.flatMap(side => side.shelf.places), sides.flatMap(side => side.channel?.wires ?? []), isRanked ? rankOf : () => 0)
+        }
+        const cost = costOf(channels, ranks, rankOf)
+        const isBetter = isRanked
+          ? cost.weight <= best.cost.weight && isLess(cost.ranked, best.cost.ranked)
+          : isLess([cost.weight, ...cost.ranked, cost.sideways], [best.cost.weight, ...best.cost.ranked, best.cost.sideways])
+        if (isBetter) best = { cost, seating: seating() }
       }
-      const cost = costOf()
-      if (cost[0] < best.cost[0] || (cost[0] === best.cost[0] && cost[1] < best.cost[1])) best = { cost, seating: seating() }
     }
   }
-  shelves.forEach((shelf, index) => shelf.places.forEach((place, at) => (place.x = best.seating[index]?.[at] ?? place.x)))
+  restore()
   if (!shelves.every(shelf => shelf.across === columns)) return
   const placed = shelves.flatMap(shelf => shelf.places)
   const [left, right] = [Math.min(...placed.map(place => place.x)), Math.max(...placed.map(place => place.x + place.width))]
@@ -832,7 +864,8 @@ export function layTracks(channel: Channel, xOf: (place: Place) => number, under
  * one nearer it where the two are laid out across the same columns. Pinned,
  * that is the room's for every shelf that fits it, and the longest's for
  * every shelf longer than the room. The shelves are then seated again, as
- * `reseat` says, and the channels given the rows their wires need.
+ * `reseat` says, a wire ranked by the higher priority of its link's two
+ * nodes, and the channels given the rows their wires need.
  */
 export function layoutOf(graph: Graph, room: Room, look: Look, fold = false): Layout {
   const columns = Math.max(room.columns, LEAST_COLUMNS)
@@ -914,7 +947,8 @@ function laidOut(graph: Graph, columns: number, look: Look, into?: number): Layo
       for (const wire of bundle) wire.bundle = at
     })
   })
-  reseat(shelves, channels, columns)
+  const priority = new Map(graph.nodes.map(node => [node.id, priorityOf(node)]))
+  reseat(shelves, channels, columns, wire => Math.max(priority.get(wire.link.from) ?? 0, priority.get(wire.link.to) ?? 0))
 
   let top = 0
   shelves.forEach((shelf, index) => {

@@ -76,6 +76,30 @@ const HOST: Plugin = {
       await $.graphlet.show({ pane: 'dense', graph: DENSE, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
       return next(e)
     })
+    const RANKED = {
+      nodes: [
+        { id: 'request', label: 'request' },
+        { id: 'router', label: 'router', priority: 2 },
+        { id: 'cache', label: 'cache', priority: 2 },
+        { id: 'database', label: 'database', priority: 1 },
+      ],
+      links: [
+        { from: 'request', to: 'router' },
+        { from: 'router', to: 'cache' },
+        { from: 'router', to: 'database' },
+      ],
+    }
+    on('ui.render', { component: 'Pane', requestId: 'ranked' }, async ($, e, next) => {
+      const { Box, Text } = $.ui.resolve(e)
+      const shown = await $.graphlet.show({ pane: 'ranked', graph: RANKED, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
+      const drawing = await next(e)
+      return (
+        <Box flexDirection="column">
+          <Text>{`host ${JSON.stringify({ shown })}`}</Text>
+          {drawing}
+        </Box>
+      )
+    })
     on('ui.render', { component: 'Pane', requestId: 'big' }, async ($, e, next) => {
       await $.graphlet.show({ pane: 'big', graph: HUB, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
       return next(e)
@@ -231,6 +255,30 @@ test('the arrow keys and the letters under them move the selection, and any othe
     shown: { selected: 'src/money.ts' },
     heard: ['select free src/email.ts', 'select free src/ui.ts', 'select free src/price.ts', 'select free src/money.ts', 'key free t'],
   })
+  await pane.unmount()
+})
+
+test('a pane whose owner names no selection opens on the first node the graph names of those of the highest priority, and draws the others of it heavy', WITH_HOST, async ($, on) => {
+  world(on)
+  const pane = await mount($, 'ranked', NARROW)
+  expect((await said(pane)).shown.selected).toBe('router')
+  expect(await rowsOf(pane)).toEqual([
+    '                ┌─────────┐',
+    '                │ request │',
+    '                └────┬────┘',
+    '                     │',
+    '                     ▼',
+    '                ╔════════╗',
+    '                ║ router ║',
+    '                ╚════╤═══╝',
+    '              ┌──────┴─────┐',
+    '              ▼            ▼',
+    '          ┏━━━━━━━┓  ┌──────────┐',
+    '          ┃ cache ┃  │ database │',
+    '          ┗━━━━━━━┛  └──────────┘',
+    '                                      html ↗',
+  ])
+  expect(await pane.find({ in: 'graph', type: 'Text', text: /^ *cache *$/ })).toMatchObject({ props: { bold: true } })
   await pane.unmount()
 })
 

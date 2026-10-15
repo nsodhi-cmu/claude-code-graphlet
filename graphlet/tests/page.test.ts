@@ -63,6 +63,15 @@ describe('the nodes of a page', () => {
     expect(count(page, 'class="node bad"')).toBe(2)
   })
 
+  test('a node the graph puts foremost has a heavy box and bold words, and no other node has', () => {
+    const page = pageOf(readGraph({ ...SHOP, nodes: SHOP.nodes.map(node => ({ ...node, ...(node.id === 'src/cart.ts' ? { priority: 3 } : {}) })) }), 'Shop')
+    expect(count(page, ' foremost"')).toBe(1)
+    expect(page).toMatch(/<g class="node bad foremost"[^>]*><rect[^>]*><text><tspan[^>]*><tspan class="mark">●<\/tspan><tspan[^>]*>cart\.ts</)
+    const widthOf = (rule: RegExp): number => Number(rule.exec(page)?.[1])
+    expect(widthOf(/\.foremost \.box \{ stroke-width: ([\d.]+); \}/)).toBe(2 * widthOf(/\n\.box \{[^}]*stroke-width: ([\d.]+); \}/))
+    expect(count(pageOf(SHOP, 'Shop'), ' foremost"')).toBe(0)
+  })
+
   test('a label too long for one line is on several, one under another, and every box of its layer is taller for it', () => {
     const long = 'Validate the incoming request and normalize it'
     const page = pageOf(graphOf(['short', long, 'under'], [['short', 'under'], [long, 'under']]), '')

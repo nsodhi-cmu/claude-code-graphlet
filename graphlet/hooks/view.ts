@@ -1,6 +1,7 @@
-import type { GraphletMove, GraphletNode, GraphletSize } from '../types'
+import type { GraphletMove, GraphletSize } from '../types'
 import type { Drawing, Pan, Room } from './draw'
-import type { Graph, Link } from './layers'
+import { priorityOf } from './layers'
+import type { Graph, Link, Node } from './layers'
 import { LEAST_COLUMNS, layoutOf } from './layout'
 import type { Layout, Look } from './layout'
 import { paint } from './paint'
@@ -18,7 +19,8 @@ export const FOCUS_NODES = 24
 /**
  * A graph in focus on its selected node: that node and those nearest it, by
  * the fewest links between, whichever way they run, up to `FOCUS_NODES`, of
- * nodes as near the ones the graph names first; and the links among them. A
+ * nodes as near those of highest priority, and of those the ones the graph
+ * names first; and the links among them. A
  * node shown that is joined to nodes not shown says how many after its badge,
  * `+3`, and what is not shown is counted as left out. With nothing selected,
  * or a graph no larger than that, it is the graph.
@@ -33,9 +35,14 @@ export function focusOf(graph: Graph, selected: string | null): Graph {
   const reached = new Map([[selected, 0]])
   for (const id of reached.keys()) for (const other of joined.get(id) ?? []) if (!reached.has(other)) reached.set(other, (reached.get(id) ?? 0) + 1)
   const order = new Map(graph.nodes.map((node, index) => [node.id, index]))
-  const shown = new Set([...reached.keys()].sort((a, b) => (reached.get(a) ?? 0) - (reached.get(b) ?? 0) || (order.get(a) ?? 0) - (order.get(b) ?? 0)).slice(0, FOCUS_NODES))
+  const priority = new Map(graph.nodes.map(node => [node.id, priorityOf(node)]))
+  const shown = new Set(
+    [...reached.keys()]
+      .sort((a, b) => (reached.get(a) ?? 0) - (reached.get(b) ?? 0) || (priority.get(b) ?? 0) - (priority.get(a) ?? 0) || (order.get(a) ?? 0) - (order.get(b) ?? 0))
+      .slice(0, FOCUS_NODES),
+  )
   const links: Link[] = graph.links.filter(link => shown.has(link.from) && shown.has(link.to))
-  const nodes: GraphletNode[] = graph.nodes
+  const nodes: Node[] = graph.nodes
     .filter(node => shown.has(node.id))
     .map(node => {
       const hidden = (joined.get(node.id) ?? []).filter(other => !shown.has(other)).length
@@ -43,6 +50,11 @@ export function focusOf(graph: Graph, selected: string | null): Graph {
     })
   const unread = { nodes: graph.unread.nodes + graph.nodes.length - nodes.length, links: graph.unread.links + graph.links.length - links.length }
   return { ...graph, nodes, links, unread }
+}
+
+/** The node a graph is drawn with selected when nothing else is: the first it names of those of the highest priority; null in a graph with no nodes. */
+export function leadOf(graph: Graph): string | null {
+  return graph.nodes.reduce<Node | undefined>((lead, node) => (lead === undefined || priorityOf(node) > priorityOf(lead) ? node : lead), undefined)?.id ?? null
 }
 
 /** The keys that move the selection: the arrows, and the letters under them. */

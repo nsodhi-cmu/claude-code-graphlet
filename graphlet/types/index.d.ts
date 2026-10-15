@@ -18,6 +18,15 @@ export type GraphletNode = {
    * any node of a graph, graphlet works the layers out from the links.
    */
   layer?: number
+  /**
+   * A whole number for how much the graph is about the node; 0 when left
+   * out. A priority matters as it compares with the other nodes' and with 0.
+   * The nodes of the highest priority, where it is above 0 and above another
+   * node's, are drawn with heavy borders; and the layout keeps the links of
+   * nodes of higher priority straighter where that leaves it weighing no
+   * more in rows and bent links.
+   */
+  priority?: number
 }
 
 /** A link between two nodes, by their ids: from one to the other, where it runs one way. */
@@ -59,7 +68,7 @@ export type GraphletShow = {
   /** The room the drawing may take, in cells. */
   columns: number
   rows: number
-  /** The node drawn as selected. Left out, the one the person last picked, or the graph's first. */
+  /** The node drawn as selected. Left out, the one the person last picked, or the first the graph names of those of the highest priority. */
   selected?: string
 }
 

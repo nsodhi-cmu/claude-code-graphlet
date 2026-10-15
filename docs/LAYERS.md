@@ -9,6 +9,7 @@ A graph is drawn in layers: every node in a row of the drawing, and every link r
 - A node needs an `id` that no node before it has. One without is dropped.
 - Text is made safe to draw: control characters and line breaks become spaces. A node with no label is called by its id.
 - A `tone` that is none of the tones is dropped, and the node drawn plain.
+- A `priority` that is not a whole number is dropped, and so is one of 0, which is a node's when it has none. The nodes of the highest priority the graph's nodes have, where it is above 0 and above another node's, are put foremost, `isForemost`, drawn with heavy frames. Whether a node is foremost is settled for the whole graph as it is read, so a node keeps its frame in a graph drawn in focus, which may leave out the node it was compared with.
 - A link runs one way unless its `isDirected` is `false`, or it has none and its graph's is `false`. Anything else there reads as running one way. A graph whose links all run no way is undirected; a graph may have links of both kinds.
 - A link is kept where both its ends are nodes of the graph, and once for each label it is given however many times it is given, so the same two nodes may be linked under several labels. A link that runs no way is kept once whichever way round it names its nodes, and a link of each kind between the same two nodes is two links.
 - A link from a node to itself is kept. It is drawn as a sign in the node's box, not as a line.

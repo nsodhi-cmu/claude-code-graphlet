@@ -6,6 +6,9 @@ import type { GraphletGraph, GraphletLink, GraphletNode, GraphletTone } from '..
 // stretches between it and its neighbors cross as little as an ordering can
 // make them.
 
+/** A node as it is drawn, and whether it is one the graph puts foremost, drawn with a heavy border. */
+export type Node = GraphletNode & { isForemost: boolean }
+
 /** A link as it is drawn: between two nodes, and whether it runs one way, from `from` to `to`, or only joins them. */
 export type Link = GraphletLink & { isDirected: boolean }
 
@@ -14,7 +17,7 @@ export type Link = GraphletLink & { isDirected: boolean }
  * its nodes, and how many nodes and links it was given past the most that
  * are read, which are left out.
  */
-export type Graph = { nodes: GraphletNode[]; links: Link[]; unread: { nodes: number; links: number } }
+export type Graph = { nodes: Node[]; links: Link[]; unread: { nodes: number; links: number } }
 
 /** How many times the layers are ordered against their neighbors, down and back up, before the best ordering is kept. */
 const SWEEPS = 4
@@ -31,7 +34,10 @@ const tidy = (text: unknown): string =>
 
 /**
  * Reads a graph leniently: a node needs an id no node before it has, text is
- * made safe to draw, a tone that is none of the tones is dropped, and a link
+ * made safe to draw, a tone that is none of the tones is dropped, a priority
+ * that is not a whole number is dropped, and so is one of 0, which is a node's
+ * when it has none. The nodes put foremost are those of the highest
+ * priority, where it is above 0 and above another node's. A link
  * is kept where both its ends are nodes, once for each label it is given; a
  * link that runs no way, once whichever way round it names them. A
  * link runs one way unless it says it does not, or says nothing in a graph
@@ -55,8 +61,11 @@ export function readGraph(graph: GraphletGraph): Graph {
       ...(TONES.includes(node.tone as GraphletTone) ? { tone: node.tone } : {}),
       ...(badge === '' ? {} : { badge }),
       ...(Number.isFinite(node.layer) ? { layer: node.layer } : {}),
+      ...(Number.isInteger(node.priority) && node.priority !== 0 ? { priority: node.priority } : {}),
     })
   }
+  const priorities = nodes.map(priorityOf)
+  const [top, lowest] = [Math.max(...priorities), Math.min(...priorities)]
   const links: Link[] = []
   const kept = new Set<string>()
   let unreadLinks = 0
@@ -73,8 +82,15 @@ export function readGraph(graph: GraphletGraph): Graph {
     }
     links.push({ from: link.from, to: link.to, isDirected, ...(label === '' ? {} : { label }) })
   }
-  return { nodes, links, unread: { nodes: given.size - nodes.length, links: unreadLinks } }
+  return {
+    nodes: nodes.map(node => ({ ...node, isForemost: priorityOf(node) === top && top > 0 && top > lowest })),
+    links,
+    unread: { nodes: given.size - nodes.length, links: unreadLinks },
+  }
 }
+
+/** A node's priority: 0 where it has none. */
+export const priorityOf = (node: GraphletNode): number => node.priority ?? 0
 
 /** Whether a link runs from `from` to `to`. */
 function isLinked(graph: Graph, from: string, to: string): boolean {
@@ -365,7 +381,7 @@ function folded(graph: Graph, ranks: Map<string, number>, fold: Fold): Map<strin
     const shared = [...bound.values()].filter(count => count > 1).length
     return shared + new Set(passing.filter(link => (bound.get(keyOf(link, 1)) ?? 0) === 1).map(link => keyOf(link, 0))).size
   }
-  const nodesIn = (ranks: Map<string, number>, rank: number): GraphletNode[] => graph.nodes.filter(node => ranks.get(node.id) === rank)
+  const nodesIn = (ranks: Map<string, number>, rank: number): Node[] => graph.nodes.filter(node => ranks.get(node.id) === rank)
   const widthIn = (ranks: Map<string, number>, rank: number): number => {
     const [nodes, lanes] = [nodesIn(ranks, rank), lanesIn(ranks, rank)]
     return nodes.reduce((sum, node) => sum + fold.widthOf(node), 0) + lanes + (nodes.length + lanes - 1) * fold.gap
@@ -400,7 +416,7 @@ function folded(graph: Graph, ranks: Map<string, number>, fold: Fold): Map<strin
  * node pass through the layer in, the one way, up it where they run against
  * the flow. A lane holds the links it carries there.
  */
-export type Slot = { node: GraphletNode } | { lane: Link[]; isUp: boolean }
+export type Slot = { node: Node } | { lane: Link[]; isUp: boolean }
 
 /** The two nodes of a link: the one it leaves and the one it is bound for; for a link that runs no way, the higher and the lower. */
 const endsOf = (link: Link, ranks: Map<string, number>): [string, string] =>

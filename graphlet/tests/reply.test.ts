@@ -87,6 +87,19 @@ test('a block\'s lines are chains of arrows, a node is known by its label, and t
   ])
 })
 
+test('a label in bold gives its node a priority of 1, whichever side of the bold its tone is written, and is the same node as the label unbolded, its pipes and dashes dropped as any label\'s', () => {
+  const graph = graphOf(['Start -> **Valid?** -> Done [good]', 'Valid? -> **Ask again** [warn]', '**Retry [bad]** -> Start', '**two** and **three** -> ****', 'Done -> **|Start|**'])
+  expect(graph.nodes).toEqual([
+    { id: 'Start', label: 'Start', priority: 1 },
+    { id: 'Valid?', label: 'Valid?', priority: 1 },
+    { id: 'Done', label: 'Done', tone: 'good' },
+    { id: 'Ask again', label: 'Ask again', tone: 'warn', priority: 1 },
+    { id: 'Retry', label: 'Retry', tone: 'bad', priority: 1 },
+    { id: '**two** and **three**', label: '**two** and **three**' },
+    { id: '****', label: '****' },
+  ])
+})
+
 test('a block whose links are all dashes is an undirected graph; in any other, an arrow runs one way, a two-headed arrow each way, and a dash no way', () => {
   const friends = graphOf(['Alice -- Bob -- Carol', 'Carol --- Dan', 'e-mail -- front-end'])
   expect(friends.isDirected).toBe(false)

@@ -79,3 +79,11 @@ test('in focus, a graph is its selected node and those nearest it, of nodes as n
   expect(focusOf(chain, 'nowhere')).toBe(chain)
 })
 
+test('in focus, of the nodes as near the selected one, those of highest priority are kept first, and then the ones named first', () => {
+  const leaves = Array.from({ length: 30 }, (_, index) => `leaf${index}`)
+  const star = readGraph({
+    nodes: [{ id: 'hub', label: 'hub' }, ...leaves.map(id => ({ id, label: id, ...(id === 'leaf29' ? { priority: 1 } : id === 'leaf0' ? { priority: -1 } : {}) }))],
+    links: leaves.map(id => ({ from: 'hub', to: id })),
+  })
+  expect(focusOf(star, 'hub').nodes.map(node => node.id)).toEqual(['hub', ...leaves.slice(1, FOCUS_NODES - 1), 'leaf29'])
+})

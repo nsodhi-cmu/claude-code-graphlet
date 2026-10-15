@@ -6,7 +6,7 @@ A click on `html ↗`, in the corner of a drawing's [foot](DRAWING.md#the-foot),
 
 `pageOf` answers one HTML document that draws the graph as an inline SVG. It has the layers and the order within them that the terminal's picture has, since both come from [`layersOf`](LAYERS.md), and places them its own way: each layer in the middle of the widest, its boxes side by side.
 
-- A node is a rounded box in its tone's color, with its mark, its label wrapped as the terminal wraps it, and its badge.
+- A node is a rounded box in its tone's color, with its mark, its label wrapped as the terminal wraps it, and its badge. A node put foremost has a border twice as heavy, and its words are bold.
 - A link is a curve with an arrowhead at the node it reaches. Down the page it leaves the middle of a box's bottom and reaches the middle of a box's top. A link that runs back up is dashed, and uses the port beside the middle. A link past a layer runs through its lane there.
 - A link between two nodes of one layer is an arc under the layer, and a link from a node to itself is a loop at the box's side.
 - A link with no direction has no arrowhead and reaches the box itself, and between two layers it runs down the page from whichever of its nodes stands higher.

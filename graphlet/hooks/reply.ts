@@ -49,6 +49,8 @@ const JOIN = /(<-+>|↔|<-+|←|-+>|→|(?<=^|\s)-{2,}(?=\s|$|\|))(?:\|((?:(?!-+
 const SAID_BETWEEN = /(?<=^|\s)-{2,}[ \t]+([^-|\n]+?)[ \t]+-+>/g
 /** A tone in brackets at the end of a label. */
 const TONE = new RegExp(`\\[(${TONES.join('|')})\\]$`, 'i')
+/** A label in bold, as Markdown writes it, `**Valid?**`: what the graph is about. */
+const BOLD = /^\*\*([^*]*[^\s*][^*]*)\*\*$/
 
 /** What is written between two arrows, less the blanks around it and the dashes at its end. */
 const trimmed = (said: string): string => {
@@ -111,21 +113,32 @@ export function partsOf(reply: string): Part[] {
  * it; a line with neither names a node alone. An arrow is a link that runs
  * one way, a two-headed arrow a link each way, and a dash a link that runs no
  * way; a block whose links are all dashes is an undirected graph. A node is
- * known by its label, so
- * the same label on any line is the same node, and a tone in brackets after a
- * label is its node's, the first one given. A blank label is passed over, and
- * pipes left at a label's ends are not part of it.
+ * known by its label, so the same label on any line is the same node, and a
+ * tone in brackets after a label is its node's, the first one given. A label
+ * written in bold, `**Valid?**`, gives its node a priority of 1, and its
+ * asterisks are not part of it. A blank label is passed over, and pipes left
+ * at a label's ends are not part of it.
  */
 export function graphOf(lines: readonly string[]): GraphletGraph {
   const nodes = new Map<string, GraphletNode>()
   const joins: Array<GraphletLink & { join: string }> = []
-  const nodeOf = (said: string): string[] => {
-    const words = trimmed(trimmed(said).replace(/^\|+|\|+$/g, ''))
+  /** A label less a tone in brackets at its end, and the tone. */
+  const toneOf = (words: string): [string, string | undefined] => {
     const tone = TONE.exec(words)
-    const id = trimmed(tone === null ? words : words.slice(0, tone.index)).replace(/\s+/g, ' ')
+    return tone === null ? [words, undefined] : [trimmed(words.slice(0, tone.index)), tone[1]]
+  }
+  /** What is written for a label, less the blanks and dashes at its ends and the pipes left there. */
+  const bare = (said: string): string => trimmed(trimmed(said).replace(/^\|+|\|+$/g, ''))
+  const nodeOf = (said: string): string[] => {
+    const [words, outer] = toneOf(bare(said))
+    const bold = BOLD.exec(words)
+    const [label, inner] = bold?.[1] === undefined ? [words, undefined] : toneOf(bare(bold[1]))
+    const id = label.replace(/\s+/g, ' ')
+    const tone = outer ?? inner
     if (id === '') return []
     const node = nodes.get(id) ?? { id, label: id }
-    if (node.tone === undefined && tone?.[1] !== undefined) node.tone = tone[1].toLowerCase() as GraphletTone
+    if (node.tone === undefined && tone !== undefined) node.tone = tone.toLowerCase() as GraphletTone
+    if (bold !== null) node.priority = 1
     nodes.set(id, node)
     return [id]
   }

@@ -27,6 +27,7 @@ A drawing is rows of painted text, and the rectangles of them that answer a clic
 - Lines that meet are joined, in a tee or a cross: they leave the same box, or reach the same box. Where a link only crosses another, it passes over unbroken, and the line it crosses is broken there.
 - A box has an arrowhead of its own for each set of boxes whose links reach it together, so links from different boxes never run into one line on the way to it.
 - `↺` in a box says the node links to itself.
+- A box with a heavy frame, `┏━┓`, and a bold label is a node the graph puts foremost: one of the highest priority its nodes have, where that is above 0 and above another node's.
 
 An undirected graph is drawn the same way, with no arrowheads and no flow, and in a graph with links of both kinds, each is drawn as its kind is:
 
@@ -73,7 +74,7 @@ A link's label is written beside its line, just past the box it leaves, in the p
 
 ## What Is Selected
 
-The selected node's box has a double frame, and its label is bold and inverse in the node's own tone. Every link that touches the selected node is lit along its whole way, in the theme's accent color, and so are its label and the borders of the boxes at the other ends. Everything else keeps its own paint: a box's border takes its node's tone, and a link is dim.
+The selected node's box has a double frame, in place of the heavy one of a node put foremost, and its label is bold and inverse in the node's own tone. Every link that touches the selected node is lit along its whole way, in the theme's accent color, and so are its label and the borders of the boxes at the other ends. Everything else keeps its own paint: a box's border takes its node's tone, and a link is dim.
 
 Lit is painted over unlit. Where links share a stretch of line, selecting a node shows which of them are its own.
 
@@ -100,7 +101,7 @@ A graph larger than its room is seen through a window, and never laid out again 
 
 While the window shows the selected node's label, each node joined to it whose label the window does not show, apart from the ellipsis of a box the edge cuts, is named at the window's edge, after an arrow pointing out toward it: `◂ cart.ts` down the first column and `cart.ts ▸` down the last, for a box off to that side, on the row of its label; `▴ cart.ts` along the top row and `▾ cart.ts` along the bottom, for a box above or below, under or over its middle. A name is lit, as the node's box would be, and a click on it selects the node, which moves the window to it.
 
-A name covers only lines, arrowheads and blanks, never a box or anything lit, and has a blank on either side. The names at the sides are written first. A name with no room where it belongs goes to the nearest place along its edge that has room, and one with none is not written; the lit line still leads to the node, and the foot still counts it.
+A name covers only lines, arrowheads and blanks, never a box or anything lit, and has a blank on either side. The names at the sides are written first, then those along the top and bottom, and of each, those of the nodes of highest priority first. A name with no room where it belongs goes to the nearest place along its edge that has room, and one with none is not written; the lit line still leads to the node, and the foot still counts it.
 
 ## The Foot
 
@@ -118,7 +119,7 @@ A still picture in a reply keeps the counts and what was left out, and drops the
 
 ## Focus
 
-`focusOf` in `view.ts` is a graph in focus on its selected node: that node and the nodes nearest it, by the fewest links between whichever way they run, up to `FOCUS_NODES`, and of nodes as near, those the graph names first; with the links among them. A node shown that is joined to nodes not shown says how many after its badge, `+3`, and what is not shown is counted as left out, so the foot says how much is out of focus. A graph no larger than that is drawn whole. A pane in focus draws the graph in focus on whichever node is selected, so the focus follows the selection.
+`focusOf` in `view.ts` is a graph in focus on its selected node: that node and the nodes nearest it, by the fewest links between whichever way they run, up to `FOCUS_NODES`, and of nodes as near, those of highest priority, and of those the ones the graph names first; with the links among them. A node shown that is joined to nodes not shown says how many after its badge, `+3`, and what is not shown is counted as left out, so the foot says how much is out of focus. A graph no larger than that is drawn whole. A pane in focus draws the graph in focus on whichever node is selected, so the focus follows the selection.
 
 ## Finding
 
