@@ -37,7 +37,9 @@ const Surface: ClientModule<Drawing, number> = (drawing, surface) => {
       if (event.type === 'up' || event.button === undefined) grips.delete(surface)
       return
     }
-    if (event.type !== 'down' || event.button !== 'left') return
+    if (event.type !== 'down') return
+    grips.delete(surface)
+    if (event.button !== 'left') return
     const hit = drawing.hits.find(
       area => event.x >= area.x && event.x < area.x + area.width && event.y >= area.y && event.y < area.y + area.height,
     )

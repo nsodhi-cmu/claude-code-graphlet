@@ -89,7 +89,7 @@ body { box-sizing: border-box; height: 100%; display: flex; flex-direction: colu
 h1 { margin: 0 0 24px; font-size: ${FONT_SIZE}px; font-weight: 600; color: var(--soft); }
 p { margin: 0; color: var(--soft); }
 main { flex: 1; min-height: 0; }
-svg { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; cursor: grab; }
+svg { display: block; width: 100%; height: 100%; touch-action: pinch-zoom; user-select: none; cursor: grab; }
 svg.held { cursor: grabbing; }
 text { text-anchor: middle; fill: var(--ink); }
 .node, .link { transition: opacity 0.15s; }
@@ -117,11 +117,12 @@ text { text-anchor: middle; fill: var(--ink); }
  * What the page does. A node under the pointer, or else the one with the
  * focus, is lit with its links and the nodes at their other ends, and the
  * rest is quieted; a node is known by its place among the page's nodes,
- * which is its place in the graph. The drawing fills the window, whole and
- * at most at its own size; the wheel zooms it in and out around the pointer,
- * from whole to `MOST_ZOOM` times its size, a drag moves it, as far as
- * leaves half the window on it, and a double click, or a new size of the
- * window, shows it whole again.
+ * which is its place in the graph. The drawing fills the window, whole, in its
+ * middle, and at most at its own size; the wheel zooms it in and out around
+ * the pointer, from whole to `MOST_ZOOM` times its size, a drag of one finger
+ * or the main button moves it, as far as leaves half the window on it, a
+ * pinch on a touch screen zooms the page as the browser does, and a double
+ * click, or a new size of the window, shows it whole again.
  */
 const SCRIPT = `
 const svg = document.querySelector('svg')
@@ -134,11 +135,13 @@ const kept = next => ({
   x: Math.min(Math.max(next.x, -next.width / 2), whole.width - next.width / 2),
   y: Math.min(Math.max(next.y, -next.height / 2), whole.height - next.height / 2),
 })
+let held = null
 const fit = () => {
   const room = svg.getBoundingClientRect()
+  if (room.width === 0 || room.height === 0) return
   const scale = Math.min(1, room.width / whole.width, room.height / whole.height)
   const [width, height] = [room.width / scale, room.height / scale]
-  fitted = view = { x: (whole.width - width) / 2, y: 0, width, height }
+  fitted = view = { x: (whole.width - width) / 2, y: (whole.height - height) / 2, width, height }
   show()
 }
 svg.addEventListener('wheel', event => {
@@ -148,22 +151,23 @@ svg.addEventListener('wheel', event => {
   const width = Math.min(Math.max(view.width * Math.exp(event.deltaY * ${ZOOM_RATE}), room.width / ${MOST_ZOOM}), fitted.width)
   const by = width / view.width
   view = width === fitted.width ? fitted : kept({ x: at.x - (at.x - view.x) * by, y: at.y - (at.y - view.y) * by, width, height: view.height * by })
+  if (held !== null) held = { x: event.clientX, y: event.clientY, from: view }
   show()
 }, { passive: false })
-let held = null
 svg.addEventListener('pointerdown', event => {
-  if (event.button !== 0) return
+  if (event.button !== 0 || !event.isPrimary) return
   held = { x: event.clientX, y: event.clientY, from: view }
   svg.setPointerCapture(event.pointerId)
   svg.classList.add('held')
 })
 svg.addEventListener('pointermove', event => {
-  if (held === null) return
+  if (held === null || !event.isPrimary) return
   const per = view.width / svg.getBoundingClientRect().width
   view = kept({ ...held.from, x: held.from.x - (event.clientX - held.x) * per, y: held.from.y - (event.clientY - held.y) * per })
   show()
 })
-const drop = () => {
+const drop = event => {
+  if (!event.isPrimary) return
   held = null
   svg.classList.remove('held')
 }

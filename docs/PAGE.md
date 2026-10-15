@@ -15,7 +15,7 @@ A click on `html ↗`, in the corner of a drawing's [foot](DRAWING.md#the-foot),
 
 The colors are set once, for a light scheme and for a dark one, and the browser picks by the person's own setting.
 
-The drawing fills the window under the title, and opens whole: shrunk to fit where it is larger than the window, and at its own size where it is not, never larger. The wheel zooms it around the pointer, out as far as whole and in as far as `MOST_ZOOM` times its own size, and a pinch on a trackpad does the same. A drag moves it, as far as leaves half the window on the drawing. A double click shows it whole again, and so does a new size of the window.
+The drawing fills the window under the title, and opens whole, in its middle: shrunk to fit where it is larger than the window, and at its own size where it is not, never larger. The wheel zooms it around the pointer, out as far as whole and in as far as `MOST_ZOOM` times its own size, and so does a pinch the browser hands the page as a turn of the wheel. A drag of the main button, or of one finger, moves it, as far as leaves half the window on the drawing; a pinch on a touch screen zooms the whole page, as the browser does. A double click shows it whole again, and so does a new size of the window.
 
 The document is one file and fetches nothing: its style and its few lines of script are inline. Everything a graph says is escaped before it is written, and a node is named in the page only by its place in the graph, never by its id.
 

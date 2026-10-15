@@ -294,6 +294,14 @@ test('a drag from where no box is moves the graph with the pointer and selects n
   await pane.pointer({ type: 'down', ...blank, button: 'left', in: 'graph' })
   await pane.pointer({ type: 'move', x: blank.x - 2, y: blank.y, button: 'left', in: 'graph' })
   expect(await rowsOf(pane)).toEqual(shownAt(8))
+
+  const other = view.draw(SHOP, 'src/price.ts', room, view.scroll(SHOP, room, from, { x: 8, y: 0 })).hits.find(hit => 'node' in hit && hit.node !== 'src/price.ts' && hit.height > 2)
+  if (other === undefined || !('node' in other)) throw new Error('no other node is in view')
+  await click(pane, other)
+  const picked = await rowsOf(pane)
+  await pane.pointer({ type: 'up', x: blank.x - 30, y: blank.y, button: 'left', in: 'graph' })
+  expect((await said(pane)).shown.selected).toBe(other.node)
+  expect(await rowsOf(pane)).toEqual(picked)
   await pane.unmount()
 })
 

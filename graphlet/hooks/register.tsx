@@ -215,7 +215,7 @@ export const register: Register = (on, options) => {
       const before = last !== undefined && last.grab === grab ? last.at : ORIGIN
       if (isDropped === true) dragged.delete(pane)
       else dragged.set(pane, { grab, at: drag })
-      await $.graphlet.scroll({ pane, by: { x: before.x - drag.x, y: before.y - drag.y } })
+      if (before.x !== drag.x || before.y !== drag.y) await $.graphlet.scroll({ pane, by: { x: before.x - drag.x, y: before.y - drag.y } })
     } else if (page === true) {
       await openPage($, pane, at.whole)
     } else if (query !== undefined && key === 'backspace' && query === '') {
