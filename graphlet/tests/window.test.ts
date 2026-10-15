@@ -97,8 +97,11 @@ describe('a layer longer than the room', () => {
   test('which nodes a window shows, and where, does not depend on which of them is selected', () => {
     const graph = wide(12)
     const room = { columns: 60, rows: 40 }
-    const places = (selected: string): Array<[number, number, number]> =>
-      pinned.draw(graph, selected, room, { x: 30, y: 0 }).hits.flatMap(hit => ('node' in hit ? [[hit.x, hit.y, hit.width] as [number, number, number]] : []))
+    const places = (selected: string): Array<[number, number, number]> => {
+      const drawing = pinned.draw(graph, selected, room, { x: 30, y: 0 })
+      const isName = (hit: Hit): boolean => /^[▴▾◂]|▸$/u.test((picture(drawing)[hit.y] ?? '').slice(hit.x, hit.x + hit.width))
+      return drawing.hits.flatMap(hit => ('node' in hit && !isName(hit) ? [[hit.x, hit.y, hit.width] as [number, number, number]] : []))
+    }
     expect(places('user11')).toEqual(places('user0'))
     expect(places('core')).toEqual(places('user0'))
   })

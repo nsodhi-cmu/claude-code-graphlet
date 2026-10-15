@@ -1,4 +1,4 @@
-import { canvasOf, footRow, leftOut, sizeOf, spansOf } from './draw'
+import { canvasOf, clipMiddle, footRow, leftOut, sizeOf, spansOf } from './draw'
 import type { Canvas, Drawing, Hit, Paint, Pan, Room } from './draw'
 import { isJoined } from './layers'
 import type { Graph } from './layers'
@@ -12,6 +12,8 @@ import { sightOf, slideOf, within } from './window'
 
 /** How much of a window stays in view when a click scrolls it: about a box sideways, and a few rows down. */
 const PAGE_OVERLAP = { x: 16, y: 3 }
+/** How many cells a node's name takes where it is written at the window's edge, cut in the middle past that. */
+const SIGN_CELLS = 20
 
 type Frame = { corners: string; across: string; down: string; exits: { above: string; below: string } }
 
@@ -22,6 +24,9 @@ const FRAMES = {
 
 /** Where a window puts things: each place's first column, and each row of the layout. */
 type Seen = { xOf: (place: Place) => number; yOf: (row: number) => number; columns: number; rows: number }
+
+/** A node's box as the window has it: its place, its first column, its top row, and how many rows it takes. */
+type Box = { place: Place; x: number; y: number; rows: number }
 
 const idOf = (place: Place): string | null => ('node' in place.slot ? place.slot.node.id : null)
 
@@ -227,17 +232,89 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
   }
 }
 
+/** What a name at the window's edge may be written over: a blank, a line, or an arrowhead. */
+const COVERABLE = /^[ \u2500-\u257f▲▼]$/u
+/** The four edges of a window, and the arrow a name written at each points out with. */
+const EDGES = { top: '▴', bottom: '▾', left: '◂', right: '▸' } as const
+
+/**
+ * Writes at the window's edge the names of the nodes joined to the selected
+ * one whose labels the window does not show, while it shows the selected
+ * node's own, each with an arrow pointing out toward its box: a box beside
+ * the window is named at that side, on the row of its label; one above or
+ * below it, along the top or bottom row, under or over the middle of the
+ * box as near as the row allows. A name is written only over lines and
+ * blanks that are not lit and in no box, with a blank on either side. Names
+ * at the sides are written first, then those along the top and bottom; a
+ * name that would cover a box, a lit line, or a name written already moves
+ * along its edge to the nearest place it may be written, and one with no
+ * such place is not written. Answers each name as a hit that selects its
+ * node.
+ */
+function paintSigns(canvas: Canvas, graph: Graph, boxes: Box[], selected: string | null, seen: Seen): Hit[] {
+  const isShown = (box: Box): boolean => box.y + 1 >= 0 && box.y + 1 < seen.rows && box.x + 2 < seen.columns && box.x + box.place.width - 2 > 0
+  const from = boxes.find(box => idOf(box.place) === selected)
+  if (selected === null || from === undefined || !isShown(from)) return []
+  const signs = boxes.flatMap(box => {
+    const id = idOf(box.place)
+    if (id === null || id === selected || isShown(box) || !isJoined(graph, id, selected)) return []
+    const row = box.y + 1
+    const edge: keyof typeof EDGES = row < 0 ? 'top' : row >= seen.rows ? 'bottom' : box.x < 0 ? 'left' : 'right'
+    const name = 'node' in box.place.slot ? clipMiddle(box.place.slot.node.label, SIGN_CELLS) : ''
+    const text = edge === 'right' ? `${name} ${EDGES[edge]}` : `${EDGES[edge]} ${name}`
+    const width = sizeOf(text)
+    const isAcross = edge === 'top' || edge === 'bottom'
+    const along = isAcross ? Math.round(box.x + (box.place.width - width) / 2) : row
+    return [{ id, edge, text, width, isAcross, along }]
+  })
+  const hits: Hit[] = []
+  const boxed = new Set<string>()
+  for (const box of boxes) {
+    for (let y = Math.max(box.y, 0); y < Math.min(box.y + box.rows, seen.rows); y += 1) {
+      for (let x = Math.max(box.x, 0); x < Math.min(box.x + box.place.width, seen.columns); x += 1) boxed.add(`${x},${y}`)
+    }
+  }
+  /** Whether a name may be written over a cell: a line or a blank, not lit, and in no box. */
+  const isCoverable = (x: number, y: number): boolean => {
+    const cell = canvas.cells[y]?.[x]
+    return cell === undefined || (COVERABLE.test(cell.char) && cell.paint !== 'accent' && !boxed.has(`${x},${y}`))
+  }
+  const isFree = (x: number, y: number, width: number): boolean =>
+    x >= 0 &&
+    x + width <= seen.columns &&
+    y >= 0 &&
+    y < seen.rows &&
+    !hits.some(hit => hit.y === y && x < hit.x + hit.width + 1 && hit.x < x + width + 1) &&
+    Array.from({ length: width + 2 }, (_, index) => x - 1 + index).every(column => isCoverable(column, y))
+  for (const sign of [...signs.filter(one => !one.isAcross), ...signs.filter(one => one.isAcross)]) {
+    const placeAt = (at: number): [number, number] =>
+      sign.isAcross ? [at, sign.edge === 'top' ? 0 : seen.rows - 1] : [sign.edge === 'left' ? 0 : seen.columns - sign.width, at]
+    const wanted = sign.isAcross ? Math.min(Math.max(sign.along, 0), seen.columns - sign.width) : sign.along
+    const reach = sign.isAcross ? seen.columns : seen.rows
+    const near = Array.from({ length: 2 * reach }, (_, step) => wanted + (step % 2 === 0 ? step / 2 : -(step + 1) / 2))
+    const at = near.find(one => isFree(...placeAt(one), sign.width))
+    if (at === undefined) continue
+    const [x, y] = placeAt(at)
+    canvas.put(x - 1, y, ' ', { paint: 'plain' })
+    canvas.put(x + sign.width, y, ' ', { paint: 'plain' })
+    canvas.put(x, y, sign.text, { paint: 'accent' })
+    hits.push({ node: sign.id, x, y, width: sign.width, height: 1 })
+  }
+  return hits
+}
+
 /**
  * Paints a layout through a window at `pan`. Every shelf slides under the
  * window together, each as far as its own end, and the wires between two
  * shelves that have slid apart are given their tracks again as they now
  * stand. A channel the window shows nothing of, nor of either shelf beside
  * it, is passed over. Where something is being found, the boxes of the nodes
- * found have their borders in `note`. The last row is the foot: it counts the
- * nodes out of view of a graph larger than the room, says what is being
- * found and which of the found the selected node is, or else what was left
- * out of the graph, and holds the corner a click opens the graph as a web
- * page by.
+ * found have their borders in `note`. The nodes joined to the selected one
+ * that the window does not show are named at its edge. The last row is the
+ * foot: it counts the nodes out of view of a graph larger than the room, says
+ * what is being found and which of the found the selected node is, or else
+ * what was left out of the graph, and holds the corner a click opens the
+ * graph as a web page by.
  */
 export function paint(layout: Layout, graph: Graph, selected: string | null, room: Room, pan: Pan, finding?: Finding): Drawing {
   if (layout.shelves.length === 0) return { rows: [], hits: [] }
@@ -262,10 +339,11 @@ export function paint(layout: Layout, graph: Graph, selected: string | null, roo
     paintChannel(canvas, graph, layout, channel, selected, seen)
   })
 
-  const rows = canvas.cells.map(spansOf)
-  const boxes = layout.shelves.flatMap(shelf =>
+  const boxes: Box[] = layout.shelves.flatMap(shelf =>
     shelf.places.filter(place => 'node' in place.slot).map(place => ({ place, x: seen.xOf(place), y: seen.yOf(shelf.top), rows: place.rows })),
   )
+  const signs = paintSigns(canvas, graph, boxes, selected, seen)
+  const rows = canvas.cells.map(spansOf)
   const beyond = {
     left: boxes.filter(box => box.x < 0).length,
     right: boxes.filter(box => box.x + box.place.width > layout.columns).length,
@@ -279,5 +357,5 @@ export function paint(layout: Layout, graph: Graph, selected: string | null, roo
       ? leftOut(graph.unread)
       : [`/${finding.query} · ${finding.found.length === 0 ? 'no match' : `${Math.max(which, 0) + 1} of ${finding.found.length}`}`, `/${finding.query}`]
   const foot = footRow(sight.isWhole ? undefined : beyond, layout.columns, page, rows.length, notes)
-  return { rows: [...rows, foot.row], hits: [...hits, ...foot.hits] }
+  return { rows: [...rows, foot.row], hits: [...signs, ...hits, ...foot.hits] }
 }

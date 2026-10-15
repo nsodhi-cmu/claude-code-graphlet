@@ -515,6 +515,49 @@ describe('what is selected', () => {
   })
 })
 
+describe('what the window does not show', () => {
+  const graph = graphOf(
+    ['Checkout', 'Cart', 'Payments', 'Shipping', 'Receipts', 'Ledger'],
+    [['Checkout', 'Cart'], ['Checkout', 'Payments'], ['Checkout', 'Shipping'], ['Checkout', 'Receipts'], ['Payments', 'Ledger'], ['Receipts', 'Ledger']],
+  )
+  const room = { columns: 40, rows: 8 }
+  const shown = (selected: string): Drawing => {
+    const view = viewOf(LOOK)
+    return view.draw(graph, selected, room, view.show(graph, selected, room, ORIGIN))
+  }
+
+  test('a node joined to the selected one that the window does not show is named at the edge it lies past, over nothing but unlit lines and blanks, and a click on its name selects it', () => {
+    const checkout = shown('Checkout')
+    expect(graphRows(checkout)).toEqual([
+      '              ╔══════════╗',
+      '              ║ Checkout ║',
+      '              ╚═╤═══╤════╝    Receipts ▸',
+      '    ┌───────────┼───┴─────────┬─────────',
+      '    ▼           ▼             ▼',
+      '┌──────┐  ┌──────────┐  ┌──────────┐  ┌─',
+      '│ Cart │  │ Payments │  │ Shipping │  │…',
+    ])
+    expect(checkout.hits[0]).toEqual({ node: 'Receipts', x: 30, y: 2, width: 10, height: 1 })
+    const payments = shown('Payments')
+    expect(graphRows(payments)).toEqual([
+      '    ┌───────────┼ ▴ Checkout ─┬─────────',
+      '    ▼           ▼             ▼',
+      '┌──────┐  ╔══════════╗  ┌──────────┐  ┌─',
+      '│ Cart │  ║ Payments ║  │ Shipping │  │…',
+      '└──────┘  ╚═════╤════╝  └──────────┘  └─',
+      '                └───┬───────────────────',
+      '           ▾ Ledger ▼',
+    ])
+    expect(spansWith(payments, '▴ Checkout')).toEqual([{ text: '▴ Checkout', paint: 'accent' }])
+    expect(boxes(payments).slice(0, 2).map(hit => hit.node)).toEqual(['Checkout', 'Ledger'])
+  })
+
+  test('a node the window shows, and any node while the selected one is out of view, is not named', () => {
+    expect(boxes(viewOf(LOOK).draw(graph, 'Payments', WHOLE, ORIGIN)).map(hit => hit.node)).toEqual(graph.nodes.map(node => node.id))
+    expect(boxes(viewOf(LOOK).draw(graph, 'Ledger', room, ORIGIN)).map(hit => hit.node)).toEqual(['Checkout', 'Cart', 'Payments', 'Shipping', 'Receipts'])
+  })
+})
+
 describe('where a click lands', () => {
   test('every box is a hit over exactly its own cells, and no two hits overlap', () => {
     const drawing = drawn(SHOP, 'src/cart.ts', WHOLE)

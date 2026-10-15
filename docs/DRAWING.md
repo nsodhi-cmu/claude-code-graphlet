@@ -86,6 +86,12 @@ A graph larger than its room is seen through a window, and never laid out again 
 - `scrollIn` scrolls the window by cells, or by turns of the wheel, which go the way the graph has more rooms' worth out of view: along it, or down it.
 - Every shelf slides under the window together, each as far as its own end. With `scroll` at `pinned`, that leaves a shelf that fits the room where it is while a longer one slides, and the wires between the two follow. With `scroll` at `sheet`, the shelves move as one.
 
+## Names At The Edge
+
+While the window shows the selected node's label, each node joined to it whose label the window does not show is named at the window's edge, after an arrow pointing out toward it: `◂ cart.ts` down the first column and `cart.ts ▸` down the last, for a box off to that side, on the row of its label; `▴ cart.ts` along the top row and `▾ cart.ts` along the bottom, for a box above or below, under or over its middle. A name is lit, as the node's box would be, and a click on it selects the node, which moves the window to it.
+
+A name covers only lines and blanks, never a box or a lit line, and has a blank on either side. The names at the sides are written first. A name with no room where it belongs goes to the nearest place along its edge that has room, and one with none is not written; the lit line still leads to the node, and the foot still counts it.
+
 ## The Foot
 
 The last row of a drawing is its foot. A graph with no nodes has no drawing, and so none.
