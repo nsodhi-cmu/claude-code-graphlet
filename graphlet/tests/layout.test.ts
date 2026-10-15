@@ -46,6 +46,11 @@ describe('wrapping a label', () => {
     expect(wrap('abcdefghijklmnopqrstuvwxyz0123', 10, 3)).toEqual(['abcdefghij', 'klmnopqrst', 'uvwxyz0123'])
   })
 
+  test('a label in characters two cells wide is wrapped by the cells it takes', () => {
+    expect(wrap('数据库 连接池 管理器', 8, 3)).toEqual(['数据库', '连接池', '管理器'])
+    expect(wrap('这是一个非常长的标签', 8, 3)).toEqual(['这是一个', '非常长的', '标签'])
+  })
+
   test('what is left after the last line allowed is cut short there, and ends in an ellipsis', () => {
     expect(wrap('one two three four five six seven eight nine ten', 9, 3)).toEqual(['one two', 'three', 'four fiv…'])
   })

@@ -1,8 +1,8 @@
-import { canvasOf, footRow, spansOf } from './draw'
+import { canvasOf, footRow, sizeOf, spansOf } from './draw'
 import type { Canvas, Drawing, Hit, Paint, Pan, Room } from './draw'
 import { isJoined } from './layers'
 import type { Graph } from './layers'
-import { layTracks, routeOf, sizeOf } from './layout'
+import { layTracks, routeOf } from './layout'
 import type { Channel, End, Layout, Place, Shelf } from './layout'
 import { sightOf, slideOf, within } from './window'
 

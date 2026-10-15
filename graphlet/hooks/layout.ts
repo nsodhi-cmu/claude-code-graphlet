@@ -1,5 +1,5 @@
 import type { GraphletLink, GraphletNode } from '../types'
-import { clipMiddle } from './draw'
+import { charactersOf, clipMiddle, fitting, sizeOf } from './draw'
 import type { Room } from './draw'
 import { layersOf } from './layers'
 import type { Graph, Piece, Slot } from './layers'
@@ -32,14 +32,14 @@ export type Links = 'separate' | 'merged'
 export type Look = { scroll: Scroll; labels: Labels; links: Links }
 
 /**
- * The widest a line of a wrapped label is, the longest a word may be and
- * still keep a line to itself, and the most lines a label is wrapped onto.
+ * The most cells a line of a wrapped label takes, the most a word may take
+ * and still keep a line to itself, and the most lines a label is wrapped onto.
  */
 const LABEL_COLUMNS = 24
 const WORD_COLUMNS = 32
 const LABEL_ROWS = 3
-/** The most characters of a label that is cut to one line. */
-const CLIP_CHARS = 32
+/** The most cells of a label that is cut to one line. */
+const CLIP_CELLS = 32
 /** What a box adds to its widest line: a space and a border on each side. */
 const BOX_PADDING = 4
 /** The narrowest box: one whose two ports stand apart. A shorter label is set in its middle. */
@@ -55,11 +55,9 @@ const BREAKS = '/-_.'
 /** The sign in the box of a node that links to itself. */
 const LOOP = '↺'
 
-export const sizeOf = (text: string): number => [...text].length
-
 /**
- * A label on lines no wider than `columns`, broken at its spaces. A word of
- * up to `word` characters keeps a line to itself, however wide that makes
+ * A label on lines no wider than `columns` cells, broken at its spaces. A
+ * word of up to `word` cells keeps a line to itself, however wide that makes
  * the line; a longer one is broken after the last `/`, `-`, `_` or `.` that
  * fits a line, or with none, where the line ends. What is left after `rows`
  * lines is cut short on the last of them, and ends in an ellipsis.
@@ -68,16 +66,16 @@ export function wrap(label: string, columns: number, rows: number, word = column
   const lines: string[] = []
   let line = ''
   for (const next of label.split(' ')) {
-    let rest = [...next]
-    if (line !== '' && sizeOf(line) + 1 + rest.length <= columns) {
+    let rest = charactersOf(next)
+    if (line !== '' && sizeOf(line) + 1 + sizeOf(next) <= columns) {
       line = `${line} ${next}`
       continue
     }
     if (line !== '') lines.push(line)
-    while (rest.length > word) {
-      const fits = rest.slice(0, columns)
-      const last = Math.max(...[...BREAKS].map(mark => fits.lastIndexOf(mark)))
-      const cut = last > 0 ? last + 1 : columns
+    while (sizeOf(rest.join('')) > word) {
+      const fits = fitting(rest, columns)
+      const last = Math.max(...[...BREAKS].map(mark => rest.slice(0, fits).lastIndexOf(mark)))
+      const cut = last > 0 ? last + 1 : fits
       lines.push(rest.slice(0, cut).join(''))
       rest = rest.slice(cut)
     }
@@ -85,8 +83,8 @@ export function wrap(label: string, columns: number, rows: number, word = column
   }
   if (line !== '') lines.push(line)
   if (lines.length <= rows) return lines
-  const last = [...lines.slice(rows - 1).join(' ')]
-  return [...lines.slice(0, rows - 1), `${last.slice(0, columns - 1).join('').trimEnd()}…`]
+  const last = charactersOf(lines.slice(rows - 1).join(' '))
+  return [...lines.slice(0, rows - 1), `${last.slice(0, fitting(last, columns - 1)).join('').trimEnd()}…`]
 }
 
 /** A label on the lines every picture of its node wraps it onto. */
@@ -103,7 +101,7 @@ export function wordsOf(graph: Graph, node: GraphletNode, labels: Labels): Words
   const after = [...(isLooped ? [LOOP] : []), ...(node.badge === undefined ? [] : [node.badge])].join(' ')
   return {
     mark: node.mark === undefined ? '' : `${node.mark} `,
-    lines: labels === 'clip' ? [clipMiddle(node.label, CLIP_CHARS)] : linesOf(node.label),
+    lines: labels === 'clip' ? [clipMiddle(node.label, CLIP_CELLS)] : linesOf(node.label),
     badge: after === '' ? '' : `  ${after}`,
   }
 }

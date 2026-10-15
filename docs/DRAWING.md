@@ -89,3 +89,7 @@ A run of text is in one paint: a node's tone, or `accent` for what is selected o
 | `warn` | `warning` |
 | `bad` | `error` |
 | `accent` | `claude` |
+
+## Cells
+
+A drawing is painted on a canvas of cells, a row of them a row of the picture, before its rows become runs of text. A character two cells wide, of an East Asian script or an emoji, takes its cell and the one after, which holds nothing. Where the window's edge would cut such a character, or a later write covers half of it, as the ellipsis of a box the edge cuts may, what is left of it is blank. So no row ever holds half a character, and every row is as wide as the window, whatever its labels are written in.

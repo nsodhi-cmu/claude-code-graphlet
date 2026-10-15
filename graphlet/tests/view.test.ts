@@ -2,12 +2,12 @@ import { expect, test } from 'claude-code/testing'
 
 import { numbers } from './fixture'
 import type { GraphletMove } from '../types'
-import { rowText } from '../hooks/draw'
+import { rowText, sizeOf } from '../hooks/draw'
 import { readGraph } from '../hooks/layers'
 import type { Look } from '../hooks/layout'
 import { MOVES, viewOf } from '../hooks/view'
 
-const LABELS = ['a', 'node', 'src/some/long/path/to/file.component.ts', 'Validate the incoming request', 'x-y_z.w', '']
+const LABELS = ['a', 'node', 'src/some/long/path/to/file.component.ts', 'Validate the incoming request', 'x-y_z.w', '', '数据库连接池', '✅ 完成']
 const LOOKS: Look[] = (['pinned', 'sheet'] as const).flatMap(scroll =>
   (['wrap', 'clip'] as const).flatMap(labels => (['separate', 'merged'] as const).map(links => ({ scroll, labels, links }))),
 )
@@ -34,7 +34,7 @@ test('any graph, in any room, under any settings, is drawn inside its room with 
 
     const pan = view.show(graph, selected, room, { x: pick(300), y: pick(60) })
     const drawing = view.draw(graph, selected, room, pan)
-    expect(Math.max(0, ...drawing.rows.map(row => [...rowText(row)].length))).toBeLessThanOrEqual(room.columns)
+    expect(Math.max(0, ...drawing.rows.map(row => sizeOf(rowText(row))))).toBeLessThanOrEqual(room.columns)
     expect(drawing.rows.length).toBeLessThanOrEqual(room.rows)
     const cells: string[] = []
     for (const hit of drawing.hits) {

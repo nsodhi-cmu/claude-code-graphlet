@@ -1,5 +1,5 @@
 import type { GraphletGraph, GraphletNode } from '../types'
-import { rowText } from '../hooks/draw'
+import { charactersOf, rowText, sizeOf } from '../hooks/draw'
 import type { Drawing } from '../hooks/draw'
 import { readGraph } from '../hooks/layers'
 import type { Graph } from '../hooks/layers'
@@ -23,6 +23,9 @@ export const numbers = (seed: number): (() => number) => {
     return state / 0x7fffffff
   }
 }
+
+/** A row of a picture as the cells a terminal draws it in: a character two cells wide, and then nothing. */
+export const cellsOf = (row: string): string[] => charactersOf(row).flatMap(character => (sizeOf(character) === 2 ? [character, ''] : [character]))
 
 /** A drawing as the text of its rows. */
 export const picture = (drawing: Drawing): string[] => drawing.rows.map(rowText)

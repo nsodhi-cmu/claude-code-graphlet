@@ -129,19 +129,59 @@ export function rowText(row: Span[]): string {
   return row.map(span => span.text).join('')
 }
 
-/** A label cut to `max` characters from its middle, so that it keeps how it starts and how it ends. */
-export function clipMiddle(label: string, max: number): string {
-  const characters = [...label]
-  if (characters.length <= max) return label
-  const kept = Math.max(0, max - 1)
-  const head = characters.slice(0, Math.ceil(kept / 2)).join('')
-  return `${head}…${characters.slice(characters.length - Math.floor(kept / 2)).join('')}`
+let graphemes: Intl.Segmenter | undefined
+/**
+ * The characters a person sees in a text: a letter with the marks on it is
+ * one, and so is an emoji with the ones joined to it. Where the runtime cannot
+ * tell, each code point is one.
+ */
+export function charactersOf(text: string): string[] {
+  if (typeof Intl?.Segmenter !== 'function') return [...text]
+  graphemes ??= new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+  return Array.from(graphemes.segment(text), part => part.segment)
 }
 
-/** One cell of a canvas. */
+/** The characters a terminal draws two cells wide: those of East Asian scripts and the fullwidth forms. */
+const WIDE = /^[\u1100-\u115f\u2329\u232a\u2e80-\u303e\u3041-\u33ff\u3400-\u4dbf\u4e00-\u9fff\ua000-\ua4cf\ua960-\ua97f\uac00-\ud7a3\uf900-\ufaff\ufe10-\ufe19\ufe30-\ufe6f\uff00-\uff60\uffe0-\uffe6\u{1f200}-\u{1f2ff}\u{20000}-\u{3fffd}]/u
+/** An emoji drawn as a picture, two cells wide: one that is by default, one a variation selector asks to be, or a flag. */
+const PICTURE = /^(?:\p{Emoji_Presentation}|\p{Extended_Pictographic}\ufe0f|\p{Regional_Indicator})/u
+/** What takes no cell of its own: a mark on the character before it, or a sign that shapes the text and draws nothing. */
+const UNSEEN = /^[\p{Mn}\p{Me}\p{Cf}]+$/u
+
+/** How many cells a text takes in a terminal: two a wide character or emoji, none a mark alone, and one any other. */
+export const sizeOf = (text: string): number =>
+  charactersOf(text).reduce((sum, character) => sum + (WIDE.test(character) || PICTURE.test(character) ? 2 : UNSEEN.test(character) ? 0 : 1), 0)
+
+/** How many of a text's first characters fit in `cells`, and at least one. */
+export function fitting(characters: string[], cells: number): number {
+  let [count, used] = [0, 0]
+  for (const character of characters) {
+    if (used + sizeOf(character) > cells) break
+    used += sizeOf(character)
+    count += 1
+  }
+  return Math.max(1, Math.min(count, characters.length))
+}
+
+/** A label cut to `max` cells from its middle, so that it keeps how it starts and how it ends. */
+export function clipMiddle(label: string, max: number): string {
+  if (sizeOf(label) <= max) return label
+  const characters = charactersOf(label)
+  const kept = Math.max(0, max - 1)
+  const head = characters.slice(0, fitting(characters, Math.ceil(kept / 2)))
+  const tail = characters.toReversed().slice(0, fitting(characters.toReversed(), Math.floor(kept / 2))).toReversed()
+  return `${head.join('')}…${tail.join('')}`
+}
+
+/** One cell of a canvas. The cell after a character two cells wide holds nothing, `''`, for the character covers it. */
 export type Cell = { char: string; paint: Paint; isBold?: true; isInverse?: true }
 
-/** The cells a window is painted on, and the one way they are written: what falls outside them is not. */
+/**
+ * The cells a window is painted on, and the one way they are written: what
+ * falls outside them is not. A character two cells wide takes two; where the
+ * window's edge would cut it, or a later write covers half of it, what is
+ * left of it is blank, so that no row ever holds half a character.
+ */
 export type Canvas = { cells: Cell[][]; put: (x: number, y: number, text: string, style: Omit<Cell, 'char'>) => void }
 
 export function canvasOf(columns: number, rows: number): Canvas {
@@ -149,10 +189,31 @@ export function canvasOf(columns: number, rows: number): Canvas {
     Array.from({ length: columns }, () => ({ char: ' ', paint: 'plain' as Paint })),
   )
   const put: Canvas['put'] = (x, y, text, style) => {
-    ;[...text].forEach((char, index) => {
-      const row = cells[y]
-      if (row !== undefined && x + index >= 0 && x + index < columns) row[x + index] = { char, ...style }
-    })
+    const row = cells[y]
+    if (row === undefined) return
+    const blank = (at: number): void => {
+      const cell = row[at]
+      if (cell !== undefined) row[at] = { ...cell, char: ' ' }
+    }
+    const set = (at: number, char: string): void => {
+      const cell = row[at]
+      if (cell === undefined) return
+      if (cell.char === '') blank(at - 1)
+      else if (sizeOf(cell.char) === 2) blank(at + 1)
+      row[at] = { char, ...style }
+    }
+    let at = x
+    for (const character of charactersOf(text)) {
+      const size = sizeOf(character)
+      if (size === 2 && (at < 0 || at + 1 >= columns)) {
+        set(at, ' ')
+        set(at + 1, ' ')
+      } else if (size > 0) {
+        set(at, character)
+        if (size === 2) set(at + 1, '')
+      }
+      at += size
+    }
   }
   return { cells, put }
 }

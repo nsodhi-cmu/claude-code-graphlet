@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { beyondRow, canvasOf, clipMiddle, reveal, rowText, spansOf } from '../hooks/draw'
+import { beyondRow, canvasOf, clipMiddle, reveal, rowText, sizeOf, spansOf } from '../hooks/draw'
 
 describe('a window brought to what it must show', () => {
   test('one that already shows it stays where it is', () => {
@@ -82,6 +82,27 @@ describe('text and cells', () => {
   test('a label is cut from its middle, so that how it starts and how it ends both stay', () => {
     expect(clipMiddle('subscription-manager.test.ts', 16)).toBe('subscrip…test.ts')
     expect(clipMiddle('cart.ts', 16)).toBe('cart.ts')
+    expect(clipMiddle('数据库连接池管理器', 9)).toBe('数据…理器')
+  })
+
+  test('text takes the cells a terminal draws it in: two a wide character or emoji, one an emoji and all that is joined to it, none a mark', () => {
+    expect(sizeOf('数据库')).toBe(6)
+    expect(sizeOf('✅ done')).toBe(7)
+    expect(sizeOf('👨‍👩‍👧')).toBe(2)
+    expect(sizeOf('🇯🇵')).toBe(2)
+    expect(sizeOf('❤️')).toBe(2)
+    expect(sizeOf('cafe\u0301')).toBe(4)
+    expect(sizeOf('◆ ↺ … →')).toBe(7)
+  })
+
+  test('on a canvas a wide character covers the cell after it, and what an edge or a later write leaves of it is blank, never half a character', () => {
+    const canvas = canvasOf(7, 1)
+    canvas.put(-1, 0, '数a数据', { paint: 'plain' })
+    canvas.put(5, 0, 'x', { paint: 'plain' })
+    canvas.put(6, 0, '库', { paint: 'plain' })
+    expect(canvas.cells.map(row => rowText(spansOf(row)))).toEqual([' a数 x'])
+    canvas.put(2, 0, 'y', { paint: 'plain' })
+    expect(canvas.cells.map(row => rowText(spansOf(row)))).toEqual([' ay  x'])
   })
 
   test('what is written past a canvas\'s edges is not kept, and a row reads as its runs of one paint, less the blanks it ends in', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { LOOK, SHOP, graphOf, graphRows, numbers, picture, undirected } from './fixture'
+import { LOOK, SHOP, cellsOf, graphOf, graphRows, numbers, picture, undirected } from './fixture'
 import { rowText } from '../hooks/draw'
 import type { Drawing, Hit, Span } from '../hooks/draw'
 import { readGraph } from '../hooks/layers'
@@ -213,6 +213,25 @@ describe('the drawing', () => {
       { from: 'a', to: 'b' },
       { from: 'b', to: 'c' },
     ],
+  })
+
+  test('a label in characters two cells wide takes two cells a character, so its box and its row stay in line', () => {
+    const graph = graphOf(['用户服务', '数据库', '✅ Done', '缓存层'], [['用户服务', '数据库'], ['用户服务', '缓存层'], ['数据库', '✅ Done'], ['缓存层', '✅ Done']])
+    expect(graphRows(drawn(graph))).toEqual([
+      '              ┌──────────┐',
+      '              │ 用户服务 │',
+      '              └─────┬────┘',
+      '              ┌─────┴─────┐',
+      '              ▼           ▼',
+      '         ┌────────┐  ┌────────┐',
+      '         │ 数据库 │  │ 缓存层 │',
+      '         └────┬───┘  └────┬───┘',
+      '              └─────┬─────┘',
+      '                    ▼',
+      '               ┌─────────┐',
+      '               │ ✅ Done │',
+      '               └─────────┘',
+    ])
   })
 
   test('a long label is wrapped onto more lines of a taller box, and a short one is set in the middle of the narrowest', () => {
@@ -530,7 +549,7 @@ type Said = { node: string; channel: number; side: 'from' | 'to' | 'above' | 'be
  * for. Also answers where each line ends with nothing to meet it.
  */
 function readOff(graph: Graph, layout: Layout, drawing: Drawing, xOf: (place: Place) => number): { links: string[]; loose: string[] } {
-  const rows = picture(drawing).slice(0, -1).map(row => [...row])
+  const rows = picture(drawing).slice(0, -1).map(cellsOf)
   const at = (x: number, y: number): string => rows[y]?.[x] ?? ' '
   const isOff = (x: number): boolean => x < 0 || x >= layout.columns
   const ways = new Map<string, number>()
@@ -655,7 +674,7 @@ describe('what a picture says', () => {
     const count = 2 + pick(15)
     const links = Array.from({ length: pick(count * 2 + 2) }, () => [`n${pick(count)}`, `n${pick(count)}`])
     return readGraph({
-      nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: pick(4) === 0 ? `Validate the request ${index}` : `n${index}` })),
+      nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: [`Validate the request ${index}`, `数据库 ${index}`, `✅ ${index}`][pick(4)] ?? `n${index}` })),
       links: [...links, ...links.filter(() => pick(3) === 0).map(([from, to]) => [to, from])].map(([from = '', to = '']) => ({ from, to })),
       isDirected: pick(4) !== 0,
     })

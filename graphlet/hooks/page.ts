@@ -1,4 +1,5 @@
 import type { GraphletLink, GraphletNode, GraphletTone } from '../types'
+import { sizeOf } from './draw'
 import { layersOf } from './layers'
 import type { Graph, Slot } from './layers'
 import { linesOf } from './layout'
@@ -156,7 +157,7 @@ type Spot = { slot: Slot; layer: number; x: number; y: number; width: number; he
  */
 type Arrow = { path: string; tip: Point; way: Point; isUp: boolean }
 
-const widthOf = (text: string): number => [...text].length * CHAR_WIDTH
+const widthOf = (text: string): number => sizeOf(text) * CHAR_WIDTH
 
 const middleOf = (spot: Spot): number => spot.x + spot.width / 2
 
