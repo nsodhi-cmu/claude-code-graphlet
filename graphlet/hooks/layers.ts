@@ -75,24 +75,36 @@ export function isJoined(graph: Graph, a: string, b: string): boolean {
   return isLinked(graph, a, b) || isLinked(graph, b, a)
 }
 
+/** Each node's links out, and each node's links in, a link to itself in neither, in the order the graph names them. */
+function adjacencyOf(graph: Graph): { outOf: Map<string, GraphletLink[]>; into: Map<string, GraphletLink[]> } {
+  const outOf = new Map<string, GraphletLink[]>(graph.nodes.map(node => [node.id, []]))
+  const into = new Map<string, GraphletLink[]>(graph.nodes.map(node => [node.id, []]))
+  for (const link of graph.links) {
+    if (link.from === link.to) continue
+    outOf.get(link.from)?.push(link)
+    into.get(link.to)?.push(link)
+  }
+  return { outOf, into }
+}
+
 /**
  * Links that close the loops, found by following the links from the nodes
  * nothing links to, and then from any node not yet reached: each link that
  * leads back to a node still being followed.
  */
 function followedLoops(graph: Graph): Set<GraphletLink> {
+  const { outOf, into } = adjacencyOf(graph)
   const closing = new Set<GraphletLink>()
   const state = new Map<string, 'open' | 'done'>()
   const follow = (id: string): void => {
     state.set(id, 'open')
-    for (const link of graph.links) {
-      if (link.from !== id || link.to === id) continue
+    for (const link of outOf.get(id) ?? []) {
       if (state.get(link.to) === 'open') closing.add(link)
       else if (!state.has(link.to)) follow(link.to)
     }
     state.set(id, 'done')
   }
-  const sources = graph.nodes.filter(node => !graph.links.some(link => link.to === node.id && link.from !== node.id))
+  const sources = graph.nodes.filter(node => (into.get(node.id) ?? []).length === 0)
   for (const node of [...sources, ...graph.nodes]) if (!state.has(node.id)) follow(node.id)
   return closing
 }
@@ -109,13 +121,8 @@ function followedLoops(graph: Graph): Set<GraphletLink> {
  * closes a loop; with these turned around, the graph has no loop.
  */
 function orderedLoops(graph: Graph): Set<GraphletLink> {
+  const { outOf, into } = adjacencyOf(graph)
   const links = graph.links.filter(link => link.from !== link.to)
-  const outOf = new Map<string, GraphletLink[]>(graph.nodes.map(node => [node.id, []]))
-  const into = new Map<string, GraphletLink[]>(graph.nodes.map(node => [node.id, []]))
-  for (const link of links) {
-    outOf.get(link.from)?.push(link)
-    into.get(link.to)?.push(link)
-  }
   const reached = new Map<string, number>()
   const walk = (id: string): void => {
     if (reached.has(id)) return
@@ -126,27 +133,36 @@ function orderedLoops(graph: Graph): Set<GraphletLink> {
   for (const node of graph.nodes) walk(node.id)
 
   const left = new Set(graph.nodes.map(node => node.id))
-  const outs = (id: string): number => (outOf.get(id) ?? []).filter(link => left.has(link.to)).length
-  const ins = (id: string): number => (into.get(id) ?? []).filter(link => left.has(link.from)).length
+  const outs = new Map(graph.nodes.map(node => [node.id, (outOf.get(node.id) ?? []).length]))
+  const ins = new Map(graph.nodes.map(node => [node.id, (into.get(node.id) ?? []).length]))
+  const take = (id: string): void => {
+    left.delete(id)
+    for (const link of into.get(id) ?? []) outs.set(link.from, (outs.get(link.from) ?? 0) - 1)
+    for (const link of outOf.get(id) ?? []) ins.set(link.to, (ins.get(link.to) ?? 0) - 1)
+  }
   const [front, back]: [string[], string[]] = [[], []]
   while (left.size > 0) {
     for (let isPeeled = true; isPeeled; ) {
       isPeeled = false
-      for (const id of [...left].filter(one => outs(one) === 0)) {
+      for (const id of [...left].filter(one => outs.get(one) === 0)) {
         back.unshift(id)
-        left.delete(id)
+        take(id)
         isPeeled = true
       }
-      for (const id of [...left].filter(one => ins(one) === 0)) {
+      for (const id of [...left].filter(one => ins.get(one) === 0)) {
         front.push(id)
-        left.delete(id)
+        take(id)
         isPeeled = true
       }
     }
-    const next = [...left].sort((a, b) => outs(b) - ins(b) - (outs(a) - ins(a)) || (reached.get(a) ?? 0) - (reached.get(b) ?? 0))[0]
+    let next: string | undefined
+    for (const id of left) {
+      const [lead, best] = [(outs.get(id) ?? 0) - (ins.get(id) ?? 0), next === undefined ? -Infinity : (outs.get(next) ?? 0) - (ins.get(next) ?? 0)]
+      if (lead > best || (lead === best && (reached.get(id) ?? 0) < (reached.get(next ?? '') ?? 0))) next = id
+    }
     if (next === undefined) break
     front.push(next)
-    left.delete(next)
+    take(next)
   }
   const at = new Map([...front, ...back].map((id, index) => [id, index]))
   return new Set(links.filter(link => (at.get(link.from) ?? 0) > (at.get(link.to) ?? 0)))
@@ -187,15 +203,18 @@ function distancesOf(graph: Graph): Map<string, number> {
  * to wherever that makes more links shorter than longer.
  */
 function ranksWith(graph: Graph, closing: Set<GraphletLink>): Map<string, number> {
-  const down = graph.links
-    .filter(link => link.from !== link.to)
-    .map(link => (closing.has(link) ? { from: link.to, to: link.from } : link))
+  const [above, below] = [new Map<string, string[]>(), new Map<string, string[]>()]
+  for (const link of graph.links) {
+    if (link.from === link.to) continue
+    const [from, to] = closing.has(link) ? [link.to, link.from] : [link.from, link.to]
+    above.set(to, [...(above.get(to) ?? []), from])
+    below.set(from, [...(below.get(from) ?? []), to])
+  }
   const ranks = new Map<string, number>()
   const rankOf = (id: string): number => {
     const known = ranks.get(id)
     if (known !== undefined) return known
-    const above = down.filter(link => link.to === id).map(link => rankOf(link.from) + 1)
-    const rank = Math.max(0, ...above)
+    const rank = Math.max(0, ...(above.get(id) ?? []).map(from => rankOf(from) + 1))
     ranks.set(id, rank)
     return rank
   }
@@ -205,10 +224,9 @@ function ranksWith(graph: Graph, closing: Set<GraphletLink>): Map<string, number
   const settle = (id: string): void => {
     if (settled.has(id)) return
     settled.add(id)
-    const below = down.filter(link => link.from === id)
-    for (const link of below) settle(link.to)
-    const above = down.filter(link => link.to === id)
-    if (below.length > above.length) ranks.set(id, Math.min(...below.map(link => ranks.get(link.to) ?? 0)) - 1)
+    const downs = below.get(id) ?? []
+    for (const to of downs) settle(to)
+    if (downs.length > (above.get(id) ?? []).length) ranks.set(id, Math.min(...downs.map(to => ranks.get(to) ?? 0)) - 1)
   }
   for (const node of graph.nodes) settle(node.id)
   return packed(ranks)
@@ -311,12 +329,23 @@ export type Piece = { link: GraphletLink; upper: Slot; lower: Slot; isUp: boolea
  */
 export type Layers = { slots: Slot[][]; pieces: Piece[][]; flats: GraphletLink[][] }
 
-/** How many pairs of stretches between two neighboring layers cross. */
+/**
+ * How many pairs of stretches between two neighboring layers cross: with the
+ * stretches in the order of their places above, how many pairs stand the other
+ * way round below, counted as Barth, Jünger and Mutzel count them.
+ */
 function crossingsOf(pieces: Piece[], upper: Slot[], lower: Slot[]): number {
   const [above, below] = [new Map(upper.map((slot, place) => [slot, place])), new Map(lower.map((slot, place) => [slot, place]))]
-  const ends = pieces.map(piece => [above.get(piece.upper) ?? 0, below.get(piece.lower) ?? 0] as const)
-  let crossings = 0
-  for (const [i, j] of ends) for (const [k, l] of ends) if (i < k && j > l) crossings += 1
+  const ends = pieces.map(piece => [above.get(piece.upper) ?? 0, below.get(piece.lower) ?? 0] as const).sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  const counted = Array.from({ length: lower.length + 1 }, () => 0)
+  let [crossings, seen] = [0, 0]
+  for (const [, place] of ends) {
+    let atOrBefore = 0
+    for (let at = place + 1; at > 0; at -= at & -at) atOrBefore += counted[at] ?? 0
+    crossings += seen - atOrBefore
+    for (let at = place + 1; at < counted.length; at += at & -at) counted[at] = (counted[at] ?? 0) + 1
+    seen += 1
+  }
   return crossings
 }
 
@@ -360,7 +389,7 @@ export function layersOf(graph: Graph, fold?: Fold): Layers {
   const ranks = fold === undefined ? ranksOf(graph) : folded(graph, ranksOf(graph), fold)
   const count = Math.max(-1, ...ranks.values()) + 1
   const slotOf = new Map<string, Slot>(graph.nodes.map(node => [node.id, { node }]))
-  let slots: Slot[][] = Array.from({ length: count }, () => [])
+  const slots: Slot[][] = Array.from({ length: count }, () => [])
   for (const node of graph.nodes) slots[ranks.get(node.id) ?? 0]?.push(slotOf.get(node.id) ?? { node })
   const pieces: Piece[][] = Array.from({ length: Math.max(0, count - 1) }, () => [])
   const flats: GraphletLink[][] = Array.from({ length: count }, () => [])
@@ -393,19 +422,15 @@ export function layersOf(graph: Graph, fold?: Fold): Layers {
 
   const crossings = (order: Slot[][]): number =>
     pieces.reduce((sum, between, index) => sum + crossingsOf(between, order[index] ?? [], order[index + 1] ?? []), 0)
-  let best = { slots, crossings: crossings(slots) }
+  let best = { slots: [...slots], crossings: crossings(slots) }
   const keepBest = (): void => {
     const now = crossings(slots)
-    if (now < best.crossings) best = { slots, crossings: now }
+    if (now < best.crossings) best = { slots: [...slots], crossings: now }
   }
   for (let sweep = 0; sweep < SWEEPS && best.crossings > 0; sweep += 1) {
-    for (let index = 1; index < count; index += 1) {
-      slots = slots.with(index, sorted(slots[index] ?? [], slots[index - 1] ?? [], pieces[index - 1] ?? []))
-    }
+    for (let index = 1; index < count; index += 1) slots[index] = sorted(slots[index] ?? [], slots[index - 1] ?? [], pieces[index - 1] ?? [])
     keepBest()
-    for (let index = count - 2; index >= 0; index -= 1) {
-      slots = slots.with(index, sorted(slots[index] ?? [], slots[index + 1] ?? [], pieces[index] ?? []))
-    }
+    for (let index = count - 2; index >= 0; index -= 1) slots[index] = sorted(slots[index] ?? [], slots[index + 1] ?? [], pieces[index] ?? [])
     keepBest()
   }
   return { slots: best.slots, pieces, flats }

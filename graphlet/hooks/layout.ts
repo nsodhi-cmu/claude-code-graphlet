@@ -293,8 +293,8 @@ function bundlesOf(wires: Wire[], links: Links, isDirected: boolean): Wire[][] {
 function dealPorts(shelves: Shelf[], channels: Channel[], isDirected: boolean): void {
   type Group = { ends: End[]; leaving: Wire[]; heading: number; isUp: boolean; far: Set<Place>; label: string }
   const faces = new Map<Place, { top: Group[]; bottom: Group[] }>()
-  const alongOf = (place: Place): number =>
-    ((shelves[place.shelf]?.places.indexOf(place) ?? 0) + 0.5) / (shelves[place.shelf]?.places.length ?? 1)
+  const indexOf = new Map(shelves.flatMap(shelf => shelf.places.map((place, index) => [place, index] as const)))
+  const alongOf = (place: Place): number => ((indexOf.get(place) ?? 0) + 0.5) / (shelves[place.shelf]?.places.length ?? 1)
   const groupOf = (ends: End[], far: End[], leaving: Wire[], isUp: boolean): void => {
     const [first] = ends
     if (first === undefined) return
@@ -476,19 +476,29 @@ const runOf = (stops: Stop[], jog: number | null): Run => {
   }
 }
 
-/** Whether run `a` must go above run `b`: it comes down a column that `b` goes down from its own, so below it they would run into one line. */
-const asksAbove = (a: Run, b: Run): boolean => a.fromAbove.some(column => b.below.has(column))
+/**
+ * For each run, the runs it asks to go above, in the order they stand: those
+ * that go down from their own track a column it comes down to its track, so
+ * that below it the two would run into one line.
+ */
+function asksOf(runs: Run[]): number[][] {
+  const belowAt = new Map<number, number[]>()
+  runs.forEach((run, index) => {
+    for (const column of run.below) belowAt.set(column, [...(belowAt.get(column) ?? []), index])
+  })
+  return runs.map((run, a) => [...new Set(run.fromAbove.flatMap(column => belowAt.get(column) ?? []))].filter(b => b !== a).sort((x, y) => x - y))
+}
 
 /** Runs that ask to go above one another in a ring, each above the next: none of them can be given it. What is `excused` of a run is not asked of it. */
 function ringOf(runs: Run[], excused: Map<Run, Set<Run>>): number[] | undefined {
+  const asks = asksOf(runs)
   const state = runs.map(() => 'new' as 'new' | 'open' | 'done')
   const path: number[] = []
   const follow = (a: number): number[] | undefined => {
     state[a] = 'open'
     path.push(a)
-    for (let b = 0; b < runs.length; b += 1) {
-      const [above, below] = [runs[a] as Run, runs[b] as Run]
-      if (b === a || !asksAbove(above, below) || excused.get(above)?.has(below)) continue
+    for (const b of asks[a] ?? []) {
+      if (excused.get(runs[a] as Run)?.has(runs[b] as Run)) continue
       if (state[b] === 'open') return path.slice(path.indexOf(b))
       const ring = state[b] === 'new' ? follow(b) : undefined
       if (ring !== undefined) return ring
@@ -573,10 +583,26 @@ function tracksOf(bundles: Wire[][], xOf: (place: Place) => number, isLoose: boo
   }
 
   const laid = runs.sort((a, b) => a.start - b.start)
-  const within = (columns: number[], run: Run): number => columns.filter(column => column > run.start && column < run.end).length
+  const [aboveOf, belowOf] = [laid.map(run => run.fromAbove.toSorted((x, y) => x - y)), laid.map(run => run.fromBelow.toSorted((x, y) => x - y))]
+  /** How many of these columns, in order, stand within a run's ends. */
+  const within = (columns: number[], run: Run): number => {
+    const firstPast = (column: number, isAt: boolean): number => {
+      let [low, high] = [0, columns.length]
+      while (low < high) {
+        const middle = (low + high) >> 1
+        if ((columns[middle] ?? 0) < column || (!isAt && columns[middle] === column)) low = middle + 1
+        else high = middle
+      }
+      return low
+    }
+    return Math.max(0, firstPast(run.end, true) - firstPast(run.start, false))
+  }
   /** For each pair, whether the first asks to go above the second, and how many times they cross if it does. */
-  const asks = laid.map(a => laid.map(b => asksAbove(a, b)))
-  const crossings = laid.map(a => laid.map(b => within(b.fromAbove, a) + within(a.fromBelow, b)))
+  const asks = laid.map(() => laid.map(() => false))
+  asksOf(laid).forEach((below, a) => {
+    for (const b of below) (asks[a] as boolean[])[b] = true
+  })
+  const crossings = laid.map((a, ai) => laid.map((b, bi) => within(aboveOf[bi] ?? [], a) + within(belowOf[ai] ?? [], b)))
   const mustFollow = (a: number, b: number): boolean => asks[b]?.[a] === true && asks[a]?.[b] !== true
 
   const waiting = new Set(laid.keys())
