@@ -2,7 +2,7 @@ import type { GraphletLink, GraphletNode } from '../types'
 import { charactersOf, clipMiddle, fitting, sizeOf } from './draw'
 import type { Room } from './draw'
 import { layersOf } from './layers'
-import type { Graph, Piece, Slot } from './layers'
+import type { Graph, Link, Piece, Slot } from './layers'
 
 // The layout: a box a node, the boxes of a layer side by side on a shelf with
 // the lanes of the links that pass through it, and between two shelves a
@@ -31,7 +31,7 @@ export type Links = 'separate' | 'merged'
 /**
  * Whether the selected node's links show the way they run. `still`: they are
  * lit lines. `flowing`: beads run along each, from the node it leaves to the
- * node it reaches. An undirected graph's links run no way, and never flow.
+ * node it reaches. A link that runs no way never flows.
  */
 export type Motion = 'still' | 'flowing'
 
@@ -164,12 +164,12 @@ export type End = { place: Place; isAbove: boolean; at: number }
  * does not go straight across, it turns on the row of the channel that is its
  * `track`, and where its bundle runs on two tracks, steps across to the
  * other at its `jog`. It keeps `clearOf` the other ports of the face it
- * leaves, of the columns next to its own where it leaves with others, and in
- * an undirected graph of the columns next to the other ports, so that two
- * ticks never touch.
+ * leaves, of the columns next to its own where it leaves with others, and on
+ * a face where a link with no direction meets its box at a tick, of the
+ * columns next to the other ports, so that two ticks never touch.
  */
 export type Wire = {
-  link: GraphletLink
+  link: Link
   from: End
   to: End
   hasHead: boolean
@@ -225,7 +225,7 @@ export function routeOf(wire: Wire, xOf: (place: Place) => number): { out: numbe
 }
 
 /** The wires of the channel under a shelf: the stretches that cross it, and the links between two nodes of that shelf. */
-function wiresOf(pieces: Piece[], flats: GraphletLink[], shelf: Shelf, placeOf: Map<Slot, Place>, isDirected: boolean): Wire[] {
+function wiresOf(pieces: Piece[], flats: Link[], shelf: Shelf, placeOf: Map<Slot, Place>): Wire[] {
   const wires: Wire[] = []
   const rest = { bundle: 0, track: 0, jog: null, clearOf: [] }
   for (const piece of pieces) {
@@ -234,7 +234,7 @@ function wiresOf(pieces: Piece[], flats: GraphletLink[], shelf: Shelf, placeOf: 
     const above: End = { place: upper, isAbove: true, at: 0 }
     const below: End = { place: lower, isAbove: false, at: 0 }
     const [from, to] = piece.isUp ? [below, above] : [above, below]
-    wires.push({ link: piece.link, from, to, hasHead: isDirected && 'node' in to.place.slot, isUp: piece.isUp, ...rest })
+    wires.push({ link: piece.link, from, to, hasHead: piece.link.isDirected && 'node' in to.place.slot, isUp: piece.isUp, ...rest })
   }
   const find = (id: string): Place | undefined =>
     shelf.places.find(place => 'node' in place.slot && place.slot.node.id === id)
@@ -245,7 +245,7 @@ function wiresOf(pieces: Piece[], flats: GraphletLink[], shelf: Shelf, placeOf: 
       link,
       from: { place: from, isAbove: true, at: 0 },
       to: { place: to, isAbove: true, at: 0 },
-      hasHead: isDirected,
+      hasHead: link.isDirected,
       isUp: false,
       ...rest,
     })
@@ -257,10 +257,11 @@ function wiresOf(pieces: Piece[], flats: GraphletLink[], shelf: Shelf, placeOf: 
  * A channel's wires in bundles, the wires that turn on one track. Kept
  * apart, a bundle is the wires that leave one face of a place, a fan, with
  * the fans of every other place whose wires reach the very same faces, so
- * that run together they say nothing false. In an undirected graph, whose
- * lines have no arrowheads to tell their two ends apart, a link between two
- * nodes of the shelf is a bundle alone, and merged too where it has a label.
- * Merged, a bundle is every wire with no label
+ * that run together they say nothing false. Links of the two kinds are never
+ * of one bundle. A link with no direction, whose line has no arrowhead to
+ * tell its two ends apart, between two nodes of the shelf is a bundle alone,
+ * and merged too where it has a label. Merged, a bundle is every wire of one
+ * kind with no label
  * that runs the one way, with the flow or against it. Wires with a label are
  * bundled as they are kept apart whichever the setting, and wires with
  * different labels are never of one bundle, so that a label is true of every
@@ -269,20 +270,20 @@ function wiresOf(pieces: Piece[], flats: GraphletLink[], shelf: Shelf, placeOf: 
  * lane that wires from elsewhere reach too is a fan of its own, so that it meets the lane's
  * others there without joining them to the box's other links.
  */
-function bundlesOf(wires: Wire[], links: Links, isDirected: boolean): Wire[][] {
+function bundlesOf(wires: Wire[], links: Links): Wire[][] {
   const ids = new Map<Place, number>()
   const faceOf = (end: End): string => {
     if (!ids.has(end.place)) ids.set(end.place, ids.size)
     return `${ids.get(end.place)}${end.isAbove ? 'v' : '^'}`
   }
-  const isAlone = (wire: Wire): boolean => !isDirected && wire.from.isAbove === wire.to.isAbove && (links === 'separate' || labelOf(wire.link) !== '')
+  const isAlone = (wire: Wire): boolean => !wire.link.isDirected && wire.from.isAbove === wire.to.isAbove && (links === 'separate' || labelOf(wire.link) !== '')
   const reaching = new Map<Place, Set<Place>>()
   for (const wire of wires) if ('lane' in wire.to.place.slot) reaching.set(wire.to.place, new Set([...(reaching.get(wire.to.place) ?? []), wire.from.place]))
   /** Whether a wire leaves a box for a lane that wires from elsewhere reach too, which it must reach on a line of its own. */
   const isJoining = (wire: Wire): boolean => 'node' in wire.from.place.slot && (reaching.get(wire.to.place)?.size ?? 0) > 1
   const fans = new Map<string, { way: string; isMerged: boolean; wires: Wire[] }>()
   for (const wire of wires.filter(wire => !isAlone(wire))) {
-    const way = JSON.stringify([wire.isUp, wire.link.label ?? ''])
+    const way = JSON.stringify([wire.isUp, wire.link.isDirected, wire.link.label ?? ''])
     const isMerged = links === 'merged' && labelOf(wire.link) === ''
     const key = isMerged ? way : `${way} ${faceOf(wire.from)}${isJoining(wire) ? ` into ${faceOf(wire.to)}` : ''}`
     fans.set(key, { way, isMerged, wires: [...(fans.get(key)?.wires ?? []), wire] })
@@ -308,22 +309,22 @@ function bundlesOf(wires: Wire[], links: Links, isDirected: boolean): Wire[][] {
  * a place in common, the one with the flow is first, wherever their other
  * wires lead, so that the links two boxes have each way stand in the same
  * order on both. A wire that leaves straight keeps clear of the face's other
- * ports and labels, and in an undirected graph, where a wire meets the box it
- * reaches at a tick too, of the columns beside the ports.
+ * ports and labels, and on a face where a link with no direction meets its
+ * box at a tick, of the columns beside the ports.
  */
-function dealPorts(shelves: Shelf[], channels: Channel[], isDirected: boolean): void {
-  type Group = { ends: End[]; leaving: Wire[]; heading: number; isUp: boolean; far: Set<Place>; label: string }
+function dealPorts(shelves: Shelf[], channels: Channel[]): void {
+  type Group = { ends: End[]; leaving: Wire[]; heading: number; isUp: boolean; isTicked: boolean; far: Set<Place>; label: string }
   const faces = new Map<Place, { top: Group[]; bottom: Group[] }>()
   const indexOf = new Map(shelves.flatMap(shelf => shelf.places.map((place, index) => [place, index] as const)))
   const alongOf = (place: Place): number => ((indexOf.get(place) ?? 0) + 0.5) / (shelves[place.shelf]?.places.length ?? 1)
-  const groupOf = (ends: End[], far: End[], leaving: Wire[], isUp: boolean): void => {
+  const groupOf = (ends: End[], far: End[], leaving: Wire[], isUp: boolean, isTicked: boolean): void => {
     const [first] = ends
     if (first === undefined) return
     const face = faces.get(first.place) ?? { top: [], bottom: [] }
     faces.set(first.place, face)
     const heading = far.reduce((sum, end) => sum + alongOf(end.place), 0) / far.length
     const label = leaving[0] === undefined ? '' : labelOf(leaving[0].link)
-    ;(first.isAbove ? face.bottom : face.top).push({ ends, leaving, heading, isUp, far: new Set(far.map(end => end.place)), label })
+    ;(first.isAbove ? face.bottom : face.top).push({ ends, leaving, heading, isUp, isTicked, far: new Set(far.map(end => end.place)), label })
   }
   /** A face's groups by their heading, each against the flow moved past every group with the flow that leads to a place it does. */
   const ordered = (groups: Group[]): Group[] => {
@@ -345,11 +346,11 @@ function dealPorts(shelves: Shelf[], channels: Channel[], isDirected: boolean): 
   }
   for (const channel of channels) {
     for (const leaving of channel.bundles.flatMap(bundle => byPlace(bundle, wire => wire.from))) {
-      groupOf(leaving.map(wire => wire.from), leaving.map(wire => wire.to), leaving, leaving[0]?.isUp ?? false)
+      groupOf(leaving.map(wire => wire.from), leaving.map(wire => wire.to), leaving, leaving[0]?.isUp ?? false, leaving[0]?.link.isDirected === false)
     }
     for (const bundle of channel.bundles) {
       for (const reaching of byPlace(bundle, wire => wire.to)) {
-        groupOf(reaching.map(wire => wire.to), reaching.map(wire => wire.from), [], bundle[0]?.isUp ?? false)
+        groupOf(reaching.map(wire => wire.to), reaching.map(wire => wire.from), [], bundle[0]?.isUp ?? false, bundle[0]?.link.isDirected === false)
       }
     }
   }
@@ -376,7 +377,7 @@ function dealPorts(shelves: Shelf[], channels: Channel[], isDirected: boolean): 
         const beside = group.leaving.length > 1 ? [own - 1, own + 1] : []
         for (const end of group.ends) end.at = own
         const others = ports.filter((_, other) => other !== index)
-        const clear = isDirected ? others : others.flatMap(port => [port - 1, port, port + 1])
+        const clear = groups.some(one => one.isTicked) ? others.flatMap(port => [port - 1, port, port + 1]) : others
         for (const wire of group.leaving) wire.clearOf = [...clear, ...beside, ...written]
       })
     }
@@ -716,7 +717,7 @@ export function layoutOf(graph: Graph, room: Room, look: Look, fold = false): La
 function laidOut(graph: Graph, columns: number, look: Look, into?: number): Layout {
   /** How wide a node's box is at least for the labels of the links it may leave by, each beside a port of its own, with a gap after all but the last. */
   const writtenOf = (node: GraphletNode): number => {
-    const leaving = graph.links.filter(link => link.from !== link.to && (link.from === node.id || (!graph.isDirected && link.to === node.id)))
+    const leaving = graph.links.filter(link => link.from !== link.to && (link.from === node.id || (!link.isDirected && link.to === node.id)))
     const labels = [...new Set(leaving.map(labelOf).filter(text => text !== ''))]
     return labels.length === 0 ? 0 : labels.reduce((sum, text) => sum + sizeOf(text) + 2, 0) + 1
   }
@@ -740,18 +741,18 @@ function laidOut(graph: Graph, columns: number, look: Look, into?: number): Layo
   /** Whether a wire has a label, written where it leaves its box. */
   const isWritten = (wire: Wire): boolean => 'node' in wire.from.place.slot && labelOf(wire.link) !== ''
   const channels: Channel[] = shelves.map((shelf, index) => {
-    const wires = wiresOf(layers.pieces[index] ?? [], layers.flats[index] ?? [], shelf, placeOf, graph.isDirected)
+    const wires = wiresOf(layers.pieces[index] ?? [], layers.flats[index] ?? [], shelf, placeOf)
     return {
       top: 0,
       rows: 0,
       wires,
-      bundles: bundlesOf(wires, look.links, graph.isDirected),
+      bundles: bundlesOf(wires, look.links),
       isLoose: false,
       hasTopRow: wires.some(wire => (wire.hasHead && wire.to.isAbove) || (wire.from.isAbove && isWritten(wire))),
       hasBottomRow: wires.some(wire => (wire.hasHead && !wire.to.isAbove) || (!wire.from.isAbove && isWritten(wire))),
     }
   })
-  dealPorts(shelves, channels, graph.isDirected)
+  dealPorts(shelves, channels)
 
   for (const shelf of shelves) shelf.width = shelf.places.reduce((sum, place) => sum + place.width + GAP, -GAP)
   const widest = Math.max(columns, ...shelves.map(shelf => shelf.width))
@@ -776,8 +777,8 @@ function laidOut(graph: Graph, columns: number, look: Look, into?: number): Layo
     channel.isLoose = next !== undefined && next.across !== shelf.across
     if (look.links === 'merged') {
       const written = channel.bundles.filter(bundle => bundle[0] !== undefined && labelOf(bundle[0].link) !== '')
-      const unwritten = channel.wires.filter(wire => labelOf(wire.link) === '')
-      channel.bundles = [...(unwritten.length > 0 ? [unwritten] : []), ...written]
+      const unwritten = [true, false].map(isDirected => channel.wires.filter(wire => labelOf(wire.link) === '' && wire.link.isDirected === isDirected))
+      channel.bundles = [...unwritten.filter(bundle => bundle.length > 0), ...written]
     }
     channel.bundles.forEach((bundle, index) => {
       for (const wire of bundle) wire.bundle = index

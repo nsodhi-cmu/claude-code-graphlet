@@ -1,6 +1,6 @@
-import type { GraphletLink, GraphletMove, GraphletNode, GraphletSize } from '../types'
+import type { GraphletMove, GraphletNode, GraphletSize } from '../types'
 import type { Drawing, Pan, Room } from './draw'
-import type { Graph } from './layers'
+import type { Graph, Link } from './layers'
 import { LEAST_COLUMNS, layoutOf } from './layout'
 import type { Layout, Look } from './layout'
 import { paint } from './paint'
@@ -34,7 +34,7 @@ export function focusOf(graph: Graph, selected: string | null): Graph {
   for (const id of reached.keys()) for (const other of joined.get(id) ?? []) if (!reached.has(other)) reached.set(other, (reached.get(id) ?? 0) + 1)
   const order = new Map(graph.nodes.map((node, index) => [node.id, index]))
   const shown = new Set([...reached.keys()].sort((a, b) => (reached.get(a) ?? 0) - (reached.get(b) ?? 0) || (order.get(a) ?? 0) - (order.get(b) ?? 0)).slice(0, FOCUS_NODES))
-  const links: GraphletLink[] = graph.links.filter(link => shown.has(link.from) && shown.has(link.to))
+  const links: Link[] = graph.links.filter(link => shown.has(link.from) && shown.has(link.to))
   const nodes: GraphletNode[] = graph.nodes
     .filter(node => shown.has(node.id))
     .map(node => {

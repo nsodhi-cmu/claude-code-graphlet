@@ -38,7 +38,7 @@ A wire that does not go straight across turns on one row of the channel, its tra
 
 Wires that share a track run into one line, which says that everything on it is joined. So wires share a track only as a bundle that says nothing false: the wires that leave one face, a fan, together with the fans of every other face whose wires reach the very same faces. Several boxes' links to one box alone are such a bundle, and so are two boxes that both link to the same two. A box's link into a lane that other wires reach too is a fan of its own, so that where it meets them at the lane, it does not join them to the box's other links.
 
-In an undirected graph, a line has no arrowheads to tell the boxes it leaves from the boxes it reaches, so a link between two nodes of one shelf is a bundle alone, with a port of its own on each of its boxes. A line then joins each box whose bottom it meets to each box whose top it meets, or, meeting only the bottoms of two boxes, is the one link between them.
+A link with no direction is drawn with no arrowhead, so a line of such links has nothing to tell the boxes it leaves from the boxes it reaches, and a link with no direction is never in a bundle with one that runs one way. A link with no direction between two nodes of one shelf is a bundle alone, with a port of its own on each of its boxes. A line of links with no direction then joins each box whose bottom it meets to each box whose top it meets, or, meeting only the bottoms of two boxes, is the one link between them. On a face where such a line meets its box at a tick, a wire that leaves straight keeps clear of the columns beside the other ports too, so that two ticks never touch.
 
 `layTracks` gives each bundle a track.
 

@@ -64,7 +64,7 @@ function paintShelf(canvas: Canvas, graph: Graph, shelf: Shelf, selected: string
     if ('lane' in place.slot) {
       const { lane, isUp } = place.slot
       const isLit = lane.some(link => link.from === selected || link.to === selected)
-      const flows = isLit && isFlowing && graph.isDirected
+      const flows = isLit && isFlowing && lane.every(link => link.isDirected)
       for (let row = 0; row < shelf.rows; row += 1) {
         const y = top + row
         canvas.put(left, y, isUp ? '┊' : '│', { paint: isLit ? 'accent' : 'dim', ...(flows ? { beat: beatOf(isUp ? -y : y) } : {}) })
@@ -160,7 +160,7 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
     const jog = wire.jog === null ? null : { x: seen.xOf(wire.from.place) + wire.jog.at, turn: tracks + wire.jog.track }
     const { out, into } = routeOf(wire, seen.xOf)
     const isLit = selected !== null && (wire.link.from === selected || wire.link.to === selected)
-    const flows = isLit && isFlowing && graph.isDirected
+    const flows = isLit && isFlowing && wire.link.isDirected
     const [start, end] = [borderOfEnd(wire.from), borderOfEnd(wire.to)]
     const draw = (x: number, y: number, ways: number, along: number): void => {
       if (x < 0 || x >= seen.columns) return

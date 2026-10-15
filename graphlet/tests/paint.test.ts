@@ -458,6 +458,38 @@ describe('the drawing', () => {
     ])
   })
 
+  test('in a graph of both kinds, a link that runs one way ends at an arrowhead, one that runs no way meets both its boxes at ticks, and the two never share a line', () => {
+    const home = readGraph({
+      nodes: ['Modem', 'Router', 'Laptop', 'TV', 'NAS'].map(id => ({ id, label: id })),
+      links: [
+        { from: 'Modem', to: 'Router', isDirected: false },
+        { from: 'Router', to: 'Laptop', isDirected: false },
+        { from: 'Router', to: 'TV', isDirected: false },
+        { from: 'Router', to: 'NAS', isDirected: false },
+        { from: 'Laptop', to: 'NAS', label: 'backup' },
+      ],
+    })
+    expect(graphRows(drawn(home, null, { columns: 60, rows: 40 }))).toEqual([
+      '                         ┌───────┐',
+      '                         │ Modem │',
+      '                         └───┬───┘',
+      '                             │',
+      '                        ┌────┴───┐',
+      '                        │ Router │',
+      '                        └────┬───┘',
+      '                        ┌────┴────┬─────┐',
+      '                   ┌────┴───┐  ┌──┴──┐  │',
+      '                   │ Laptop │  │ TV  │  │',
+      '                   └┬───────┘  └─────┘  │',
+      '                    │backup             │',
+      '                    │ ┌─────────────────┘',
+      '                    ▼ │',
+      '                  ┌───┴─┐',
+      '                  │ NAS │',
+      '                  └─────┘',
+    ])
+  })
+
   test('an empty graph draws nothing', () => {
     expect(drawn(readGraph({ nodes: [], links: [] }))).toEqual({ rows: [], hits: [] })
   })
@@ -740,7 +772,7 @@ function readOff(
         (shelfOf.get(link.from) ?? 0) < (shelfOf.get(link.to) ?? 0) ? [link.from, link.to] : [link.to, link.from]
       ways.set(top, UP)
       ways.set(bottom, DOWN)
-      if (!graph.isDirected) {
+      if (lane.every(link => !link.isDirected)) {
         ends.set(top, lane.map(link => ({ node: highOf(link)[1], channel: index - 1, side: 'below' as const })))
         ends.set(bottom, lane.map(link => ({ node: highOf(link)[0], channel: index, side: 'above' as const })))
       } else {
@@ -758,11 +790,11 @@ function readOff(
         if (x === box.x || x === box.x + box.width - 1) return
         if (y === box.y + box.rows - 1 && '┬╤'.includes(char)) {
           ways.set(key, DOWN)
-          ends.set(key, [{ node: box.node, channel: box.shelf, side: graph.isDirected ? 'from' : 'above' }])
+          ends.set(key, [{ node: box.node, channel: box.shelf, side: 'above' }])
           written.set(key, { node: box.node, text: wordsAt(x + 1, y + 1) })
         } else if (y === box.y && '┴╧'.includes(char)) {
           ways.set(key, UP)
-          ends.set(key, [{ node: box.node, channel: box.shelf - 1, side: graph.isDirected ? 'from' : 'below' }])
+          ends.set(key, [{ node: box.node, channel: box.shelf - 1, side: 'below' }])
           written.set(key, { node: box.node, text: wordsAt(x + 1, y - 1) })
         }
         return
@@ -802,37 +834,44 @@ function readOff(
 
   const lines = new Map<string, Said[]>()
   for (const [key, said] of ends) lines.set(find(key), [...(lines.get(find(key)) ?? []), ...said])
+  /** The lines that run one way: those with an arrowhead, or a lane of links that do. Their ticks are where they leave. */
+  const isOneWay = new Set([...lines].filter(([, said]) => said.some(end => end.side === 'to' || end.side === 'from')).map(([line]) => line))
+  for (const [line, said] of lines) if (isOneWay.has(line)) lines.set(line, said.map(end => (end.side === 'above' || end.side === 'below' ? { ...end, side: 'from' as const } : end)))
   const isCut = new Set([...cut].map(find))
   const links = new Set<string>()
   const labels: string[] = []
-  const labelsOf = (one: string, other: string): string[] =>
-    graph.links.filter(link => (link.from === one && link.to === other) || (!graph.isDirected && link.from === other && link.to === one)).map(labelOf)
+  const labelsOf = (one: string, other: string, isDirected: boolean): string[] =>
+    graph.links
+      .filter(link => link.isDirected === isDirected && ((link.from === one && link.to === other) || (!isDirected && link.from === other && link.to === one)))
+      .map(labelOf)
   for (const [key, { node, text }] of written) {
     const own = ends.get(key)?.[0]
     if (text === '' || own === undefined) continue
     const said = lines.get(find(key)) ?? []
-    const across = said.filter(end => (graph.isDirected ? end.side === 'to' : end.side !== own.side))
-    for (const other of new Set((across.length > 0 || graph.isDirected ? across : said).map(end => end.node).filter(one => one !== node))) {
-      for (const label of labelsOf(node, other)) if (isWindow ? !label.startsWith(text) : label !== text) labels.push(`'${text}' beside ${node}, on its link to ${other} labelled '${label}'`)
+    const isDirected = isOneWay.has(find(key))
+    const across = said.filter(end => (isDirected ? end.side === 'to' : end.side !== own.side))
+    for (const other of new Set((across.length > 0 || isDirected ? across : said).map(end => end.node).filter(one => one !== node))) {
+      for (const label of labelsOf(node, other, isDirected)) if (isWindow ? !label.startsWith(text) : label !== text) labels.push(`'${text}' beside ${node}, on its link to ${other} labelled '${label}'`)
     }
   }
   if (!isWindow) {
     for (const link of graph.links) {
       const label = labelOf(link)
-      const isBeside = [...written.values()].some(({ node, text }) => text === label && (node === link.from || (!graph.isDirected && node === link.to)))
+      const isBeside = [...written.values()].some(({ node, text }) => text === label && (node === link.from || (!link.isDirected && node === link.to)))
       if (label !== '' && link.from !== link.to && !isBeside) labels.push(`'${label}' of ${link.from} to ${link.to} is written nowhere beside it`)
     }
   }
   for (const [line, said] of lines) {
     const on = (side: Said['side']): string[] => [...new Set(said.filter(end => end.side === side).map(end => end.node))]
-    const pairs = graph.isDirected
-      ? on('from').flatMap(from => on('to').map(to => [from, to]))
-      : on('above').length > 0 && on('below').length > 0
-        ? on('above').flatMap(above => on('below').map(below => [above, below].sort()))
-        : isCut.has(line)
-          ? []
-          : [...on('above'), ...on('below')].flatMap((one, index, all) => all.slice(index + 1).map(other => [one, other].sort()))
-    for (const [one, other] of pairs) links.add(`${said[0]?.channel} ${one} ${other}`)
+    const pairs = isOneWay.has(line)
+      ? on('from').flatMap(from => on('to').map(to => `${from} ${to}`))
+      : (on('above').length > 0 && on('below').length > 0
+          ? on('above').flatMap(above => on('below').map(below => [above, below]))
+          : isCut.has(line)
+            ? []
+            : [...on('above'), ...on('below')].flatMap((one, index, all) => all.slice(index + 1).map(other => [one, other]))
+        ).map(ends => ends.sort().join(' -- '))
+    for (const pair of pairs) links.add(`${said[0]?.channel} ${pair}`)
   }
   return { links: [...links].sort(), loose, labels }
 }
@@ -844,8 +883,8 @@ function linksOf(graph: Graph, layout: Layout): string[] {
     .filter(link => link.from !== link.to)
     .flatMap(link => {
       const [from, to] = [shelfOf.get(link.from) ?? 0, shelfOf.get(link.to) ?? 0]
-      const ends = graph.isDirected ? [link.from, link.to] : [link.from, link.to].sort()
-      return Array.from({ length: Math.max(1, Math.abs(from - to)) }, (_, step) => `${Math.min(from, to) + step} ${ends.join(' ')}`)
+      const ends = link.isDirected ? `${link.from} ${link.to}` : [link.from, link.to].sort().join(' -- ')
+      return Array.from({ length: Math.max(1, Math.abs(from - to)) }, (_, step) => `${Math.min(from, to) + step} ${ends}`)
     })
     .sort()
 }
@@ -854,6 +893,8 @@ describe('what a picture says', () => {
   const next = numbers(31)
   const pick = (below: number): number => Math.floor(next() * below)
   const nameOf = (index: number): string => [`Validate the request ${index}`, `数据库 ${index}`, `✅ ${index}`][pick(4)] ?? `n${index}`
+  /** A link's own direction, now and then, so that a graph has links of both kinds. */
+  const someWay = (): { isDirected?: boolean } => (pick(4) === 0 ? { isDirected: pick(2) === 0 } : {})
   /** A label for a link, now and then. */
   const someLabel = (): { label?: string } => (pick(3) === 0 ? { label: ['yes', 'no', 'retry', '数据', 'GET /items', 'a much longer label than fits'][pick(6)] ?? 'x' } : {})
   /** A graph of any shape, its links often running both ways. */
@@ -862,7 +903,7 @@ describe('what a picture says', () => {
     const links = Array.from({ length: pick(count * 2 + 2) }, () => [`n${pick(count)}`, `n${pick(count)}`])
     return readGraph({
       nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: nameOf(index) })),
-      links: [...links, ...links.filter(() => pick(3) === 0).map(([from, to]) => [to, from])].map(([from = '', to = '']) => ({ from, to, ...someLabel() })),
+      links: [...links, ...links.filter(() => pick(3) === 0).map(([from, to]) => [to, from])].map(([from = '', to = '']) => ({ from, to, ...someLabel(), ...someWay() })),
       isDirected: pick(4) !== 0,
     })
   }
@@ -871,7 +912,7 @@ describe('what a picture says', () => {
     const count = 4 + pick(10)
     return readGraph({
       nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: nameOf(index), layer: index < 2 ? 0 : pick(2 + pick(2)) })),
-      links: Array.from({ length: count + pick(count) }, () => ({ from: `n${pick(count)}`, to: `n${pick(count)}`, ...someLabel() })),
+      links: Array.from({ length: count + pick(count) }, () => ({ from: `n${pick(count)}`, to: `n${pick(count)}`, ...someLabel(), ...someWay() })),
       isDirected: pick(5) !== 0,
     })
   }

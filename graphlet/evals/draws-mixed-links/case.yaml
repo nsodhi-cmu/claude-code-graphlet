@@ -1,0 +1,37 @@
+schema_version: '1.0'
+name: draws-mixed-links
+description: 'Links with no direction and links that run one way, in one picture, are written each as what it is.'
+tags: [draw]
+execution:
+  prompt: |
+    Sketch my home network: the modem is cabled to the router, and the router connects to my laptop, my TV, and a NAS. Every night my laptop backs up to the NAS. Show how it all fits together.
+  max_turns: 3
+  timeout_seconds: 180
+  allowed_tools: []
+  env:
+    EVAL_GRAPHLET_GUIDE: '1'
+runs: 3
+graders:
+  - type: regex
+    name: writes-a-graph-block
+    pattern: '^[ \t]*```graphlet[ \t]*$'
+    flags: 'm'
+    match: 'contains'
+  - type: regex
+    name: introduces-the-graph
+    pattern: '^\s*[^\s`]'
+    flags: ''
+    match: 'contains'
+  - type: regex
+    name: no-mermaid-in-the-block
+    pattern: '```graphlet[^`]*?(?:^\s*(?:graph|flowchart)\s+(?:TD|LR|TB|RL|BT)|subgraph|==>|-\.->|:::|\[\(|\(\[|\{\{)'
+    flags: 'mi'
+    match: 'not_contains'
+  - type: regex
+    name: mixes-dashes-and-arrows
+    pattern: '```graphlet(?=(?:(?!```)[\s\S])*?[ \t]-{2,}[ \t|])(?=(?:(?!```)[\s\S])*?(?:->|→))'
+    flags: ''
+    match: 'contains'
+  - type: llm
+    name: each-link-as-it-is
+    criteria: 'Judge only the ```graphlet blocks, where `a -- b` is a link with no direction and `a -> b` one that runs from a to b. PASS if both of these hold: (1) the connections between the devices, the modem and the router, and the router and each of the laptop, the TV and the NAS, are written with -- ; (2) the nightly backup is an arrow from the laptop to the NAS. FAIL if either does not hold.'

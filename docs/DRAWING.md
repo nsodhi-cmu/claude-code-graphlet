@@ -28,7 +28,7 @@ A drawing is rows of painted text, and the rectangles of them that answer a clic
 - A box has an arrowhead of its own for each set of boxes whose links reach it together, so links from different boxes never run into one line on the way to it.
 - `↺` in a box says the node links to itself.
 
-An undirected graph is drawn the same way, with no arrowheads and no flow:
+An undirected graph is drawn the same way, with no arrowheads and no flow, and in a graph with links of both kinds, each is drawn as its kind is:
 
 ```
                  ┌─────┐

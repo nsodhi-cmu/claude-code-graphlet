@@ -9,7 +9,7 @@ A click on `html ↗`, in the corner of a drawing's [foot](DRAWING.md#the-foot),
 - A node is a rounded box in its tone's color, with its mark, its label wrapped as the terminal wraps it, and its badge.
 - A link is a curve with an arrowhead at the node it reaches. Down the page it leaves the middle of a box's bottom and reaches the middle of a box's top. A link that runs back up is dashed, and uses the port beside the middle. A link past a layer runs through its lane there.
 - A link between two nodes of one layer is an arc under the layer, and a link from a node to itself is a loop at the box's side.
-- In an undirected graph a link has no arrowhead and reaches the box itself, and a link between two layers runs down the page from whichever of its nodes stands higher.
+- A link with no direction has no arrowhead and reaches the box itself, and between two layers it runs down the page from whichever of its nodes stands higher.
 - A link's label, cut as the terminal cuts it, is written on its first stretch, at the middle of the curve out of the box it leaves, over a halo of the page's own color so the line under it does not cut it. Where it would stand over a label written before it, it is moved down, a line at a time, until it does not. A link from a node to itself has no label written.
 - A node under the pointer, or with the keyboard's focus, is lit with its links and the nodes at their other ends, and the rest is quieted.
 

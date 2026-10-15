@@ -13,7 +13,7 @@ export const graphOf = (ids: string[], links: Array<[from: string, to: string]>,
   readGraph({ nodes: ids.map(id => ({ id, label: id, ...rest })), links: links.map(([from, to]) => ({ from, to })) })
 
 /** A graph read again with its links undirected. */
-export const undirected = (graph: Graph): Graph => readGraph({ ...graph, isDirected: false })
+export const undirected = (graph: Graph): Graph => readGraph({ ...graph, links: graph.links.map(link => ({ ...link, isDirected: false })) })
 
 /** A source of numbers from 0 up to 1 that gives the same ones every run. */
 export const numbers = (seed: number): (() => number) => {

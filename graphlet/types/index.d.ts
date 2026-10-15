@@ -20,12 +20,18 @@ export type GraphletNode = {
   layer?: number
 }
 
-/** A link between two nodes, by their ids: from one to the other, in a directed graph. */
+/** A link between two nodes, by their ids: from one to the other, where it runs one way. */
 export type GraphletLink = {
   from: string
   to: string
   /** A few words written on the link, where it leaves the node it is drawn from. */
   label?: string
+  /**
+   * Whether the link runs from one node to the other, drawn with an arrowhead.
+   * `false`, it only joins its two nodes, whichever it names first. Left out,
+   * it is as its graph says.
+   */
+  isDirected?: boolean
 }
 
 /** A graph. Its links may run in a loop. */
@@ -33,8 +39,8 @@ export type GraphletGraph = {
   nodes: GraphletNode[]
   links: GraphletLink[]
   /**
-   * Whether each link runs from one node to the other. Left out, it does.
-   * `false`, a link only joins its two nodes, whichever it names first.
+   * Whether a link that does not say runs from one node to the other. Left
+   * out, it does. `false`, such a link only joins its two nodes.
    */
   isDirected?: boolean
 }

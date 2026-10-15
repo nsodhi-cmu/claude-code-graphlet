@@ -20,8 +20,8 @@ describe('reading a graph', () => {
     })
     expect(graph.nodes.map(node => node.label)).toEqual(['A', 'B'])
     expect(graph.links).toEqual([
-      { from: 'a', to: 'b' },
-      { from: 'b', to: 'b' },
+      { from: 'a', to: 'b', isDirected: true },
+      { from: 'b', to: 'b', isDirected: true },
     ])
   })
 
@@ -35,8 +35,8 @@ describe('reading a graph', () => {
       ],
     })
     expect(graph.links).toEqual([
-      { from: 'a', to: 'b', label: 'yes sir' },
-      { from: 'b', to: 'a' },
+      { from: 'a', to: 'b', isDirected: true, label: 'yes sir' },
+      { from: 'b', to: 'a', isDirected: true },
     ])
   })
 
@@ -71,19 +71,26 @@ describe('reading a graph', () => {
   })
 
   test('what is no graph at all reads as an empty one', () => {
-    const empty = { nodes: [], links: [], isDirected: true, unread: { nodes: 0, links: 0 } }
+    const empty = { nodes: [], links: [], unread: { nodes: 0, links: 0 } }
     expect(readGraph(undefined as never)).toEqual(empty)
     expect(readGraph({ nodes: 'many', links: null } as never)).toEqual(empty)
   })
 
-  test('a graph is directed unless it says it is not, and an undirected one keeps a link once whichever way round it names its nodes', () => {
+  test('a link runs one way unless it says it does not, or its graph does and it says nothing; one that runs no way is kept once whichever way round it names its nodes', () => {
     const nodes = [{ id: 'a', label: 'a' }, { id: 'b', label: 'b' }]
     const links = [{ from: 'a', to: 'b' }, { from: 'b', to: 'a' }, { from: 'b', to: 'b' }]
-    expect(readGraph({ nodes, links, isDirected: 'no' as never })).toMatchObject({ links, isDirected: true })
-    expect(readGraph({ nodes, links, isDirected: false })).toMatchObject({
-      links: [{ from: 'a', to: 'b' }, { from: 'b', to: 'b' }],
-      isDirected: false,
-    })
+    const ways = (graph: Graph): string[] => graph.links.map(link => `${link.from}${link.isDirected ? '->' : '--'}${link.to}`)
+    expect(ways(readGraph({ nodes, links, isDirected: 'no' as never }))).toEqual(['a->b', 'b->a', 'b->b'])
+    expect(ways(readGraph({ nodes, links, isDirected: false }))).toEqual(['a--b', 'b--b'])
+    const mixed = [
+      { from: 'a', to: 'b', isDirected: false },
+      { from: 'b', to: 'a' },
+      { from: 'b', to: 'a', isDirected: false },
+      { from: 'a', to: 'b', isDirected: 'yes' as never },
+      { from: 'a', to: 'b', isDirected: true },
+    ]
+    expect(ways(readGraph({ nodes, links: mixed }))).toEqual(['a--b', 'b->a', 'a->b'])
+    expect(ways(readGraph({ nodes, links: mixed, isDirected: false }))).toEqual(['a--b', 'a->b'])
   })
 })
 
@@ -121,9 +128,9 @@ describe('layers', () => {
 
   test('a loop is laid out from the node nothing else leads to, and the link that closes it runs back up', () => {
     const graph = graphOf(['c', 'a', 'b', 'start'], [['a', 'b'], ['b', 'c'], ['c', 'a'], ['start', 'a']])
-    expect([...loopLinks(graph)]).toEqual([{ from: 'c', to: 'a' }])
+    expect([...loopLinks(graph)]).toEqual([{ from: 'c', to: 'a', isDirected: true }])
     expect(layers(graph)).toEqual([['start'], ['a'], ['b', 'c→a'], ['c']])
-    expect(layersOf(graph).pieces[1]?.find(piece => piece.isUp)?.link).toEqual({ from: 'c', to: 'a' })
+    expect(layersOf(graph).pieces[1]?.find(piece => piece.isUp)?.link).toEqual({ from: 'c', to: 'a', isDirected: true })
   })
 
   test('a loop with no way in is entered at the node the graph names first', () => {
@@ -159,7 +166,7 @@ describe('layers', () => {
         { from: 'a', to: 'a' },
       ],
     })
-    expect(layersOf(graph).flats).toEqual([[{ from: 'a', to: 'b' }]])
+    expect(layersOf(graph).flats).toEqual([[{ from: 'a', to: 'b', isDirected: true }]])
     expect(layersOf(graph).pieces).toEqual([])
   })
 
@@ -180,7 +187,7 @@ describe('layers', () => {
   test('an undirected graph stands each node as many layers down as it is links from the first node of its part, so a loop closes under a layer and nothing runs back up', () => {
     const graph = undirected(graphOf(['a', 'b', 'c', 'd', 'e', 'x', 'y'], [['c', 'b'], ['b', 'a'], ['d', 'c'], ['a', 'e'], ['e', 'd'], ['y', 'x']]))
     expect(layers(graph)).toEqual([['a', 'x'], ['b', 'e', 'y'], ['c', 'd']])
-    expect(layersOf(graph).flats).toEqual([[], [], [{ from: 'd', to: 'c' }]])
+    expect(layersOf(graph).flats).toEqual([[], [], [{ from: 'd', to: 'c', isDirected: false }]])
     expect(layersOf(graph).pieces.flat().filter(piece => piece.isUp)).toEqual([])
   })
 
@@ -257,7 +264,7 @@ describe('folding into a room', () => {
       const [plain, folded] = [layersOf(graph).slots, layersOf(graph, room).slots]
       expect(Math.max(...folded.map(widthOf))).toBeLessThanOrEqual(Math.max(room.columns, ...plain.map(widthOf)))
       const [before, after] = [layerOf(plain), layerOf(folded)]
-      for (const link of graph.isDirected ? graph.links : []) {
+      for (const link of graph.links.filter(one => one.isDirected)) {
         const [was, is] = [(before.get(link.to) ?? 0) - (before.get(link.from) ?? 0), (after.get(link.to) ?? 0) - (after.get(link.from) ?? 0)]
         expect(Math.sign(is) === Math.sign(was) || (was === 0 && is > 0)).toBe(true)
       }

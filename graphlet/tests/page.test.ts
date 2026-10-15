@@ -241,6 +241,13 @@ describe('an undirected graph on a page', () => {
   })
 })
 
+describe('a graph of both kinds on a page', () => {
+  test('a link that runs one way has an arrowhead, and one that runs no way has none', () => {
+    const page = pageOf(readGraph({ nodes: ['a', 'b', 'c'].map(id => ({ id, label: id })), links: [{ from: 'a', to: 'b' }, { from: 'b', to: 'c', isDirected: false }, { from: 'c', to: 'a', isDirected: false }] }), '')
+    expect([...page.matchAll(/<g class="link"[^>]*>(.*?)<\/g>/g)].map(([, inner = '']) => inner.includes('<polygon'))).toEqual([true, false, false])
+  })
+})
+
 describe('the page as a document', () => {
   test('what a graph and a title say is escaped, a tone the page does not know is drawn plain, and an id is never written', () => {
     const id = '"><img src=x>'

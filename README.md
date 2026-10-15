@@ -35,7 +35,7 @@ graphlet is a Claude Code mod that draws graphs, nodes and the links between the
                                                           html ↗
 ```
 
-- **Any graph, directed or not.** The nodes are laid out in layers down the drawing. A directed graph runs along the way its links run, and the link that closes a loop runs back up, dashed. An undirected graph spreads down from the first node it names, and its links have no arrowheads.
+- **Any graph, directed or not, or both.** The nodes are laid out in layers down the drawing. A directed graph runs along the way its links run, and the link that closes a loop runs back up, dashed. An undirected graph spreads down from the first node it names, and its links have no arrowheads. A graph may have links of both kinds, each drawn as what it is.
 - **Every link is drawn, and can be followed**, between neighboring layers, past layers, back up, and between two nodes of one layer. One box's links fan out on rows of their own, links from different boxes reach a box at arrowheads, or ticks, of their own, and a link that only crosses another passes over it.
 - **A link can say what it means.** Its label, `yes` or `retry`, is written beside the line where it leaves its box, and the box makes room for it.
 - **It scrolls.** A graph larger than its room is seen through a window that follows the selection, and that the wheel moves.
@@ -117,7 +117,7 @@ on('graphlet.select', async ($, e, next) => {
 })
 ```
 
-A graph is directed. Given `isDirected: false`, it is undirected: a link only joins its two nodes, whichever it names first.
+A link runs from one node to the other. Given `isDirected: false`, it only joins its two nodes, whichever it names first; a graph given `isDirected: false` has every link that does not say so join its nodes that way.
 
 While developing, load both from disk: `claude --plugin-dir ./graphlet --plugin-dir ./my-mod`.
 
@@ -126,7 +126,7 @@ While developing, load both from disk: `claude --plugin-dir ./graphlet --plugin-
 ## Reading A Graph
 
 - A box is a node. Its label is wrapped onto as many lines as it takes, up to a few.
-- A link leaves a box where its border has a tick, and reaches a box at an arrowhead. In an undirected graph there are no arrowheads, and a link meets both its boxes at ticks.
+- A link leaves a box where its border has a tick, and reaches a box at an arrowhead. A link with no direction has no arrowhead, and meets both its boxes at ticks.
 - A solid line runs with the flow, down the drawing. A dashed line runs against it: the link that closes a loop, on its way back up. An undirected graph has no flow, and every line in it is solid.
 - A line that passes a layer beside its boxes is a link bound for a layer farther on.
 - Lines that meet are joined: they leave the same box, or reach the same box. In an undirected graph, a line joins each box whose bottom it meets to each box whose top it meets, and a line that meets the bottoms of two boxes of one layer, and nothing else, joins those two. A link that only crosses another passes over it unbroken.
@@ -196,7 +196,6 @@ It reads no file, stores nothing between sessions, calls no model, and makes no 
 - A graph in a reply is still. It does not scroll, and has no web page.
 - Where an organization manages Claude Code, the engine adds graphlet's section to the system prompt only if the organization lists graphlet in managed settings. Otherwise Claude is not told of graph blocks there, though graphlet still draws one Claude writes.
 - Layers run top to bottom only.
-- A graph's links are all directed or all undirected. One graph cannot mix the two.
 - A graph has at most 1000 nodes and 2000 links, and a pane holds one. What is past those is left out, and the row under the graph says how much.
 - Where links between two layers must each pass over another and there is no free column to step one aside at, or a window slides two layers so that more of them need stepping aside than the rows between allow, two of them may share a stretch of line. Selecting a node lights its own.
 - A character is taken to be as wide as Unicode says a terminal draws it: two cells for the wide characters of East Asian scripts and for emoji, none for a mark on the character before it. A terminal or font that draws a character at another width pushes its row out of line.

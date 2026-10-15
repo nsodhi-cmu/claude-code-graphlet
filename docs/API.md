@@ -6,10 +6,10 @@ graphlet adds one noun to `$`, `$.graphlet`, in the `engine.create` hook of `gra
 
 ```ts
 type GraphletGraph = { nodes: GraphletNode[]; links: GraphletLink[]; isDirected?: boolean }
-type GraphletLink = { from: string; to: string; label?: string }
+type GraphletLink = { from: string; to: string; label?: string; isDirected?: boolean }
 ```
 
-A link names its two nodes by their ids, and the links may run in a loop. A link's `label`, a few words, is written beside it where it leaves the node it is drawn from: its `from` node, or in an undirected graph the one of its two that stands higher. A label longer than a link's labels may be is cut in its middle, in the terminal and on the web page. A link given twice keeps the label it was first given, and a link from a node to itself, drawn as `↺`, has no label written. A graph is directed unless it says `isDirected: false`: then a link only joins its two nodes, whichever it names first, and a link given both ways round is one link. A graph's links are all directed or all undirected.
+A link names its two nodes by their ids, and the links may run in a loop. A link's `label`, a few words, is written beside it where it leaves the node it is drawn from: its `from` node, or for a link with no direction the one of its two that stands higher. A label longer than a link's labels may be is cut in its middle, in the terminal and on the web page. A link given twice keeps the label it was first given, and a link from a node to itself, drawn as `↺`, has no label written. A link runs from one node to the other unless it says `isDirected: false`: then it only joins its two nodes, whichever it names first, and such a link given both ways round is one link. A link that says nothing takes its graph's `isDirected`, and a graph says nothing for a link that runs one way. A graph may have links of both kinds, and a link of each kind between the same two nodes is two links.
 
 | Field of a node | What it holds |
 | :- | :- |

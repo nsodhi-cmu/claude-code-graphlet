@@ -1,7 +1,7 @@
-import type { GraphletLink, GraphletNode, GraphletTone } from '../types'
+import type { GraphletNode, GraphletTone } from '../types'
 import { sizeOf } from './draw'
 import { layersOf } from './layers'
-import type { Graph, Slot } from './layers'
+import type { Graph, Link, Slot } from './layers'
 import { labelOf, linesOf } from './layout'
 
 // The page: a graph as one HTML document that draws it in SVG, in the layers
@@ -320,12 +320,13 @@ function loopOf(spot: Spot, short: number): Arrow {
 
 /**
  * A link as it is drawn between the boxes of its two ends: a loop, an arc, or
- * a run through its lanes in the order it passes them. In a directed graph
- * its shaft stops short of its box by the length of an arrowhead; in an
- * undirected one it reaches the box, and runs down the page whichever way
- * round it names its ends.
+ * a run through its lanes in the order it passes them. A link that runs one
+ * way stops short of its box by the length of an arrowhead; one that runs no
+ * way reaches the box, and runs down the page whichever way round it names
+ * its ends.
  */
-function arrowOf(link: GraphletLink, from: Spot, to: Spot, spots: Spot[], isDirected: boolean): Arrow {
+function arrowOf(link: Link, from: Spot, to: Spot, spots: Spot[]): Arrow {
+  const { isDirected } = link
   const short = isDirected ? HEAD.length : 0
   if (from === to) return loopOf(from, short)
   if (from.layer === to.layer) return arcOf(from, to, short)
@@ -367,10 +368,10 @@ function drawingOf(graph: Graph): string {
   })
   const drawn = graph.links.flatMap(link => {
     const [from, to] = [places.get(link.from), places.get(link.to)]
-    return from === undefined || to === undefined ? [] : [{ link, from, to, arrow: arrowOf(link, from.spot, to.spot, spots, graph.isDirected) }]
+    return from === undefined || to === undefined ? [] : [{ link, from, to, arrow: arrowOf(link, from.spot, to.spot, spots) }]
   })
   const written: Array<{ x: number; y: number; width: number }> = []
-  const writtenAt = new Map<GraphletLink, Point>()
+  const writtenAt = new Map<Link, Point>()
   for (const { link, arrow } of drawn.filter(one => one.link.from !== one.link.to && labelOf(one.link) !== '').sort((a, b) => a.arrow.middle.y - b.arrow.middle.y || a.arrow.middle.x - b.arrow.middle.x)) {
     const width = widthOf(labelOf(link)) * (BADGE_SIZE / FONT_SIZE)
     let { x, y } = arrow.middle
@@ -381,7 +382,7 @@ function drawingOf(graph: Graph): string {
   const links = drawn.map(({ link, from, to, arrow }) => {
     const dashes = arrow.isUp ? ` stroke-dasharray="${DASHES}"` : ''
     const ends = `data-from="${from.index}" data-to="${to.index}"`
-    const head = graph.isDirected ? `<polygon points="${headOf(arrow.tip, arrow.way)}"/>` : ''
+    const head = link.isDirected ? `<polygon points="${headOf(arrow.tip, arrow.way)}"/>` : ''
     const at = writtenAt.get(link)
     const label = at === undefined ? '' : `<text x="${at.x}" y="${at.y + BASELINE}">${escaped(labelOf(link))}</text>`
     return `<g class="link" ${ends}><path${dashes} d="${arrow.path}"/>${head}${label}</g>`
