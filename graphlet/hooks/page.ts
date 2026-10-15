@@ -101,6 +101,7 @@ text { text-anchor: middle; fill: var(--ink); }
 .link { color: var(--line); }
 .link path { fill: none; stroke: currentColor; stroke-width: 1.25; }
 .link polygon { fill: currentColor; }
+.link text { font-size: ${BADGE_SIZE}px; fill: currentColor; paint-order: stroke; stroke: var(--page); stroke-width: 4px; }
 .link.lit { color: var(--ink); }
 .quieted .node:not(.lit), .quieted .link:not(.lit) { opacity: 0.25; }
 `
@@ -153,9 +154,10 @@ type Spot = { slot: Slot; layer: number; x: number; y: number; width: number; he
 /**
  * A link as it is drawn: the path of its shaft, the point where it reaches
  * its box and the way it is going there, a step of one across, down, or up,
- * and whether it runs back up.
+ * the middle of its first stretch, where its label is written, and whether it
+ * runs back up.
  */
-type Arrow = { path: string; tip: Point; way: Point; isUp: boolean }
+type Arrow = { path: string; tip: Point; way: Point; middle: Point; isUp: boolean }
 
 const widthOf = (text: string): number => sizeOf(text) * CHAR_WIDTH
 
@@ -227,13 +229,15 @@ function runOf(from: Spot, lanes: Spot[], to: Spot, isUp: boolean, short: number
   const farOf = (spot: Spot): number => (isUp ? spot.y : spot.y + spot.height)
   const tip = { x: middleOf(to) + port, y: nearOf(to) }
   let at = { x: middleOf(from) + port, y: farOf(from) }
+  const [next = tip] = lanes.map(lane => ({ x: middleOf(lane), y: nearOf(lane) }))
+  const middle = { x: (at.x + next.x) / 2, y: (at.y + next.y) / 2 }
   let path = `M${at.x},${at.y}`
   for (const lane of lanes) {
     path += `${curveOf(at, { x: middleOf(lane), y: nearOf(lane) })}L${middleOf(lane)},${farOf(lane)}`
     at = { x: middleOf(lane), y: farOf(lane) }
   }
   path += curveOf(at, { x: tip.x, y: tip.y - way * short })
-  return { path, tip, way: { x: 0, y: way }, isUp }
+  return { path, tip, way: { x: 0, y: way }, middle, isUp }
 }
 
 /** A link between two nodes of one layer: an arc under the layer, out of the middle of the first box's bottom and up into the port beside the second's, stopping `short` of it. */
@@ -241,7 +245,7 @@ function arcOf(from: Spot, to: Spot, short: number): Arrow {
   const y = from.y + from.height
   const [out, into] = [middleOf(from), middleOf(to) + PORT_STEP]
   const path = `M${out},${y}C${out},${y + ARC_DEPTH} ${into},${y + ARC_DEPTH} ${into},${y + short}`
-  return { path, tip: { x: into, y }, way: { x: 0, y: -1 }, isUp: false }
+  return { path, tip: { x: into, y }, way: { x: 0, y: -1 }, middle: { x: (out + into) / 2, y: y + ARC_DEPTH * 0.75 }, isUp: false }
 }
 
 /** A link from a node to itself: a loop out of the right side of its box and back into it, stopping `short` of it. */
@@ -249,7 +253,7 @@ function loopOf(spot: Spot, short: number): Arrow {
   const x = spot.x + spot.width
   const [out, into] = [spot.y + (spot.height - LOOP.span) / 2, spot.y + (spot.height + LOOP.span) / 2]
   const path = `M${x},${out}C${x + LOOP.reach},${out} ${x + LOOP.reach},${into} ${x + short},${into}`
-  return { path, tip: { x, y: into }, way: { x: -1, y: 0 }, isUp: false }
+  return { path, tip: { x, y: into }, way: { x: -1, y: 0 }, middle: { x: x + LOOP.reach * 0.75, y: (out + into) / 2 }, isUp: false }
 }
 
 /**
@@ -286,8 +290,8 @@ function boxOf(node: GraphletNode, spot: Spot): string {
 
 /**
  * The drawing: every link, each naming its two ends by their places in the
- * graph and with an arrowhead where the graph is directed, and over them
- * every node, in the graph's order.
+ * graph, with an arrowhead where the graph is directed and its label written
+ * on its first stretch, and over them every node, in the graph's order.
  */
 function drawingOf(graph: Graph): string {
   const spots = spotsOf(layersOf(graph).slots)
@@ -303,7 +307,8 @@ function drawingOf(graph: Graph): string {
     const dashes = arrow.isUp ? ` stroke-dasharray="${DASHES}"` : ''
     const ends = `data-from="${from.index}" data-to="${to.index}"`
     const head = graph.isDirected ? `<polygon points="${headOf(arrow.tip, arrow.way)}"/>` : ''
-    return [`<g class="link" ${ends}><path${dashes} d="${arrow.path}"/>${head}</g>`]
+    const label = link.label === undefined ? '' : `<text x="${arrow.middle.x}" y="${arrow.middle.y + BASELINE}">${escaped(link.label)}</text>`
+    return [`<g class="link" ${ends}><path${dashes} d="${arrow.path}"/>${head}${label}</g>`]
   })
   const nodes = graph.nodes.flatMap(node => {
     const place = places.get(node.id)

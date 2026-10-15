@@ -14,6 +14,8 @@ A box is as wide as its widest line and no narrower than `BOX_COLUMNS`, which le
 
 A link meets a lane in its one column. Each face of a box, its top and its bottom, has a port for each bundle of links that leaves it, and a port for each bundle that reaches it, `PORT_STEP` apart across its middle; the links that leave a face of a directed graph's box are always one bundle. `dealPorts` orders a face's ports by where along their shelves the places at the links' other ends stand, so links from the left arrive on the left. Of two ports whose links lead to a place in common, the one with the flow is first, wherever their other links lead: so the two links between two boxes, one each way, stand in the same order on both boxes and run side by side. They may still cross where one leaves its box straight, or where the tracks the two turn on make them. A box too narrow for its ports is widened. So a link back up arrives beside the links that leave, and links from different boxes into one box arrive at arrowheads of their own, or in an undirected graph at ticks of their own.
 
+A link's label, cut in its middle to `LINK_LABEL_CELLS`, is written beside the port it leaves by, along the face after it. So the port after a labeled one stands past the label and a gap, and a box is widened for its ports and labels together. Links with different labels are never of one bundle, so every link that leaves by a port has the label written beside it. A link with a label always leaves by its own port, and a link that leaves straight keeps clear of the columns a label takes.
+
 A link that crosses a channel leaves its box straight toward the port it is bound for, wherever the box reaches over that port clear of its corners and its other ports, and else by its own port. A link that leaves with others keeps clear of the columns beside their port, and in an undirected graph, where every port shows a tick, of the columns beside the face's other ports, so that two ticks never touch.
 
 ## Shelves
@@ -30,7 +32,7 @@ How wide a shelf is laid out is the `scroll` setting's to say. `pinned`: across 
 
 A channel is the rows between two shelves. The stretches of links that cross it are its wires, and so are the links between two nodes of the shelf above, which run under that shelf and back up to it. The last shelf has a channel under it only for those.
 
-A wire that does not go straight across turns on one row of the channel, its track. A channel's rows are a row of the arrowheads that point up, when it has any, then a row a track, then a row of the arrowheads that point down, when it has any. An undirected graph has no arrowheads, so its channels are their tracks alone. A channel with no wires is one empty row.
+A wire that does not go straight across turns on one row of the channel, its track. A channel's rows are a row for the arrowheads that point up and the labels of the links that leave the shelf above, when it has any, then a row a track, then a row for the arrowheads that point down and the labels of the links that leave the shelf below, when it has any. An undirected graph has no arrowheads, so its channels are their tracks, and the rows its labels need. A channel with no wires is one empty row.
 
 ### Tracks
 

@@ -194,7 +194,7 @@ describe('the rows between two shelves', () => {
 
   test('a link back up has a row for its arrowhead above the rows the links turn on', () => {
     const layout = laid(graphOf(['a', 'b'], [['a', 'b'], ['b', 'a']]))
-    expect(layout.channels[0]).toMatchObject({ rows: 3, hasUpHeads: true, hasDownHeads: true })
+    expect(layout.channels[0]).toMatchObject({ rows: 3, hasTopRow: true, hasBottomRow: true })
   })
 
   test('links between two nodes of the last shelf run under it', () => {
@@ -205,7 +205,7 @@ describe('the rows between two shelves', () => {
       ],
       links: [{ from: 'a', to: 'b' }],
     })
-    expect(laid(graph).channels[0]).toMatchObject({ rows: 2, hasUpHeads: true, hasDownHeads: false })
+    expect(laid(graph).channels[0]).toMatchObject({ rows: 2, hasTopRow: true, hasBottomRow: false })
   })
 
   test('where two shelves slide apart, no two bundles share a row, since what does not meet as laid out may once slid', () => {

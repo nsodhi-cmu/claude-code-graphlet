@@ -179,6 +179,20 @@ describe('the links of a page', () => {
     expect((arc?.tip.x ?? NaN) > b.x && (arc?.tip.x ?? NaN) < b.right).toBe(true)
   })
 
+  test('a link\'s label is written once, on the first stretch of its link, and escaped', () => {
+    const graph = readGraph({
+      nodes: ['a', 'b', 'c'].map(id => ({ id, label: id })),
+      links: [
+        { from: 'a', to: 'b', label: '<i>yes</i>' },
+        { from: 'a', to: 'c' },
+      ],
+    })
+    const page = pageOf(graph, 'labels')
+    expect(page).toMatch(/<g class="link" data-from="0" data-to="1"><path [^>]*\/><polygon [^>]*\/><text x="[\d.]+" y="[\d.]+">&lt;i&gt;yes&lt;\/i&gt;<\/text><\/g>/)
+    expect(count(page, '&lt;i&gt;yes')).toBe(1)
+    expect(page).not.toContain('<i>yes')
+  })
+
   test('a link from a node to itself is a loop out of the side of its box and back into it', () => {
     const page = pageOf(graphOf(['a'], [['a', 'a']]), '')
     const [a = { x: NaN, y: NaN, right: NaN, bottom: NaN }] = boxes(page)

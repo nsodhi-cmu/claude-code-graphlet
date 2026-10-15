@@ -28,10 +28,11 @@ const tidy = (text: unknown): string =>
 /**
  * Reads a graph leniently: a node needs an id no node before it has, text is
  * made safe to draw, a tone that is none of the tones is dropped, and a link
- * is kept once, where both its ends are nodes; in an undirected graph, once
- * whichever way round it names them. A link from a node to itself is kept,
- * and drawn as a sign on the node. Nodes and links past the most that are
- * read are left out. A graph is directed unless it says it is not.
+ * is kept once, where both its ends are nodes, with the label it is first
+ * given; in an undirected graph, once whichever way round it names them. A
+ * link from a node to itself is kept, and drawn as a sign on the node. Nodes
+ * and links past the most that are read are left out. A graph is directed
+ * unless it says it is not.
  */
 export function readGraph(graph: GraphletGraph): Graph {
   const nodes: GraphletNode[] = []
@@ -58,7 +59,8 @@ export function readGraph(graph: GraphletGraph): Graph {
     const isKept = links.some(
       one => (one.from === link.from && one.to === link.to) || (!isDirected && one.from === link.to && one.to === link.from),
     )
-    if (!isKept) links.push({ from: link.from, to: link.to })
+    const label = tidy(link.label)
+    if (!isKept) links.push({ from: link.from, to: link.to, ...(label === '' ? {} : { label }) })
   }
   return { nodes, links, isDirected }
 }

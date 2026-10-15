@@ -40,6 +40,8 @@ const WORD_COLUMNS = 32
 const LABEL_ROWS = 3
 /** The most cells of a label that is cut to one line. */
 const CLIP_CELLS = 32
+/** The most cells a link's label takes: a longer one is cut in its middle. */
+const LINK_LABEL_CELLS = 16
 /** What a box adds to its widest line: a space and a border on each side. */
 const BOX_PADDING = 4
 /** The narrowest box: one whose two ports stand apart. A shorter label is set in its middle. */
@@ -91,6 +93,9 @@ export function wrap(label: string, columns: number, rows: number, word = column
 export function linesOf(label: string): string[] {
   return wrap(label, LABEL_COLUMNS, LABEL_ROWS, WORD_COLUMNS)
 }
+
+/** What is written on a link, cut to the cells a link's label may take; nothing where it has no label. */
+export const labelOf = (link: GraphletLink): string => (link.label === undefined ? '' : clipMiddle(link.label, LINK_LABEL_CELLS))
 
 /** What a box says: its node's mark, the lines of its label, and what follows the last of them, dim. */
 export type Words = { mark: string; lines: string[]; badge: string }
@@ -161,11 +166,13 @@ export type Wire = {
 }
 
 /**
- * The rows between two shelves, or under the last: a row of the arrowheads
- * that point up, when there are any, then a row a track, then a row of the
- * arrowheads that point down, when there are any. Its wires turn in bundles,
- * each on a track; with the wires merged it has none, and one track. A
- * channel `isLoose` where its two shelves slide apart under a window.
+ * The rows between two shelves, or under the last: a row for the arrowheads
+ * that point up and the labels of the links that leave the shelf above, when
+ * there are any, then a row a track, then a row for the arrowheads that point
+ * down and the labels of the links that leave the shelf below, when there are
+ * any. Its wires turn in bundles, each on a track; with the wires merged it
+ * has none, and one track. A channel `isLoose` where its two shelves slide
+ * apart under a window.
  */
 export type Channel = {
   top: number
@@ -173,8 +180,8 @@ export type Channel = {
   wires: Wire[]
   bundles: Wire[][]
   isLoose: boolean
-  hasUpHeads: boolean
-  hasDownHeads: boolean
+  hasTopRow: boolean
+  hasBottomRow: boolean
 }
 
 /** A graph laid out for a room `columns` wide. Channel `n` is under shelf `n`. */
@@ -186,15 +193,16 @@ export const middleOf = (place: Place, x: number): number => x + Math.floor(plac
  * The column a wire leaves in and the column it arrives in, where `xOf` puts
  * each place. A wire that crosses its channel leaves its box straight toward
  * the port it is bound for where the box reaches over that port, clear of
- * its corners and of its other ports, and else by its own port, to turn on
- * its track.
+ * its corners and of its other ports and their labels, and else by its own
+ * port, to turn on its track; a wire with a label always leaves by its own
+ * port, beside which its label is written.
  */
 export function routeOf(wire: Wire, xOf: (place: Place) => number): { out: number; into: number } {
   const { place } = wire.from
   const x = xOf(place)
   const into = xOf(wire.to.place) + wire.to.at
   const own = x + wire.from.at
-  if ('lane' in place.slot || wire.from.isAbove === wire.to.isAbove) return { out: own, into }
+  if ('lane' in place.slot || wire.from.isAbove === wire.to.isAbove || labelOf(wire.link) !== '') return { out: own, into }
   const isOver = into > x + 1 && into < x + place.width - 2 && !wire.clearOf.includes(into - x)
   return { out: isOver ? into : own, into }
 }
@@ -235,7 +243,9 @@ function wiresOf(pieces: Piece[], flats: GraphletLink[], shelf: Shelf, placeOf: 
  * that run together they say nothing false. In an undirected graph, whose
  * lines have no arrowheads to tell their two ends apart, a link between two
  * nodes of the shelf is a bundle alone. Merged, it is every wire that runs
- * the one way, with the flow or against it.
+ * the one way, with the flow or against it. Either way, wires with different
+ * labels are never of one bundle, so that a label is true of every wire of
+ * the line it is written beside.
  */
 function bundlesOf(wires: Wire[], links: Links, isDirected: boolean): Wire[][] {
   const ids = new Map<Place, number>()
@@ -244,15 +254,16 @@ function bundlesOf(wires: Wire[], links: Links, isDirected: boolean): Wire[][] {
     return `${ids.get(end.place)}${end.isAbove ? 'v' : '^'}`
   }
   const isAlone = (wire: Wire): boolean => links === 'separate' && !isDirected && wire.from.isAbove === wire.to.isAbove
-  const fans = new Map<string, Wire[]>()
+  const fans = new Map<string, { way: string; wires: Wire[] }>()
   for (const wire of wires.filter(wire => !isAlone(wire))) {
-    const key = links === 'merged' ? `${wire.isUp}` : `${wire.isUp} ${faceOf(wire.from)}`
-    fans.set(key, [...(fans.get(key) ?? []), wire])
+    const way = JSON.stringify([wire.isUp, labelOf(wire.link)])
+    const key = links === 'merged' ? way : `${way} ${faceOf(wire.from)}`
+    fans.set(key, { way, wires: [...(fans.get(key)?.wires ?? []), wire] })
   }
   const bound = new Map<string, Wire[]>()
-  for (const [key, fan] of fans) {
+  for (const [key, { way, wires: fan }] of fans) {
     const reached = [...new Set(fan.map(wire => faceOf(wire.to)))].sort().join(' ')
-    const sign = links === 'merged' ? key : `${key.split(' ')[0]} ${reached}`
+    const sign = links === 'merged' ? key : `${way} ${reached}`
     bound.set(sign, [...(bound.get(sign) ?? []), ...fan])
   }
   return [...bound.values(), ...wires.filter(isAlone).map(wire => [wire])]
@@ -260,19 +271,21 @@ function bundlesOf(wires: Wire[], links: Links, isDirected: boolean): Wire[][] {
 
 /**
  * Deals every face of every place its ports, and widens a box that is too
- * narrow for them. The wires of one bundle that leave a face share a port,
- * and so do the wires of one bundle that reach it, so two bundles never run
- * into one port. A face's ports stand `PORT_STEP` apart across its middle, in
+ * narrow for them and their labels. The wires of one bundle that leave a face
+ * share a port, and so do the wires of one bundle that reach it, so two
+ * bundles never run into one port. A port of wires with a label has the label
+ * written after it along the face, and the next port stands past the label;
+ * else a face's ports stand `PORT_STEP` apart. They stand across its middle, in
  * the order of where along their shelves the places at the wires' other ends
  * stand, so that wires from the left arrive on the left; of two that lead to
  * a place in common, the one with the flow is first, wherever their other
  * wires lead, so that the links two boxes have each way stand in the same
  * order on both. A wire that leaves straight keeps clear of the face's other
- * ports, and in an undirected graph, where a wire meets the box it reaches at
- * a tick too, of the columns beside them.
+ * ports and labels, and in an undirected graph, where a wire meets the box it
+ * reaches at a tick too, of the columns beside the ports.
  */
 function dealPorts(shelves: Shelf[], channels: Channel[], isDirected: boolean): void {
-  type Group = { ends: End[]; leaving: Wire[]; heading: number; isUp: boolean; far: Set<Place> }
+  type Group = { ends: End[]; leaving: Wire[]; heading: number; isUp: boolean; far: Set<Place>; label: string }
   const faces = new Map<Place, { top: Group[]; bottom: Group[] }>()
   const alongOf = (place: Place): number =>
     ((shelves[place.shelf]?.places.indexOf(place) ?? 0) + 0.5) / (shelves[place.shelf]?.places.length ?? 1)
@@ -282,7 +295,8 @@ function dealPorts(shelves: Shelf[], channels: Channel[], isDirected: boolean): 
     const face = faces.get(first.place) ?? { top: [], bottom: [] }
     faces.set(first.place, face)
     const heading = far.reduce((sum, end) => sum + alongOf(end.place), 0) / far.length
-    ;(first.isAbove ? face.bottom : face.top).push({ ends, leaving, heading, isUp, far: new Set(far.map(end => end.place)) })
+    const label = leaving[0] === undefined ? '' : labelOf(leaving[0].link)
+    ;(first.isAbove ? face.bottom : face.top).push({ ends, leaving, heading, isUp, far: new Set(far.map(end => end.place)), label })
   }
   /** A face's groups by their heading, each against the flow moved past every group with the flow that leads to a place it does. */
   const ordered = (groups: Group[]): Group[] => {
@@ -312,19 +326,31 @@ function dealPorts(shelves: Shelf[], channels: Channel[], isDirected: boolean): 
       }
     }
   }
+  /** Where along a face its ports stand from the first, each far enough past the one before for that one's label and a gap; and the last column the last label takes. */
+  const spread = (groups: Group[]): { steps: number[]; end: number } => {
+    const steps = groups.reduce<number[]>(
+      (at, group, index) => (index === 0 ? [0] : [...at, (at[index - 1] ?? 0) + Math.max(PORT_STEP, sizeOf(groups[index - 1]?.label ?? '') + 2)]),
+      [],
+    )
+    return { steps, end: (steps.at(-1) ?? 0) + sizeOf(groups.at(-1)?.label ?? '') }
+  }
   for (const [place, face] of faces) {
     if ('lane' in place.slot) continue
-    const most = Math.max(face.top.length, face.bottom.length)
-    place.width = Math.max(place.width, PORT_STEP * most + 1)
-    for (const groups of [ordered(face.top), ordered(face.bottom)]) {
-      const ports = groups.map((_, index) => Math.floor(place.width / 2) + PORT_STEP * index - (groups.length - 1))
+    const [top, bottom] = [ordered(face.top), ordered(face.bottom)]
+    place.width = Math.max(place.width, spread(top).end + 3, spread(bottom).end + 3)
+    for (const groups of [top, bottom]) {
+      const { steps, end } = spread(groups)
+      const isLabeled = groups.some(group => group.label !== '')
+      const first = isLabeled ? Math.floor((place.width - 1 - end) / 2) : Math.floor(place.width / 2) - (groups.length - 1)
+      const ports = steps.map(step => first + step)
+      const written = groups.flatMap((group, index) => Array.from({ length: sizeOf(group.label) }, (_, cell) => (ports[index] ?? 0) + 1 + cell))
       groups.forEach((group, index) => {
         const own = ports[index] ?? 0
         const beside = group.leaving.length > 1 ? [own - 1, own + 1] : []
         for (const end of group.ends) end.at = own
         const others = ports.filter((_, other) => other !== index)
         const clear = isDirected ? others : others.flatMap(port => [port - 1, port, port + 1])
-        for (const wire of group.leaving) wire.clearOf = [...clear, ...beside]
+        for (const wire of group.leaving) wire.clearOf = [...clear, ...beside, ...written]
       })
     }
   }
@@ -617,7 +643,16 @@ export function layTracks(channel: Channel, xOf: (place: Place) => number, under
  */
 export function layoutOf(graph: Graph, room: Room, look: Look, fold = false): Layout {
   const columns = Math.max(room.columns, LEAST_COLUMNS)
-  const layers = layersOf(graph, fold ? { columns, widthOf: node => widthOf(wordsOf(graph, node, look.labels)), gap: GAP } : undefined)
+  /** The least a node's box is widened to for the labels of the links it may leave by, each beside a port of its own. */
+  const writtenOf = (node: GraphletNode): number => {
+    const leaving = graph.links.filter(link => link.from === node.id || (!graph.isDirected && link.to === node.id))
+    const labels = [...new Set(leaving.map(labelOf).filter(text => text !== ''))]
+    return labels.length === 0 ? 0 : labels.reduce((sum, text) => sum + sizeOf(text) + 2, 0) + 3
+  }
+  const layers = layersOf(
+    graph,
+    fold ? { columns, widthOf: node => Math.max(widthOf(wordsOf(graph, node, look.labels)), writtenOf(node)), gap: GAP } : undefined,
+  )
   const placeOf = new Map<Slot, Place>()
   const shelves: Shelf[] = layers.slots.map((slots, shelf) => {
     const places = slots.map(slot => {
@@ -631,6 +666,8 @@ export function layoutOf(graph: Graph, room: Room, look: Look, fold = false): La
     for (const place of places) if ('lane' in place.slot) place.rows = rows
     return { places, width: 0, across: columns, top: 0, rows }
   })
+  /** Whether a wire has a label, written where it leaves its box. */
+  const isWritten = (wire: Wire): boolean => 'node' in wire.from.place.slot && labelOf(wire.link) !== ''
   const channels: Channel[] = shelves.map((shelf, index) => {
     const wires = wiresOf(layers.pieces[index] ?? [], layers.flats[index] ?? [], shelf, placeOf, graph.isDirected)
     return {
@@ -639,8 +676,8 @@ export function layoutOf(graph: Graph, room: Room, look: Look, fold = false): La
       wires,
       bundles: bundlesOf(wires, look.links, graph.isDirected),
       isLoose: false,
-      hasUpHeads: wires.some(wire => wire.hasHead && wire.to.isAbove),
-      hasDownHeads: wires.some(wire => wire.hasHead && !wire.to.isAbove),
+      hasTopRow: wires.some(wire => (wire.hasHead && wire.to.isAbove) || (wire.from.isAbove && isWritten(wire))),
+      hasBottomRow: wires.some(wire => (wire.hasHead && !wire.to.isAbove) || (!wire.from.isAbove && isWritten(wire))),
     }
   })
   dealPorts(shelves, channels, graph.isDirected)
@@ -671,7 +708,7 @@ export function layoutOf(graph: Graph, room: Room, look: Look, fold = false): La
     })
     if (look.links === 'merged') channel.bundles = []
     const tracks = layTracks(channel, place => place.x)
-    const heads = (channel.hasUpHeads ? 1 : 0) + (channel.hasDownHeads ? 1 : 0)
+    const heads = (channel.hasTopRow ? 1 : 0) + (channel.hasBottomRow ? 1 : 0)
     const spare = channel.isLoose && channel.bundles.length > 1 ? 1 : 0
     channel.top = top
     channel.rows = channel.wires.length === 0 ? (next === undefined ? 0 : 1) : heads + tracks + spare

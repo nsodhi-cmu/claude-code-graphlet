@@ -4,7 +4,7 @@ import { LOOK, SHOP, cellsOf, graphOf, graphRows, numbers, picture, undirected }
 import type { Drawing, Hit, Span } from '../hooks/draw'
 import { readGraph } from '../hooks/layers'
 import type { Graph } from '../hooks/layers'
-import { layoutOf } from '../hooks/layout'
+import { labelOf, layoutOf } from '../hooks/layout'
 import type { Layout, Look, Place } from '../hooks/layout'
 import { paint } from '../hooks/paint'
 import { viewOf } from '../hooks/view'
@@ -132,6 +132,37 @@ describe('the drawing', () => {
       '                 │  x  │  │  y  │  │  z  │',
       '                 └─────┘  └─────┘  └─────┘',
     ])
+  })
+
+  test('a link\'s label is written beside the port it leaves its box by, each port far enough from the next for its label, and lit with its link', () => {
+    const graph = readGraph({
+      nodes: ['Read', 'Valid?', 'Save', 'Ask again'].map(id => ({ id, label: id })),
+      links: [
+        { from: 'Read', to: 'Valid?' },
+        { from: 'Valid?', to: 'Save', label: 'yes' },
+        { from: 'Valid?', to: 'Ask again', label: 'no' },
+        { from: 'Ask again', to: 'Read', label: 'retry' },
+      ],
+    })
+    expect(graphRows(drawn(graph, null, { columns: 50, rows: 60 }))).toEqual([
+      '                 ┌──────┐',
+      '                 │ Read │',
+      '                 └──┬───┘',
+      '                    │ ▲',
+      '                    │ └┈┈┈┈┐',
+      '                    ▼      ┊',
+      '               ┌────────┐  ┊',
+      '               │ Valid? │  ┊',
+      '               └┬────┬──┘  ┊',
+      '                │yes │no   ┊',
+      '                └┐   └───┐ ┊',
+      '                 ▼       ▼ ┊retry',
+      '             ┌──────┐  ┌───┴───────┐',
+      '             │ Save │  │ Ask again │',
+      '             └──────┘  └───────────┘',
+    ])
+    const lit = drawn(graph, 'Valid?', { columns: 50, rows: 60 })
+    expect([...spansWith(lit, 'yes'), ...spansWith(lit, 'no'), ...spansWith(lit, 'retry')].map(span => span.paint)).toEqual(['accent', 'accent', 'plain'])
   })
 
   test('a link past a layer runs straight down a lane beside that layer\'s boxes, to an arrowhead of its own on the node it reaches', () => {
@@ -545,9 +576,20 @@ type Said = { node: string; channel: number; side: 'from' | 'to' | 'above' | 'be
  * where it meets boxes on one side only, each of them to each. A lane stands
  * for the one link it carries, and a line that meets another's side passes
  * under it. A line the window's edge cuts says nothing of what it was bound
- * for. Also answers where each line ends with nothing to meet it.
+ * for. Also answers where each line ends with nothing to meet it, and each
+ * label that is not where it should be: the words beside a tick, in the row
+ * past the box, must be the label of every link that leaves there, and a
+ * link's label must be written beside a tick of the node it leaves. Through a
+ * window, which may cut a label or leave its box out of view, the words
+ * beside a tick need only start the label.
  */
-function readOff(graph: Graph, layout: Layout, drawing: Drawing, xOf: (place: Place) => number): { links: string[]; loose: string[] } {
+function readOff(
+  graph: Graph,
+  layout: Layout,
+  drawing: Drawing,
+  xOf: (place: Place) => number,
+  isWindow = false,
+): { links: string[]; loose: string[]; labels: string[] } {
   const rows = picture(drawing).slice(0, -1).map(cellsOf)
   const at = (x: number, y: number): string => rows[y]?.[x] ?? ' '
   const isOff = (x: number): boolean => x < 0 || x >= layout.columns
@@ -556,6 +598,13 @@ function readOff(graph: Graph, layout: Layout, drawing: Drawing, xOf: (place: Pl
   const boxAt = new Map<string, { node: string; x: number; y: number; width: number; rows: number; shelf: number }>()
   const lanes = new Set<string>()
   const shelfOf = new Map<string, number>()
+  /** The words written from a cell on, up to the next line. */
+  const wordsAt = (x: number, y: number): string => {
+    let words = ''
+    for (let at = x; at < (rows[y]?.length ?? 0) && WAYS[at < 0 ? ' ' : (rows[y]?.[at] ?? ' ')] === undefined; at += 1) words += rows[y]?.[at] ?? ''
+    return words.trim()
+  }
+  const written = new Map<string, { node: string; text: string }>()
   layout.shelves.forEach((shelf, index) => {
     for (const place of shelf.places) {
       const x = xOf(place)
@@ -596,9 +645,11 @@ function readOff(graph: Graph, layout: Layout, drawing: Drawing, xOf: (place: Pl
         if (y === box.y + box.rows - 1 && '┬╤'.includes(char)) {
           ways.set(key, DOWN)
           ends.set(key, { node: box.node, channel: box.shelf, side: graph.isDirected ? 'from' : 'above' })
+          written.set(key, { node: box.node, text: wordsAt(x + 1, y + 1) })
         } else if (y === box.y && '┴╧'.includes(char)) {
           ways.set(key, UP)
           ends.set(key, { node: box.node, channel: box.shelf - 1, side: graph.isDirected ? 'from' : 'below' })
+          written.set(key, { node: box.node, text: wordsAt(x + 1, y - 1) })
         }
         return
       }
@@ -639,6 +690,25 @@ function readOff(graph: Graph, layout: Layout, drawing: Drawing, xOf: (place: Pl
   for (const [key, end] of ends) lines.set(find(key), [...(lines.get(find(key)) ?? []), end])
   const isCut = new Set([...cut].map(find))
   const links = new Set<string>()
+  const labels: string[] = []
+  const labelsOf = (one: string, other: string): string[] =>
+    graph.links.filter(link => (link.from === one && link.to === other) || (!graph.isDirected && link.from === other && link.to === one)).map(labelOf)
+  for (const [key, { node, text }] of written) {
+    const own = ends.get(key)
+    if (text === '' || own === undefined) continue
+    const said = lines.get(find(key)) ?? []
+    const across = said.filter(end => (graph.isDirected ? end.side === 'to' : end.side !== own.side))
+    for (const other of new Set((across.length > 0 ? across : said).map(end => end.node).filter(one => one !== node))) {
+      for (const label of labelsOf(node, other)) if (isWindow ? !label.startsWith(text) : label !== text) labels.push(`'${text}' beside ${node}, on its link to ${other} labelled '${label}'`)
+    }
+  }
+  if (!isWindow) {
+    for (const link of graph.links) {
+      const label = labelOf(link)
+      const isBeside = [...written.values()].some(({ node, text }) => text === label && (node === link.from || (!graph.isDirected && node === link.to)))
+      if (label !== '' && link.from !== link.to && !isBeside) labels.push(`'${label}' of ${link.from} to ${link.to} is written nowhere beside it`)
+    }
+  }
   for (const [line, said] of lines) {
     const on = (side: Said['side']): string[] => [...new Set(said.filter(end => end.side === side).map(end => end.node))]
     const pairs = graph.isDirected
@@ -650,7 +720,7 @@ function readOff(graph: Graph, layout: Layout, drawing: Drawing, xOf: (place: Pl
           : [...on('above'), ...on('below')].flatMap((one, index, all) => all.slice(index + 1).map(other => [one, other].sort()))
     for (const [one, other] of pairs) links.add(`${said[0]?.channel} ${one} ${other}`)
   }
-  return { links: [...links].sort(), loose }
+  return { links: [...links].sort(), loose, labels }
 }
 
 /** The links a picture of a graph laid out so should say: each link, in every channel it crosses. */
@@ -669,14 +739,16 @@ function linksOf(graph: Graph, layout: Layout): string[] {
 describe('what a picture says', () => {
   const next = numbers(31)
   const pick = (below: number): number => Math.floor(next() * below)
-  const labelOf = (index: number): string => [`Validate the request ${index}`, `数据库 ${index}`, `✅ ${index}`][pick(4)] ?? `n${index}`
+  const nameOf = (index: number): string => [`Validate the request ${index}`, `数据库 ${index}`, `✅ ${index}`][pick(4)] ?? `n${index}`
+  /** A label for a link, now and then. */
+  const someLabel = (): { label?: string } => (pick(3) === 0 ? { label: ['yes', 'no', 'retry', '数据', 'GET /items', 'a much longer label than fits'][pick(6)] ?? 'x' } : {})
   /** A graph of any shape, its links often running both ways. */
   const someGraph = (): Graph => {
     const count = 2 + pick(15)
     const links = Array.from({ length: pick(count * 2 + 2) }, () => [`n${pick(count)}`, `n${pick(count)}`])
     return readGraph({
-      nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: labelOf(index) })),
-      links: [...links, ...links.filter(() => pick(3) === 0).map(([from, to]) => [to, from])].map(([from = '', to = '']) => ({ from, to })),
+      nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: nameOf(index) })),
+      links: [...links, ...links.filter(() => pick(3) === 0).map(([from, to]) => [to, from])].map(([from = '', to = '']) => ({ from, to, ...someLabel() })),
       isDirected: pick(4) !== 0,
     })
   }
@@ -684,8 +756,8 @@ describe('what a picture says', () => {
   const crowdedGraph = (): Graph => {
     const count = 4 + pick(10)
     return readGraph({
-      nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: labelOf(index), layer: index < 2 ? 0 : pick(2 + pick(2)) })),
-      links: Array.from({ length: count + pick(count) }, () => ({ from: `n${pick(count)}`, to: `n${pick(count)}` })),
+      nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: nameOf(index), layer: index < 2 ? 0 : pick(2 + pick(2)) })),
+      links: Array.from({ length: count + pick(count) }, () => ({ from: `n${pick(count)}`, to: `n${pick(count)}`, ...someLabel() })),
       isDirected: pick(5) !== 0,
     })
   }
@@ -694,11 +766,11 @@ describe('what a picture says', () => {
     const [top, bottom] = [2 + pick(3), 2 + pick(4)]
     return readGraph({
       nodes: [
-        ...Array.from({ length: top }, (_, index) => ({ id: `t${index}`, label: labelOf(index), layer: 0 })),
-        ...Array.from({ length: bottom }, (_, index) => ({ id: `b${index}`, label: labelOf(index), layer: 1 })),
+        ...Array.from({ length: top }, (_, index) => ({ id: `t${index}`, label: nameOf(index), layer: 0 })),
+        ...Array.from({ length: bottom }, (_, index) => ({ id: `b${index}`, label: nameOf(index), layer: 1 })),
       ],
       links: Array.from({ length: top + bottom + pick(top * bottom) }, () =>
-        pick(2) === 0 ? { from: `t${pick(top)}`, to: `b${pick(bottom)}` } : { from: `b${pick(bottom)}`, to: `t${pick(top)}` },
+        pick(2) === 0 ? { from: `t${pick(top)}`, to: `b${pick(bottom)}`, ...someLabel() } : { from: `b${pick(bottom)}`, to: `t${pick(top)}`, ...someLabel() },
       ),
     })
   }
@@ -717,6 +789,7 @@ describe('what a picture says', () => {
       const drawing = paint(layout, graph, null, { columns, rows: layout.rows + 1 }, ORIGIN)
       const said = readOff(graph, layout, drawing, place => place.x)
       expect(said.loose).toEqual([])
+      expect(said.labels).toEqual([])
       expect(said.links).toEqual([...new Set(linksOf(graph, layout))])
     }
   })
@@ -730,11 +803,12 @@ describe('what a picture says', () => {
       for (let x = 0; x <= sightOf(layout, room).most.x; x += 1) {
         const drawing = paint(layout, graph, null, { columns: room.columns, rows: layout.rows + 1 }, { x, y: 0 })
         for (const channel of layout.channels) {
-          const tracks = channel.rows - Number(channel.hasUpHeads) - Number(channel.hasDownHeads)
+          const tracks = channel.rows - Number(channel.hasTopRow) - Number(channel.hasBottomRow)
           for (const wire of channel.wires) expect(Math.max(wire.track, wire.jog?.track ?? 0)).toBeLessThan(Math.max(1, tracks))
         }
-        const said = readOff(graph, layout, drawing, place => place.x - slideOf(layout, layout.shelves[place.shelf], x))
+        const said = readOff(graph, layout, drawing, place => place.x - slideOf(layout, layout.shelves[place.shelf], x), true)
         expect(said.loose).toEqual([])
+        expect(said.labels).toEqual([])
         expect(said.links.filter(link => !links.has(link))).toEqual([])
       }
     }

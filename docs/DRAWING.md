@@ -48,9 +48,32 @@ An undirected graph is drawn the same way, with no arrowheads and no flow:
 - A line joins each box whose bottom it meets to each box whose top it meets. A line that meets the bottoms of two boxes of one layer, and nothing else, is the one link between those two: here, the link between B and C that closes the loop.
 - A box has a tick of its own for each set of boxes whose links reach it together, as it would an arrowhead.
 
+A link's label is written beside its line, just past the box it leaves, in the paint of a label and lit with its link:
+
+```
+                 ┌──────┐
+                 │ Read │
+                 └──┬───┘
+                    │ ▲
+                    │ └┈┈┈┈┐
+                    ▼      ┊
+               ┌────────┐  ┊
+               │ Valid? │  ┊
+               └┬────┬──┘  ┊
+                │yes │no   ┊
+                └┐   └───┐ ┊
+                 ▼       ▼ ┊retry
+             ┌──────┐  ┌───┴───────┐
+             │ Save │  │ Ask again │
+             └──────┘  └───────────┘
+```
+
+- The words beside a line where it leaves a box are the label of every link of that line, since links with different labels never share one.
+- A link down the drawing has its label under the box it leaves; a link back up, over the box it leaves, beside the dashed line.
+
 ## What Is Selected
 
-The selected node's box has a double frame, and its label is bold and inverse in the node's own tone. Every link that touches the selected node is lit along its whole way, in the theme's accent color, and so are the borders of the boxes at the other ends. Everything else keeps its own paint: a box's border takes its node's tone, and a link is dim.
+The selected node's box has a double frame, and its label is bold and inverse in the node's own tone. Every link that touches the selected node is lit along its whole way, in the theme's accent color, and so are its label and the borders of the boxes at the other ends. Everything else keeps its own paint: a box's border takes its node's tone, and a link is dim.
 
 Lit is painted over unlit. Where links share a stretch of line, selecting a node shows which of them are its own.
 

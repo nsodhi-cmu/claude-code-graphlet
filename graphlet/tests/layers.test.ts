@@ -25,6 +25,21 @@ describe('reading a graph', () => {
     ])
   })
 
+  test('a link keeps the label it is first given, made safe to draw, and a blank label is none', () => {
+    const graph = readGraph({
+      nodes: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }],
+      links: [
+        { from: 'a', to: 'b', label: ' yes\n  sir ' },
+        { from: 'a', to: 'b', label: 'no' },
+        { from: 'b', to: 'a', label: '   ' },
+      ],
+    })
+    expect(graph.links).toEqual([
+      { from: 'a', to: 'b', label: 'yes sir' },
+      { from: 'b', to: 'a' },
+    ])
+  })
+
   test('text is made safe to draw, a node with no label is called by its id, and a tone that is none of the tones is dropped', () => {
     const graph = readGraph({
       nodes: [

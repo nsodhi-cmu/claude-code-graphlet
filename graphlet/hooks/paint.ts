@@ -2,7 +2,7 @@ import { canvasOf, footRow, sizeOf, spansOf } from './draw'
 import type { Canvas, Drawing, Hit, Paint, Pan, Room } from './draw'
 import { isJoined } from './layers'
 import type { Graph } from './layers'
-import { layTracks, routeOf } from './layout'
+import { labelOf, layTracks, routeOf } from './layout'
 import type { Channel, End, Layout, Place, Shelf } from './layout'
 import { sightOf, slideOf, within } from './window'
 
@@ -122,7 +122,8 @@ type Mark = { ways: number; isLit: boolean; isSolid: boolean }
  * not, and a wire to a place out of the window runs off the window's edge.
  * Wires of one bundle that meet are joined, in a tee or a cross; a wire that
  * only crosses another bundle's passes over it unbroken, and breaks the line
- * it crosses.
+ * it crosses. A wire's label is written just past its box, beside the port it
+ * leaves by.
  */
 function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Channel, selected: string | null, seen: Seen): void {
   const first = seen.yOf(channel.top)
@@ -134,7 +135,7 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
   const borderOfEnd = (end: End): number =>
     end.isAbove ? seen.yOf(layout.shelves[end.place.shelf]?.top ?? 0) + end.place.rows - 1 : below
 
-  const tracks = first + (channel.hasUpHeads ? 1 : 0)
+  const tracks = first + (channel.hasTopRow ? 1 : 0)
   for (const wire of channel.wires) {
     const turn = tracks + wire.track
     const jog = wire.jog === null ? null : { x: seen.xOf(wire.from.place) + wire.jog.at, turn: tracks + wire.jog.track }
@@ -206,6 +207,19 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
     const [x = 0, y = 0] = key.split(',').map(Number)
     canvas.put(x, y, head.char, { paint: head.isLit ? 'accent' : 'dim' })
   }
+  const labels = new Map<string, { text: string; isLit: boolean }>()
+  for (const wire of channel.wires) {
+    const text = labelOf(wire.link)
+    if (text === '' || 'lane' in wire.from.place.slot) continue
+    const border = borderOfEnd(wire.from)
+    const key = `${seen.xOf(wire.from.place) + wire.from.at + 1},${wire.from.isAbove ? border + 1 : border - 1}`
+    const isLit = selected !== null && (wire.link.from === selected || wire.link.to === selected)
+    labels.set(key, { text, isLit: isLit || (labels.get(key)?.isLit ?? false) })
+  }
+  for (const [key, label] of labels) {
+    const [x = 0, y = 0] = key.split(',').map(Number)
+    canvas.put(x, y, label.text, { paint: label.isLit ? 'accent' : 'plain' })
+  }
 }
 
 /**
@@ -230,7 +244,7 @@ export function paint(layout: Layout, graph: Graph, selected: string | null, roo
 
   const hits = layout.shelves.flatMap(shelf => paintShelf(canvas, graph, shelf, selected, seen))
   for (const channel of layout.channels) {
-    if (channel.isLoose) layTracks(channel, seen.xOf, channel.rows - Number(channel.hasUpHeads) - Number(channel.hasDownHeads))
+    if (channel.isLoose) layTracks(channel, seen.xOf, channel.rows - Number(channel.hasTopRow) - Number(channel.hasBottomRow))
     paintChannel(canvas, graph, layout, channel, selected, seen)
   }
 

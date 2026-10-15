@@ -37,6 +37,7 @@ graphlet is a Claude Code mod that draws graphs, nodes and the links between the
 
 - **Any graph, directed or not.** The nodes are laid out in layers down the drawing. A directed graph runs along the way its links run, and the link that closes a loop runs back up, dashed. An undirected graph spreads down from the first node it names, and its links have no arrowheads.
 - **Every link is drawn, and can be followed**, between neighboring layers, past layers, back up, and between two nodes of one layer. One box's links fan out on rows of their own, links from different boxes reach a box at arrowheads, or ticks, of their own, and a link that only crosses another passes over it.
+- **A link can say what it means.** Its label, `yes` or `retry`, is written beside the line where it leaves its box, and the box makes room for it.
 - **It scrolls.** A graph larger than its room is seen through a window that follows the selection, and that the wheel moves.
 - **It answers the mouse and the keyboard.** A click selects a node, the arrow keys move from node to node along the links, and the mod that owns the pane hears each pick.
 - **Claude draws graphs in its replies.** Where graphlet is installed, Claude knows it can answer with a graph, as it knows it can answer with a table, and the graph is drawn in the transcript where Claude wrote it.
@@ -129,8 +130,9 @@ While developing, load both from disk: `claude --plugin-dir ./graphlet --plugin-
 - A solid line runs with the flow, down the drawing. A dashed line runs against it: the link that closes a loop, on its way back up. An undirected graph has no flow, and every line in it is solid.
 - A line that passes a layer beside its boxes is a link bound for a layer farther on.
 - Lines that meet are joined: they leave the same box, or reach the same box. In an undirected graph, a line joins each box whose bottom it meets to each box whose top it meets, and a line that meets the bottoms of two boxes of one layer, and nothing else, joins those two. A link that only crosses another passes over it unbroken.
+- Words written beside a line, just past the box it leaves, are its label. A label is true of every link of the line it stands beside, since links with different labels never share a line.
 - `↺` in a box says the node links to itself.
-- The selected node's box has a double frame, and its links and the boxes they reach are lit.
+- The selected node's box has a double frame, and its links, their labels, and the boxes they reach are lit.
 
 A click on a box selects its node. Once the graph has been clicked it has the keyboard, and the arrow keys, or `h` `j` `k` `l`, move the selection: left and right along a layer, up and down along a link.
 

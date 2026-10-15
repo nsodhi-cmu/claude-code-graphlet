@@ -21,7 +21,12 @@ export type GraphletNode = {
 }
 
 /** A link between two nodes, by their ids: from one to the other, in a directed graph. */
-export type GraphletLink = { from: string; to: string }
+export type GraphletLink = {
+  from: string
+  to: string
+  /** A few words written on the link, where it leaves the node it is drawn from. */
+  label?: string
+}
 
 /** A graph. Its links may run in a loop. */
 export type GraphletGraph = {
