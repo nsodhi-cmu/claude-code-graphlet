@@ -4,7 +4,7 @@ Claude, the model in a session where graphlet is installed, draws a graph in a r
 
 ## What The Model Is Told
 
-A `prompt.compose` hook adds one section to the end of the system prompt, `graphlet:graphs`, on the session's side of the cache boundary. Its text is `GUIDE` in `reply.ts`: what a block looks like, an example, the tones, labels, links with no direction, how large a graph to draw, and when to write one and when not to. The example is itself a block that graphlet draws.
+A `prompt.compose` hook adds one section to the end of the system prompt, `graphlet:graphs`, on the session's side of the cache boundary. Its text is `GUIDE` in `reply.ts`: what a block looks like, an example, the tones, labels, links with no direction, groups, how large a graph to draw, and when to write one and when not to. The example is itself a block that graphlet draws.
 
 The section is added wherever the session draws, that is, wherever `e.surfaces` names a surface, unless the person's `replies` setting is `off`: then no section is added anywhere, and the hook that draws a reply passes every block on as it is, so graphlet is only a library for the mods that use it. A run that draws nowhere, such as `claude -p`, gets no section, since a block there would reach the person as written, unless the environment variable `EVAL_GRAPHLET_GUIDE` is `1`, as the evals set it, so that what the model writes with the guide can be measured.
 
@@ -34,6 +34,17 @@ Ask for a correction -> Read the request
 - A tone in brackets at the end of a label is its node's: `[plain]`, `[dim]`, `[note]`, `[good]`, `[warn]`, or `[bad]`, in any case. The first tone given for a node holds. Brackets that name no tone are part of the label.
 - A label in bold, as Markdown writes it, `**Valid?**`, gives its node a priority of 1, so that a graph with a bold label and a label not bold draws the bold one heavy, as [DRAWING.md](DRAWING.md#reading-the-picture) tells. Its asterisks are not part of the label, so the same label bold and not is the same node, and its tone may stand inside the bold or after it. A label with an asterisk between the two pairs is not bold.
 - A label left blank, by an arrow at the start or the end of a line or a tone written alone, is passed over.
+- A line that is a name and a colon alone, `Backend:`, opens a group named so, and the lines indented under it are in it, up to a line indented no more than it. A node is in the first group it is named under, wherever else it is named, so links between groups may be written on lines of their own. A group's id is its name after `group:`, so that no node's label is one. `subgraph Backend`, as Mermaid writes it, opens a group too, for the lines up to a line `end`. A group in a group is not drawn inside it: a node is in the innermost group it is named under. Blank lines are passed over.
+
+```graphlet
+Client -> API
+Backend:
+  API -> Auth
+  API -> Orders
+Data:
+  Postgres
+Orders -> Postgres
+```
 
 The graph is then read as any other, by [`readGraph`](LAYERS.md), so the same limits hold, and its layers are worked out from its links.
 
@@ -87,6 +98,7 @@ A reply that opens with a graph has no text before it for the engine to draw, an
 `pictureOf` draws a graph for a reply, with the person's settings, as a pane's graph is drawn, but for two things. Its links are always kept separate, as the `links` setting's `separate` keeps them, since nothing in a reply can be selected to tell merged links apart. And its layers are folded into the reply's width.
 
 - **Its way.** It runs right where that fits the reply's width in half the rows of running down or fewer, as a pipeline does, and else down, as [API.md](API.md#a-graph) tells; the block has no way to say.
+- **Its groups.** Every group is drawn open, in its frame.
 - **Its width.** The room is the reply's width: the columns the surface measured, less the bullet's, or `REPLY_COLUMNS` less the bullet's where it measured none. A layer too wide for it is folded onto more layers, as [LAYERS.md](LAYERS.md#folding-into-a-room) tells, so the graph fits the reply where it can and is not cut off at its edge. The graph is laid out once, in the reply's width, and the columns blank down the whole of its left side are cut away, so a small graph stands at the reply's left edge, as the text does.
 - **Its height.** As tall as the graph needs, up to the most rows a room has, `MOST_CELLS`.
 - **It is still.** Nothing is selected or lit, no key or wheel moves it, and nothing in its rows answers a click. Its rows are plain `Text`, with no `Client` around them to take the pointer or the keyboard.
@@ -114,7 +126,8 @@ What a tool would add is a result the model reads back, and a result in a run wi
 
 | Kind | Asks for | Graded on |
 | :- | :- | :- |
-| `draws-*`, `labels-the-branches`, `colors-what-went-wrong` | something a graph answers: a flow, a state machine, files and their imports, a site map, who knows whom, a home network with a nightly backup, decisions with named outcomes, a pipeline stuck at one step | a closed graph block with a link in it, of arrows, or for who knows whom of dashes, in a block with no arrows among them, or for the network of both in one block; no Mermaid in the block; text before the first block, introducing it; and the graph being right: by a judge model's checklist, or for the imports and the acquaintances by a pattern for each link, written any way the block allows; the decisions, by a labeled link and a judge's checklist of their outcomes; the stuck step, by a tone and a judge's check that it is the failing step's; the network, by a judge's check that its cables are dashes and its backup an arrow |
+| `draws-*`, `labels-the-branches`, `colors-what-went-wrong` | something a graph answers: a flow, a state machine, files and their imports, a site map, who knows whom, a home network with a nightly backup, decisions with named outcomes, a pipeline stuck at one step | a closed graph block with a link in it, of arrows, or for who knows whom of dashes, in a block with no arrows among them, or for the network of both in one block; no Mermaid in the block; text before the first block, introducing it; and the graph being right: by a judge model's checklist, or for the imports and the acquaintances by a pattern for each link, written any way the block allows; the decisions, by a labeled link and a judge's checklist of their outcomes; the stuck step, by a tone and a judge's check that it is the failing step's; the network, by a judge's check that its cables are dashes and its backup an arrow; and for the states, the decisions, and who knows whom, which have no parts, no line opening a group |
+| `groups-the-tiers` | a web app whose parts fall into a client, a backend, and a data tier | a graph block with a line opening a group and a line indented under it; no Mermaid in it; text before it; and by a judge, a group for the backend and one for the data tier, each holding its own nodes and no other's, and the links right |
 | `keeps-a-big-graph-small` | a map of a system with many parts | a graph block; no Mermaid in it; and by a judge model, no block of more than thirty nodes |
 | `quiet-*` | something no graph answers: a language question, a poem, a one-line answer | no graph block |
 | `writes-mermaid-when-asked` | a Mermaid flowchart by name | a Mermaid block, and no graph block |

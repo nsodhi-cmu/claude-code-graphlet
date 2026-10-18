@@ -1,0 +1,37 @@
+schema_version: '1.0'
+name: groups-the-tiers
+description: 'A system of parts that fall into tiers is answered with a graph block that frames each tier as a group.'
+tags: [draw, groups]
+execution:
+  prompt: |
+    Show me how our web app fits together. In the client tier there is the browser app and the mobile app. Both call the API gateway in the backend, which calls the auth service and the orders service, also in the backend. The orders service reads and writes Postgres and caches in Redis, which make up the data tier; the auth service reads Postgres too.
+  max_turns: 3
+  timeout_seconds: 180
+  allowed_tools: []
+  env:
+    EVAL_GRAPHLET_GUIDE: '1'
+runs: 3
+graders:
+  - type: regex
+    name: writes-a-graph-block
+    pattern: '^[ \t]*```graphlet[ \t]*$'
+    flags: 'm'
+    match: 'contains'
+  - type: regex
+    name: frames-a-group
+    pattern: '```graphlet(?:(?!```)[\s\S])*?^[ \t]*[^\s:][^:\n]*:[ \t]*\n[ \t]+\S'
+    flags: 'm'
+    match: 'contains'
+  - type: regex
+    name: no-mermaid-in-the-block
+    pattern: '```graphlet[^`]*?(?:^\s*(?:graph|flowchart)\s+(?:TD|LR|TB|RL|BT)|subgraph|==>|-\.->|:::|\[\(|\(\[|\{\{)'
+    flags: 'mi'
+    match: 'not_contains'
+  - type: regex
+    name: introduces-the-graph
+    pattern: '^\s*[^\s`]'
+    flags: ''
+    match: 'contains'
+  - type: llm
+    name: groups-are-the-tiers
+    criteria: 'Judge only the graph in the ```graphlet block, where a line that is a name and a colon alone opens a group holding the nodes on the indented lines under it. PASS if all of these hold: (1) there is a group for the backend holding the API gateway, the auth service and the orders service, and no node of another tier; (2) there is a group for the data tier holding Postgres and Redis, and no node of another tier; (3) the browser app and the mobile app are each in a client group or in no group, and in no other group; (4) its -> links run from both apps to the gateway, from the gateway to the auth and orders services, from the orders service to Postgres and Redis, and from the auth service to Postgres. FAIL if any does not hold.'

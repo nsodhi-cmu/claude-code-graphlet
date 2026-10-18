@@ -134,6 +134,45 @@ test('the same two nodes may be linked again under another label, and a link giv
   expect(readGraph(graph).links.map(link => `${link.from} -> ${link.to} ${link.label ?? ''}`.trim())).toEqual(['Idle -> Running start', 'Idle -> Running resume', 'Running -> Idle'])
 })
 
+test('a name and a colon alone on a line opens a group for the lines indented under it, and subgraph does up to end, as Mermaid writes it; a node is in the first group it is named under', () => {
+  const graph = graphOf([
+    'Browser -> API',
+    'Backend:',
+    '  API -> Auth',
+    '',
+    '  API -> Cache',
+    '  Cache:',
+    '    Redis',
+    'subgraph Data',
+    'Auth -> Postgres',
+    'Redis',
+    'end',
+    'Step 1: read -> Auth',
+  ])
+  expect(graph.groups).toEqual([
+    { id: 'group:Backend', label: 'Backend' },
+    { id: 'group:Cache', label: 'Cache' },
+    { id: 'group:Data', label: 'Data' },
+  ])
+  expect(graph.nodes.map(node => `${node.id} ${node.group ?? '-'}`)).toEqual([
+    'Browser -',
+    'API group:Backend',
+    'Auth group:Backend',
+    'Cache group:Backend',
+    'Redis group:Cache',
+    'Postgres group:Data',
+    'Step 1: read -',
+  ])
+})
+
+test('the groups of a block are drawn in frames in its picture, every group open', () => {
+  const block = ['Client -> API', 'Backend:', '  API -> Auth', '  API -> Orders', 'Data:', '  Postgres', 'Auth -> Postgres', 'Orders -> Postgres']
+  const drawing = picture(pictureOf(still, readGraph(graphOf(block)), { columns: 78, rows: 1000 })).join('\n')
+  expect(drawing).toContain('╭─ Backend ─')
+  expect(drawing).toContain('╭─ Data ─')
+  expect(drawing).not.toContain('▸')
+})
+
 test('dashes within a label, and a dash in prose, stay part of the label', () => {
   const graph = graphOf(['git commit --amend -> git push --force', 'Fetch — with retry -> Parse', 'npm run build --watch -> Done'])
   expect(graph.nodes.map(node => node.id)).toEqual(['git commit --amend', 'git push --force', 'Fetch — with retry', 'Parse', 'npm run build --watch', 'Done'])

@@ -28,6 +28,11 @@ graders:
     flags: 'm'
     match: 'contains'
   - type: regex
+    name: no-group-for-what-has-no-parts
+    pattern: '```graphlet(?:(?!```)[\s\S])*?^[ \t]*[^\s:][^:\n]*:[ \t]*$'
+    flags: 'm'
+    match: 'not_contains'
+  - type: regex
     name: no-mermaid-in-the-block
     pattern: '```graphlet[^`]*?(?:^\s*(?:graph|flowchart)\s+(?:TD|LR|TB|RL|BT)|subgraph|==>|-\.->|:::|\[\(|\(\[|\{\{)'
     flags: 'mi'
