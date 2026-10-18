@@ -39,7 +39,7 @@ graphlet is a Claude Code mod that draws graphs, nodes and the links between the
 - **Every link is drawn, and can be followed**, between neighboring layers, past layers, back up, and between two nodes of one layer. One box's links fan out on rows of their own, links from different boxes reach a box at arrowheads, or ticks, of their own, and a link that only crosses another passes over it.
 - **A link can say what it means.** Its label, `yes` or `retry`, is written beside the line where it leaves its box, and the box makes room for it.
 - **It scrolls.** A graph larger than its room is seen through a window that follows the selection, and that the wheel moves.
-- **It answers the mouse and the keyboard.** A click selects a node, the arrow keys move from node to node along the links, and the mod that owns the pane hears each pick.
+- **It answers the mouse and the keyboard.** A click selects a node, the arrow keys move from node to node along the links, return or a double click opens one, and the mod that owns the pane hears each pick and each open.
 - **Claude draws graphs in its replies.** Where graphlet is installed, Claude knows it can answer with a graph, as it knows it can answer with a table, and the graph is drawn in the transcript where Claude wrote it.
 - **It is a library for other mods.** It adds no command, registers no tool, starts no agent, and calls no model.
 
@@ -115,6 +115,11 @@ on('graphlet.select', async ($, e, next) => {
   if (e.pane === 'my-pane') $.ui.toast(`picked ${e.node}`)
   return next(e)
 })
+
+on('graphlet.open', async ($, e, next) => {
+  if (e.pane === 'my-pane') $.ui.toast(`opened ${e.node}`)
+  return next(e)
+})
 ```
 
 A link runs from one node to the other. Given `isDirected: false`, it only joins its two nodes, whichever it names first; a graph given `isDirected: false` has every link that does not say so join its nodes that way. A node may say how much the graph is about it with a whole number, its `priority`, 0 when left out: the nodes of the highest, where that is above 0 and above another node's, are drawn in heavy frames; the first node of the highest is selected where neither the mod nor the person has picked one; and the layout keeps the links of nodes of higher priority straighter where that leaves the drawing's rows and bent links weighing no more.
@@ -135,7 +140,7 @@ While developing, load both from disk: `claude --plugin-dir ./graphlet --plugin-
 - A box with a heavy frame, `┏━┓`, is a node the graph is about: one of the nodes its graph gives the highest priority.
 - The selected node's box has a double frame, and its links, their labels, and the boxes they reach are lit.
 
-A click on a box selects its node. Once the graph has been clicked it has the keyboard, and the arrow keys, or `h` `j` `k` `l`, move the selection: left and right along a layer, up and down along a link.
+A click on a box selects its node. Once the graph has been clicked it has the keyboard, and the arrow keys, or `h` `j` `k` `l`, move the selection: left and right along a layer, up and down along a link. Return, or a double click on a box, opens the node, for the mod that owns the pane to act on: to go to the file it stands for, say.
 
 A graph too large to take in has two more keys:
 

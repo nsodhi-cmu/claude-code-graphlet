@@ -53,8 +53,12 @@ const HOST: Plugin = {
       heard.push(`select ${e.pane} ${e.node}`)
       return next(e)
     })
+    on('graphlet.open', async ($, e, next) => {
+      heard.push(`open ${e.pane} ${e.node}`)
+      return next(e)
+    })
     on('graphlet.key', async ($, e, next) => {
-      heard.push(`key ${e.pane} ${e.key}`)
+      heard.push(`key ${e.pane} ${e.key} ${e.selected}`)
       return next(e)
     })
     on('ui.press', { plugin: 'host' }, async ($, e) => {
@@ -253,7 +257,23 @@ test('the arrow keys and the letters under them move the selection, and any othe
   await pane.redraw()
   expect(await said(pane)).toMatchObject({
     shown: { selected: 'src/money.ts' },
-    heard: ['select free src/email.ts', 'select free src/ui.ts', 'select free src/price.ts', 'select free src/money.ts', 'key free t'],
+    heard: ['select free src/email.ts', 'select free src/ui.ts', 'select free src/price.ts', 'select free src/money.ts', 'key free t src/money.ts'],
+  })
+  await pane.unmount()
+})
+
+test('return, or a double click on a box, opens its node: the owner hears which, and a key graphlet has no use for comes with the node selected', WITH_HOST, async ($, on) => {
+  world(on)
+  const pane = await mount($, 'free')
+  await click(pane, boxOf('src/email.ts'))
+  await pane.key({ key: 'return', in: 'graph' })
+  await click(pane, boxOf('src/cart.ts'))
+  await click(pane, boxOf('src/cart.ts'))
+  await pane.key({ key: 'x', in: 'graph' })
+  await pane.redraw()
+  expect(await said(pane)).toMatchObject({
+    shown: { selected: 'src/cart.ts' },
+    heard: ['select free src/email.ts', 'open free src/email.ts', 'select free src/cart.ts', 'open free src/cart.ts', 'key free x src/cart.ts'],
   })
   await pane.unmount()
 })
@@ -374,7 +394,7 @@ test('/ finds a node by its label as it is typed: the selection goes to the firs
     'select free src/invoice.ts',
     'select free src/pages/invoice.ts',
     'select free src/price.ts',
-    'key free t',
+    'key free t src/price.ts',
   ])
   await pane.unmount()
 })

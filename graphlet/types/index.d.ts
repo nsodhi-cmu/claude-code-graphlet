@@ -85,8 +85,8 @@ export type GraphletScroll = { pane: string; by: number | { x: number; y: number
 
 /**
  * What graphlet adds to `$`. A mod that lists graphlet under `dependencies`
- * calls these from its own hooks, and hooks `graphlet.select` and
- * `graphlet.key` to hear what the person did.
+ * calls these from its own hooks, and hooks `graphlet.select`,
+ * `graphlet.open`, and `graphlet.key` to hear what the person did.
  */
 export type Graphlet = {
   /**
@@ -113,10 +113,18 @@ export type Graphlet = {
    */
   select(input: { pane: string; node: string }): Promise<void>
   /**
-   * Does nothing. Graphlet calls it with each key pressed over a graph that
-   * it has no use for itself, for a hook on `graphlet.key` to answer.
+   * Does nothing. Graphlet calls it when the person opens a node, by return
+   * on the selected one or a double click on its box, for a hook on
+   * `graphlet.open` to answer: the act a mod hosts a graph for, such as
+   * going to the file a node stands for.
    */
-  key(input: { pane: string; key: string }): Promise<void>
+  open(input: { pane: string; node: string }): Promise<void>
+  /**
+   * Does nothing. Graphlet calls it with each key pressed over a graph that
+   * it has no use for itself, and the node selected as it was pressed, for a
+   * hook on `graphlet.key` to answer.
+   */
+  key(input: { pane: string; key: string; selected: string | null }): Promise<void>
 }
 
 declare module 'claude-code' {

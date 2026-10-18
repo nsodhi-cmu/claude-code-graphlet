@@ -129,6 +129,7 @@ export const register: Register = (on, options) => {
         picked.set(input.pane, input.node)
         built.ui.invalidate('ui.render')
       },
+      open: async () => undefined,
       key: async () => undefined,
     }
     return { ...built, graphlet }
@@ -188,8 +189,9 @@ export const register: Register = (on, options) => {
     const at = held.get(e.requestId)
     if (at === undefined || typeof e.data !== 'object' || e.data === null) return next(e)
     const pane = e.requestId
-    const { node, by, drag, grab, isDropped, key, page, isChord } = e.data as {
+    const { node, isOpened, by, drag, grab, isDropped, key, page, isChord } = e.data as {
       node?: unknown
+      isOpened?: unknown
       by?: unknown
       drag?: unknown
       grab?: unknown
@@ -207,7 +209,9 @@ export const register: Register = (on, options) => {
     }
     if (typeof node === 'string') {
       finding.delete(pane)
-      await $.graphlet.select({ pane, node })
+      if (node !== at.selected) await $.graphlet.select({ pane, node })
+      else $.ui.invalidate('ui.render')
+      if (isOpened === true) await $.graphlet.open({ pane, node })
     } else if (isPan(by)) {
       await $.graphlet.scroll({ pane, by })
     } else if (isPan(drag)) {
@@ -228,6 +232,8 @@ export const register: Register = (on, options) => {
     } else if (query !== undefined && key === 'return') {
       const found = foundIn(at.whole, query)
       await pick(found[(found.indexOf(at.selected ?? '') + 1) % Math.max(found.length, 1)])
+    } else if (key === 'return' && at.selected !== null) {
+      await $.graphlet.open({ pane, node: at.selected })
     } else if (key === '/') {
       finding.set(pane, '')
       $.ui.invalidate('ui.render')
@@ -239,7 +245,7 @@ export const register: Register = (on, options) => {
     } else if (typeof key === 'string') {
       const move = MOVES[key]
       const to = move === undefined ? null : view.step(at.graph, at.selected, move, at.room, at.pan)
-      if (move === undefined) await $.graphlet.key({ pane, key })
+      if (move === undefined) await $.graphlet.key({ pane, key, selected: at.selected })
       else if (to !== null && to !== at.selected) await $.graphlet.select({ pane, node: to })
     }
     return {}

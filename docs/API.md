@@ -49,7 +49,8 @@ A mod runs before the mods it depends on, so its hook is the outer one and graph
 | `step({ pane, move })` | Answers the node a move from the selected one lands on, for a mod that has keys of its own: `left`, `right`, `up`, or `down`. |
 | `scroll({ pane, by })` | Scrolls the graph: by cells, `{ x, y }`, or by turns of the wheel, a number. |
 | `select({ pane, node })` | Selects a node. |
-| `key({ pane, key })` | Does nothing. |
+| `open({ pane, node })` | Does nothing. |
+| `key({ pane, key, selected })` | Does nothing. |
 
 A room has at least one cell each way and at most a thousand, whatever is asked: a count that is no number is taken as one. A room narrower than the narrowest a graph is laid out for, `LEAST_COLUMNS` in `graphlet/hooks/layout.ts`, is drawn as that wide. A scroll by what is no number is ignored.
 
@@ -59,7 +60,7 @@ A room has at least one cell each way and at most a thousand, whatever is asked:
 
 A pane has one node selected. Either the mod says which, by giving `show` a `selected`, or graphlet keeps it: the node `select` was last called with, or the first the graph names of the nodes of its highest priority.
 
-Graphlet calls `$.graphlet.select` itself when the person clicks a node's box, or moves with the arrow keys or `h` `j` `k` `l` while the graph has the keyboard. Every method of the noun is also an event, so a mod hears the pick in a hook, where it may act on it and pass it on:
+Graphlet calls `$.graphlet.select` itself when the person clicks the box of a node not selected, or moves with the arrow keys or `h` `j` `k` `l` while the graph has the keyboard. Every method of the noun is also an event, so a mod hears the pick in a hook, where it may act on it and pass it on:
 
 ```ts
 on('graphlet.select', async ($, e, next) => {
@@ -70,6 +71,17 @@ on('graphlet.select', async ($, e, next) => {
 
 A mod that says which node is selected hears each pick the same way, and the drawing changes when it next gives `show` the node it was told of.
 
+## Opening A Node
+
+To open a node is to ask for what it stands for: the file, the state, the step. The person opens the selected node with return, or any node with a double click on its box, two clicks there within `DOUBLE_CLICK_MS` of each other in `graphlet/hooks/surface.tsx`; the first of the two selects it, as any click does. Graphlet then calls `$.graphlet.open`, which does nothing: a mod that has something to open hooks `graphlet.open`.
+
+```ts
+on('graphlet.open', async ($, e, next) => {
+  if (e.pane === 'mine') await goTo($, e.node)
+  return next(e)
+})
+```
+
 ## Keys And The Wheel
 
 The graph is drawn by a surface module, the only kind of element that receives arrow keys, and it receives keys only after a click on it. While it has the keyboard, graphlet answers these keys itself:
@@ -77,10 +89,11 @@ The graph is drawn by a surface module, the only kind of element that receives a
 | Key | What it does |
 | :- | :- |
 | arrows, `h` `j` `k` `l` | Moves the selection. |
+| return | Opens the selected node. |
 | `f` | Draws the graph in focus on the selected node, or draws it all again. |
-| `/` | Starts finding a node by its label. While finding, what is typed is what is looked for, the selection goes to the first node found, return goes to the next, and backspace takes back what was typed, or with nothing typed, stops finding. A click on a box stops it too. |
+| `/` | Starts finding a node by its label. While finding, what is typed is what is looked for, the selection goes to the first node found, return goes to the next in place of opening one, and backspace takes back what was typed, or with nothing typed, stops finding. A click on a box stops it too. |
 
-It calls `$.graphlet.key` with every other key, and with no key typed while finding. That method does nothing: a mod with keys of its own hooks `graphlet.key` to answer them.
+It calls `$.graphlet.key` with every other key, and with no key typed while finding, along with the node selected as it was pressed, `selected`, or null where none is. That method does nothing: a mod with keys of its own hooks `graphlet.key` to answer them.
 
 A drag from where a click does nothing, on no box, name, count or corner, moves the graph with the pointer, as far as its window goes; graphlet answers it itself. The surface posts how far the pointer has gone since the button went down, so a move lost when two fall in one frame is made up by the next. Where the terminal did not report a release, the next press of a button, or a move with no button held, ends the drag where it is.
 
