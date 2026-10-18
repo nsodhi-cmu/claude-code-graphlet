@@ -52,7 +52,7 @@ A mod that depends on graphlet brings it along. To install it alone, for the gra
 /plugin install graphlet --marketplace nsodhi-cmu/claude-code-graphlet
 ```
 
-graphlet is tested on Claude Code 2.1.299. Mods are new and their API still changes between releases, so an older Claude Code may not load it. It draws in the terminal; on the desktop app, the VS Code extension, and the mobile app, a graph in a reply is shown as plain text, and a pane is left as its owner draws it.
+graphlet is tested on Claude Code 2.1.302. Mods are new and their API still changes between releases, so an older Claude Code may not load it. It draws in the terminal; on the desktop app, the VS Code extension, and the mobile app, a graph in a reply is shown as plain text, and a pane is left as its owner draws it.
 
 ## In Claude's Replies
 
