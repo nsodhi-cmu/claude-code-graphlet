@@ -90,6 +90,7 @@ The graph is drawn by a surface module, the only kind of element that receives a
 | :- | :- |
 | arrows, `h` `j` `k` `l` | Moves the selection. |
 | return | Opens the selected node. |
+| `c` | Copies the whole graph as plain text: drawn still, with nothing selected, as a reply draws it, in a room as wide as its longest layer. A toast says whether it was copied. |
 | `f` | Draws the graph in focus on the selected node, or draws it all again. |
 | `/` | Starts finding a node by its label. While finding, what is typed is what is looked for, the selection goes to the first node found, return goes to the next in place of opening one, and backspace takes back what was typed, or with nothing typed, stops finding. A click on a box stops it too. |
 

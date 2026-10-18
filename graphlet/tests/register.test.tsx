@@ -156,6 +156,7 @@ const world = (on: On) => {
     written: [] as Array<{ path: string; text: string }>,
     ran: [] as string[][],
     toasts: [] as string[],
+    copied: [] as string[],
     /** The one program that opens a file on this system; null when none does. */
     opener: 'xdg-open' as string | null,
   }
@@ -167,6 +168,10 @@ const world = (on: On) => {
   on('ui.toast', ($, e) => {
     seen.toasts.push(e.text)
     return { value: undefined }
+  })
+  on('ui.copy', ($, e) => {
+    seen.copied.push(e.text)
+    return { value: { isCopied: true as const } }
   })
   on('env.get', ($, e) => ({ value: e.name === 'TMPDIR' ? '/var/tmp/' : undefined }))
   on('fs.write', ($, e) => {
@@ -414,6 +419,38 @@ test('f draws the graph in focus on the selected node and its nearest, each sayi
   expect(whole).toContain('║ hub ║')
   expect(whole).not.toContain('+17')
   expect(whole).not.toContain('left out')
+  await pane.unmount()
+})
+
+test('c copies the whole graph as plain text, drawn still with nothing selected, and is not the owner\'s', WITH_HOST, async ($, on) => {
+  const seen = world(on)
+  const pane = await mount($, 'free', NARROW)
+  await click(pane, { x: 0, y: 0 })
+  await pane.key({ key: 'c', in: 'graph' })
+  expect(seen.copied).toEqual([
+    [
+      '┌───────────────┐  ┌────────────────────┐',
+      '│ ○ checkout.ts │  │ ○ pages/invoice.ts │',
+      '└─────┬─────────┘  └─────┬──────────────┘',
+      '      │                  │',
+      '      ▼                  ▼',
+      '┌───────────┐  ┌──────────────────┐  ┌─────────┐  ┌────────────┐',
+      '│ ● cart.ts │  │ ● src/invoice.ts │  │ ○ ui.ts │  │ ▲ email.ts │',
+      '└─────┬─────┘  └─────────┬────────┘  └────┬────┘  └──────┬─────┘',
+      '      └──────────────────┴───────┬────────┴──────────────┘',
+      '                                 ▼',
+      '                          ┌────────────┐',
+      '                          │ ◆ price.ts │',
+      '                          └──────┬─────┘',
+      '                                 │',
+      '                                 ▼',
+      '                         ┌───────────────┐',
+      '                         │ → money.ts  2 │',
+      '                         └───────────────┘',
+    ].join('\n'),
+  ])
+  expect(seen.toasts).toEqual(['graphlet: copied the graph as text.'])
+  expect((await said(pane)).heard).toEqual(['select free src/pages/checkout.ts'])
   await pane.unmount()
 })
 

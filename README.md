@@ -140,7 +140,7 @@ While developing, load both from disk: `claude --plugin-dir ./graphlet --plugin-
 - A box with a heavy frame, `┏━┓`, is a node the graph is about: one of the nodes its graph gives the highest priority.
 - The selected node's box has a double frame, and its links, their labels, and the boxes they reach are lit.
 
-A click on a box selects its node. Once the graph has been clicked it has the keyboard, and the arrow keys, or `h` `j` `k` `l`, move the selection: left and right along a layer, up and down along a link. Return, or a double click on a box, opens the node, for the mod that owns the pane to act on: to go to the file it stands for, say.
+A click on a box selects its node. Once the graph has been clicked it has the keyboard, and the arrow keys, or `h` `j` `k` `l`, move the selection: left and right along a layer, up and down along a link. Return, or a double click on a box, opens the node, for the mod that owns the pane to act on: to go to the file it stands for, say. `c` copies the whole graph as plain text, to paste into a pull request or a chat.
 
 A graph too large to take in has two more keys:
 
@@ -193,6 +193,7 @@ What graphlet does with that access:
 - **Draws** in Claude's replies where they hold a graph block, in the panes of the mods that ask it to, and nowhere else.
 - **Keeps** each such pane's graph, selection, and scroll position in memory, for the session.
 - **Writes one file and opens it**, only when you click `html ↗`: the graph as a web page, in your temporary folder, opened with your system's own opener (`xdg-open`, `open`, or `start`).
+- **Copies a graph to your clipboard**, only when you ask it to, by `c`: the graph as plain text.
 
 It reads no file, stores nothing between sessions, calls no model, and makes no network requests.
 

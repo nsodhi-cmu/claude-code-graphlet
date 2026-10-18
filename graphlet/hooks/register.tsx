@@ -1,7 +1,7 @@
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, Register, RenderSurface } from 'claude-code'
 
 import type { Graphlet } from '../types'
-import { MOST_TREE_CHARS, bounded, charactersOf, styleOf } from './draw'
+import { MOST_TREE_CHARS, bounded, charactersOf, rowText, styleOf } from './draw'
 import type { Drawing, Pan, Room } from './draw'
 import { readGraph } from './layers'
 import type { Graph } from './layers'
@@ -75,6 +75,18 @@ const MOST_CELLS = 1000
 /** A count of cells another mod handed over, as a whole number a room can have. */
 const cellsOf = (asked: unknown): number =>
   typeof asked === 'number' && Number.isFinite(asked) ? Math.min(Math.max(Math.floor(asked), 1), MOST_CELLS) : 1
+
+/**
+ * Puts a graph on the clipboard as plain text, and says whether it went: the
+ * whole graph drawn still, as a reply draws it, in a room as wide as its
+ * longest layer is laid out across in a room `columns` wide.
+ */
+const copyGraph = async ($: EngineInterface, graph: Graph, columns: number, surface?: RenderSurface): Promise<void> => {
+  const room = { columns: cellsOf(view.measure(graph, columns).columns), rows: MOST_CELLS }
+  const text = pictureOf(still, graph, room).rows.map(row => rowText(row).trimEnd()).join('\n')
+  const copied = await $.ui.copy({ text, ...(surface === undefined ? {} : { surface }) })
+  $.ui.toast(copied.isCopied ? 'graphlet: copied the graph as text.' : `graphlet: could not copy the graph (${copied.reason}).`)
+}
 
 /** The columns the bullet opening a reply takes, which the reply's text is indented by. */
 const BULLET_COLUMNS = 2
@@ -237,6 +249,8 @@ export const register: Register = (on, options) => {
     } else if (key === '/') {
       finding.set(pane, '')
       $.ui.invalidate('ui.render')
+    } else if (key === 'c') {
+      await copyGraph($, at.whole, at.room.columns)
     } else if (key === 'f') {
       if (focused.has(pane)) focused.delete(pane)
       else focused.add(pane)
