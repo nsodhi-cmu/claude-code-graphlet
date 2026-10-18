@@ -3,7 +3,7 @@ import { MOST_CELLS } from './draw'
 import type { Drawing, Pan, Room } from './draw'
 import { priorityOf, ranksOf } from './layers'
 import type { Graph, Link, Node } from './layers'
-import { LEAST_COLUMNS, layoutOf } from './layout'
+import { LEAST_COLUMNS, breadthOf, layoutOf } from './layout'
 import type { Direction, Layout, Look } from './layout'
 import { paint } from './paint'
 import type { Finding } from './paint'
@@ -68,8 +68,8 @@ const COLLAPSED = '▸'
  * after `COLLAPSED`, in its tone,
  * and how many nodes it holds as its badge; put foremost where any of them
  * is, and of the highest priority any of them has. A link to or from any of
- * them is to or from the box, given once however many of them it joins it
- * to; a link between two of them is not drawn. A graph with nothing shut is
+ * them is to or from the box, given once for each label and tone however
+ * many of them it joins it to; a link between two of them is not drawn. A graph with nothing shut is
  * as it is.
  */
 export function collapsedOf(graph: Graph, shut: Set<string>): Graph {
@@ -89,7 +89,7 @@ export function collapsedOf(graph: Graph, shut: Set<string>): Graph {
   const links = graph.links.flatMap((link): Link[] => {
     const [from, to] = [into.get(link.from) ?? link.from, into.get(link.to) ?? link.to]
     if (from === to && (into.has(link.from) || into.has(link.to))) return []
-    const key = JSON.stringify([...(link.isDirected ? [from, to] : [from, to].sort().concat('--')), link.label ?? ''])
+    const key = JSON.stringify([...(link.isDirected ? [from, to] : [from, to].sort().concat('--')), link.label ?? '', link.tone ?? ''])
     if (kept.has(key)) return []
     kept.add(key)
     return [{ ...link, from, to }]
@@ -179,7 +179,7 @@ export function viewOf(look: Look, fold = false): View {
       const layout = laid(graph, { columns, rows: MOST_CELLS })
       if (layout.direction === 'right') return { columns: layout.rows, rows: layout.shelves.length === 0 ? 0 : layout.columns + 1 }
       const across = fold
-        ? Math.max(LEAST_COLUMNS, ...layout.shelves.map(shelf => shelf.width))
+        ? Math.max(LEAST_COLUMNS, breadthOf(layout))
         : Math.max(layout.columns, ...layout.shelves.map(shelf => shelf.across))
       return { columns: across, rows: layout.shelves.length === 0 ? 0 : layout.rows + 1 }
     },

@@ -300,7 +300,7 @@ describe('layers', () => {
 })
 
 describe('folding into a room', () => {
-  const fold = { columns: 26, widthOf: () => 5, gap: 2, frame: 4 }
+  const fold = { columns: 26, widthOf: () => 5, gap: 2, frameOf: (_: string, inner: number) => inner + 4 }
   const folded = (graph: Graph, columns = fold.columns): string[][] => layersOf(graph, { ...fold, columns }).slots.map(layer => layer.map(named))
 
   test('a layer too wide for its room gives up the nodes it names last, each into the layer under it where it is joined to nothing there', () => {
@@ -343,7 +343,7 @@ describe('folding into a room', () => {
         links: Array.from({ length: pick(count * 2) }, () => ({ from: `n${pick(count)}`, to: `n${pick(count)}` })),
         isDirected: pick(4) !== 0,
       })
-      const room = { columns: 20 + pick(80), widthOf: (node: { label: string }) => node.label.length + 4, gap: 2, frame: 4 }
+      const room = { columns: 20 + pick(80), widthOf: (node: { label: string }) => node.label.length + 4, gap: 2, frameOf: (_: string, inner: number) => inner + 4 }
       const widthOf = (layer: Slot[]): number => {
         const nodes = layer.flatMap(slot => ('node' in slot ? [slot.node] : []))
         return nodes.reduce((sum, node) => sum + room.widthOf(node), 0) + (layer.length - nodes.length) + (layer.length - 1) * room.gap

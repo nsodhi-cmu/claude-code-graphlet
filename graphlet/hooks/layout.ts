@@ -267,6 +267,13 @@ export type Layout = { shelves: Shelf[]; channels: Channel[]; frames: Frame[]; c
 
 export const middleOf = (place: Place, x: number): number => x + Math.floor(place.width / 2)
 
+/** How many columns a layout reaches across, from the start of the first thing on any shelf, frames included, to the end of the last, and no fewer than its widest shelf. */
+export function breadthOf(layout: Layout): number {
+  const spans = [...layout.shelves.flatMap(shelf => shelf.places), ...layout.frames]
+  const reach = spans.length === 0 ? 0 : Math.max(...spans.map(one => one.x + one.width)) - Math.min(...spans.map(one => one.x))
+  return Math.max(reach, ...layout.shelves.map(shelf => shelf.width))
+}
+
 /**
  * The column a wire leaves in and the column it arrives in, where `xOf` puts
  * each place. A wire that crosses its channel leaves its box straight toward
@@ -933,12 +940,11 @@ export function layoutOf(graph: Graph, room: Room, look: Look, fold = false, dir
   if (direction === 'right') return laidOut(graph, Math.max(room.rows - 1, LEAST_ROWS), look, undefined, direction)
   const columns = Math.max(room.columns, LEAST_COLUMNS)
   if (!fold || graph.nodes.length > FOLDED_NODES || graph.links.length > FOLDED_LINKS) return laidOut(graph, columns, look)
-  const widestOf = (layout: Layout): number => Math.max(0, ...layout.shelves.map(shelf => shelf.width))
   let [into, layout] = [columns, laidOut(graph, columns, look, columns)]
-  for (let tries = 0; tries < REFOLDS && widestOf(layout) > columns; tries += 1) {
-    into -= widestOf(layout) - columns
+  for (let tries = 0; tries < REFOLDS && breadthOf(layout) > columns; tries += 1) {
+    into -= breadthOf(layout) - columns
     const narrower = laidOut(graph, columns, look, into)
-    if (widestOf(narrower) >= widestOf(layout)) break
+    if (breadthOf(narrower) >= breadthOf(layout)) break
     layout = narrower
   }
   return layout
@@ -955,7 +961,14 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
   }
   const layers = layersOf(
     graph,
-    into === undefined ? undefined : { columns: into, widthOf: node => Math.max(widthOf(wordsOf(graph, node, look.labels)), writtenOf(node)), gap, frame: 2 * FRAME_MARGIN },
+    into === undefined
+      ? undefined
+      : {
+          columns: into,
+          widthOf: node => Math.max(widthOf(wordsOf(graph, node, look.labels)), writtenOf(node)),
+          gap,
+          frameOf: (group, inner) => Math.max(inner + 2 * FRAME_MARGIN, sizeOf(graph.groups.find(one => one.id === group)?.label ?? '') + TITLE_CELLS),
+        },
   )
   const placeOf = new Map<Slot, Place>()
   const shelves: Shelf[] = layers.slots.map((slots, shelf) => {
@@ -1015,7 +1028,7 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
   const priority = new Map(graph.nodes.map(node => [node.id, priorityOf(node)]))
   reseat(shelves, channels, columns, wire => Math.max(priority.get(wire.link.from) ?? 0, priority.get(wire.link.to) ?? 0), gap)
 
-  const frames = framesOf(graph, shelves, channels, columns, gap, direction)
+  const frames = framesOf(graph, shelves, channels, direction === 'down' ? columns : room, gap, direction)
   shelves.forEach((shelf, index) => {
     const spans = [...shelf.places, ...frames.filter(frame => frame.first <= index && index <= frame.last)]
     if (spans.length > 0) shelf.width = Math.max(shelf.width, Math.max(...spans.map(one => one.x + one.width)) - Math.min(...spans.map(one => one.x)))
@@ -1059,7 +1072,8 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
 
 /**
  * Each group's frame, around every place of it, standing `FRAME_MARGIN` out
- * from them across their shelves, where that would be wider than `columns`
+ * from them across their shelves, or more where the label needs it, what it
+ * holds then in its middle; where that would be wider than `columns`
  * the places of each shelf first moved together to stand in the middle of
  * all of them, and where the graph runs down, wide enough
  * for the group's label in its top border, between the lines that cross it
@@ -1069,7 +1083,9 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
  * before it in the shelf's order moved back where it can be, and else the
  * frame, with all it holds, moved on; and what stands after it moved on.
  * That is done over and over, the frames only ever moving on, until nothing
- * is moved. A shelf a frame passes with nothing of its group on it takes the
+ * is moved. Where that leaves the layout reaching past `columns`, every shelf
+ * is packed from its start instead, the frames still whole, and the whole
+ * set in the middle of the columns. A shelf a frame passes with nothing of its group on it takes the
  * frame where it stands among the shelf's places.
  */
 function framesOf(graph: Graph, shelves: Shelf[], channels: Channel[], columns: number, gap: number, direction: Direction): Frame[] {
@@ -1092,7 +1108,8 @@ function framesOf(graph: Graph, shelves: Shelf[], channels: Channel[], columns: 
     const [left, right] = spanOf(held.map(({ place }) => place))
     const title = direction === 'down' ? sizeOf(group.label) + TITLE_CELLS : 0
     const [first, last] = [Math.min(...held.map(({ index }) => index)), Math.max(...held.map(({ index }) => index))]
-    const frame: Frame = { group, first, last, x: left - FRAME_MARGIN, width: Math.max(right - left + 2 * FRAME_MARGIN, title), top: 0, bottom: 0 }
+    const [inner, width] = [right - left + 2 * FRAME_MARGIN, Math.max(right - left + 2 * FRAME_MARGIN, title)]
+    const frame: Frame = { group, first, last, x: left - FRAME_MARGIN - Math.floor((width - inner) / 2), width, top: 0, bottom: 0 }
     const places = new Set(held.map(({ place }) => place))
     if (direction === 'down') {
       const crossed = (channels[first - 1]?.wires ?? []).flatMap(wire => {
@@ -1101,10 +1118,11 @@ function framesOf(graph: Graph, shelves: Shelf[], channels: Channel[], columns: 
       })
       const stops = [frame.x + 1, ...new Set(crossed.toSorted((a, b) => a - b)), frame.x + frame.width - 1]
       const room = Math.max(...stops.slice(1).map((stop, index) => stop - (stops[index] ?? 0) - 2))
-      const wanted = sizeOf(group.label) + TITLE_CELLS - 3
+      const wanted = sizeOf(group.label) + 2
       if (room < wanted) {
-        frame.x -= wanted - Math.max(0, (stops[1] ?? 0) - frame.x - 2)
-        frame.width = right + FRAME_MARGIN - frame.x
+        const end = frame.x + frame.width
+        frame.x -= wanted - Math.max(0, (stops[1] ?? 0) - frame.x - 3)
+        frame.width = end - frame.x
       }
     }
     return [{ frame, held: places }]
@@ -1114,44 +1132,57 @@ function framesOf(graph: Graph, shelves: Shelf[], channels: Channel[], columns: 
     for (const place of one.held) place.x += by
   }
   for (const one of framed) if (one.frame.x < 0) shift(one, -one.frame.x)
-  for (let isMoved = true; isMoved; ) {
-    isMoved = false
-    shelves.forEach((shelf, index) => {
-      const spanning = framed.filter(({ frame }) => frame.first <= index && index <= frame.last)
-      if (spanning.length === 0) return
-      const items: Array<{ place: Place } | { one: (typeof framed)[number] }> = []
-      for (const place of shelf.places) {
-        const one = spanning.find(({ held }) => held.has(place))
-        if (one === undefined) items.push({ place })
-        else if (!items.some(item => 'one' in item && item.one === one)) items.push({ one })
-      }
-      const middleOf = (item: (typeof items)[number]): number => ('place' in item ? item.place.x + item.place.width / 2 : item.one.frame.x + item.one.frame.width / 2)
-      for (const one of spanning.filter(one => !items.some(item => 'one' in item && item.one === one))) {
-        const at = items.findIndex(item => middleOf(item) > one.frame.x + one.frame.width / 2)
-        items.splice(at === -1 ? items.length : at, 0, { one })
-      }
-      let limit = Infinity
-      for (const item of [...items].reverse()) {
-        if ('one' in item) limit = item.one.frame.x - gap
-        else {
-          item.place.x = Math.min(item.place.x, limit - item.place.width)
-          limit = item.place.x - gap
+  const isHeld = (place: Place): boolean => framed.some(({ held }) => held.has(place))
+  /** Moves what stands on each shelf clear of the frames there, over and over until nothing moves: back where it can be first, unless the shelves are being packed, and else on. */
+  const clear = (isPacking: boolean): void => {
+    for (let isMoved = true; isMoved; ) {
+      isMoved = false
+      shelves.forEach((shelf, index) => {
+        const spanning = framed.filter(({ frame }) => frame.first <= index && index <= frame.last)
+        if (spanning.length === 0 && !isPacking) return
+        const items: Array<{ place: Place } | { one: (typeof framed)[number] }> = []
+        for (const place of shelf.places) {
+          const one = spanning.find(({ held }) => held.has(place))
+          if (one === undefined) items.push({ place })
+          else if (!items.some(item => 'one' in item && item.one === one)) items.push({ one })
         }
-      }
-      let cursor = 0
-      for (const item of items) {
-        if ('place' in item) {
-          item.place.x = Math.max(item.place.x, cursor)
-          cursor = item.place.x + item.place.width + gap
-          continue
+        const middleOf = (item: (typeof items)[number]): number => ('place' in item ? item.place.x + item.place.width / 2 : item.one.frame.x + item.one.frame.width / 2)
+        for (const one of spanning.filter(one => !items.some(item => 'one' in item && item.one === one))) {
+          const at = items.findIndex(item => middleOf(item) > one.frame.x + one.frame.width / 2)
+          items.splice(at === -1 ? items.length : at, 0, { one })
         }
-        if (item.one.frame.x < cursor) {
-          shift(item.one, cursor - item.one.frame.x)
-          isMoved = true
+        let limit = Infinity
+        for (const item of isPacking ? [] : [...items].reverse()) {
+          if ('one' in item) limit = item.one.frame.x - gap
+          else {
+            item.place.x = Math.min(item.place.x, limit - item.place.width)
+            limit = item.place.x - gap
+          }
         }
-        cursor = item.one.frame.x + item.one.frame.width + gap
-      }
-    })
+        let cursor = 0
+        for (const item of items) {
+          if ('place' in item) {
+            item.place.x = Math.max(item.place.x, cursor)
+            cursor = item.place.x + item.place.width + gap
+            continue
+          }
+          if (item.one.frame.x < cursor) {
+            shift(item.one, cursor - item.one.frame.x)
+            isMoved = true
+          }
+          cursor = item.one.frame.x + item.one.frame.width + gap
+        }
+      })
+    }
+  }
+  clear(false)
+  const spans = [...shelves.flatMap(shelf => shelf.places), ...framed.map(({ frame }) => frame)]
+  if (Math.max(...spans.map(one => one.x + one.width)) > columns) {
+    for (const one of framed) shift(one, -one.frame.x)
+    for (const place of shelves.flatMap(shelf => shelf.places)) if (!isHeld(place)) place.x = 0
+    clear(true)
+    const by = Math.floor((columns - Math.max(...spans.map(one => one.x + one.width))) / 2)
+    if (by > 0) for (const one of spans) one.x += by
   }
   return framed.map(({ frame }) => frame)
 }

@@ -355,8 +355,8 @@ function orderOf(nodes: GraphletNode[], links: Link[]): string[] {
   return order
 }
 
-/** The room a graph is folded into: the columns a layer may take, how wide a node's box is, the room between two neighbors in a layer, and what each group's frame adds to a layer it stands in. A lane takes a column. */
-export type Fold = { columns: number; widthOf: (node: GraphletNode) => number; gap: number; frame: number }
+/** The room a graph is folded into: the columns a layer may take, how wide a node's box is, the room between two neighbors in a layer, and how wide a group's frame is around nodes of it that take `inner` columns side by side. A lane takes a column. */
+export type Fold = { columns: number; widthOf: (node: GraphletNode) => number; gap: number; frameOf: (group: string, inner: number) => number }
 
 /**
  * The layers folded into a room: each layer too wide for it gives up a node
@@ -417,8 +417,13 @@ function folded(graph: Graph, ranks: Map<string, number>, fold: Fold): Map<strin
   const nodesIn = (ranks: Map<string, number>, rank: number): Node[] => graph.nodes.filter(node => ranks.get(node.id) === rank)
   const widthIn = (ranks: Map<string, number>, rank: number): number => {
     const [nodes, lanes] = [nodesIn(ranks, rank), lanesIn(ranks, rank)]
-    const frames = new Set(nodes.flatMap(node => node.group ?? [])).size * fold.frame
-    return nodes.reduce((sum, node) => sum + fold.widthOf(node), 0) + lanes + (nodes.length + lanes - 1) * fold.gap + frames
+    const groups = [...new Set(nodes.flatMap(node => node.group ?? []))]
+    const sideBySide = (some: Node[]): number => some.reduce((sum, node) => sum + fold.widthOf(node) + fold.gap, -fold.gap)
+    const items = [
+      ...nodes.filter(node => node.group === undefined).map(fold.widthOf),
+      ...groups.map(group => fold.frameOf(group, sideBySide(nodes.filter(node => node.group === group)))),
+    ]
+    return items.reduce((sum, width) => sum + width, 0) + lanes + (items.length + lanes - 1) * fold.gap
   }
   const order = new Map(graph.nodes.map((node, index) => [node.id, index]))
   for (let rank = 0; rank <= Math.max(...folds.values()); rank += 1) {

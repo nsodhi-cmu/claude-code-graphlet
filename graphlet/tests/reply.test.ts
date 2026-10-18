@@ -209,6 +209,31 @@ test('a group folded into a narrow reply keeps its frame within the reply, its l
   expect(rows.at(-1)).toMatch(/^╰─+╯$/)
 })
 
+test('a graph whose frame would push a layer past the reply has its shelves packed instead, so all of it fits, frames and all', () => {
+  const graph = readGraph({
+    nodes: [{ id: 'a', label: 'Auth' }, { id: 'b', label: 'Validate the request' }, { id: 'db', label: '数据库', group: 'g' }, { id: 'c', label: 'Cache' }, { id: 'v', label: 'Validate the request' }],
+    links: [{ from: 'v', to: 'c' }, { from: 'db', to: 'db' }, { from: 'db', to: 'c' }],
+    groups: [{ id: 'g', label: 'the first group' }],
+    direction: 'down',
+  })
+  const rows = picture(pictureOf(still, graph, { columns: 54, rows: 1000 }))
+  expect(Math.max(...rows.map(sizeOf))).toBeLessThanOrEqual(54)
+  expect(still.measure(graph, 54).columns).toBeLessThanOrEqual(54)
+  expect(rows.join('\n')).not.toContain('more')
+  expect(rows.join('\n')).toContain(' the first group ')
+})
+
+test('a frame wide enough for its label writes it whole, where no line crosses its border', () => {
+  const graph = readGraph({ nodes: [{ id: 'a', label: 'A', group: 'g' }], links: [], groups: [{ id: 'g', label: 'Backend services' }], direction: 'down' })
+  expect(picture(pictureOf(still, graph, { columns: 60, rows: 1000 }))).toEqual([
+    '╭─ Backend services ─╮',
+    '│      ┌─────┐       │',
+    '│      │  A  │       │',
+    '│      └─────┘       │',
+    '╰────────────────────╯',
+  ])
+})
+
 test('dashes within a label, and a dash in prose, stay part of the label', () => {
   const graph = graphOf(['git commit --amend -> git push --force', 'Fetch — with retry -> Parse', 'npm run build --watch -> Done'])
   expect(graph.nodes.map(node => node.id)).toEqual(['git commit --amend', 'git push --force', 'Fetch — with retry', 'Parse', 'npm run build --watch', 'Done'])
