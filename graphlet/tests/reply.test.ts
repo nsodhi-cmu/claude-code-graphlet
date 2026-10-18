@@ -166,6 +166,33 @@ test('a name and a colon alone on a line opens a group for the lines indented un
   ])
 })
 
+test('a name and a colon with nothing indented under it is a node as ever, a line that only starts with subgraph is a chain, and Mermaid\'s labelled groups are named by their label, closed only by end', () => {
+  const graph = graphOf([
+    'Deploy:',
+    'Subgraph search -> Match found',
+    'subgraph api["API tier"]',
+    '  End -> Gateway',
+    'end',
+    'subgraph one [Backend]',
+    '  Auth',
+    'end',
+    'Done',
+  ])
+  expect(graph.groups).toEqual([
+    { id: 'group:API tier', label: 'API tier' },
+    { id: 'group:Backend', label: 'Backend' },
+  ])
+  expect(graph.nodes.map(node => `${node.id} ${node.group ?? '-'}`)).toEqual([
+    'Deploy: -',
+    'Subgraph search -',
+    'Match found -',
+    'End group:API tier',
+    'Gateway group:API tier',
+    'Auth group:Backend',
+    'Done -',
+  ])
+})
+
 test('the groups of a block are drawn in frames in its picture, every group open', () => {
   const block = ['Client -> API', 'Backend:', '  API -> Auth', '  API -> Orders', 'Data:', '  Postgres', 'Auth -> Postgres', 'Orders -> Postgres']
   const drawing = picture(pictureOf(still, readGraph(graphOf(block)), { columns: 78, rows: 1000 })).join('\n')

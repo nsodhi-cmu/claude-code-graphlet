@@ -54,8 +54,8 @@ const TONE = new RegExp(`\\[(${TONES.join('|')})\\]$`, 'i')
 const BOLD = /^\*\*([^*]*[^\s*][^*]*)\*\*$/
 /** A line that names a group, `Backend:`, for the lines indented under it. */
 const HEADER = /^\s*([^\s:][^:]*?)\s*:\s*$/
-/** A line that opens a group as Mermaid writes it, `subgraph Backend`, until a line `end`. */
-const SUBGRAPH = /^\s*subgraph\s+["'\[]?(.+?)["'\]]?\s*$/i
+/** A line that opens a group as Mermaid writes it, until a line `end`: `subgraph Backend`, `subgraph "Back end"`, or `subgraph api["API tier"]`, each named by what it shows. */
+const SUBGRAPH = /^\s*subgraph\s+(?:\S+?\s*\[\s*"?([^"\]]+?)"?\s*\]|"([^"]+)"|(.+?))\s*$/i
 /** What a group's id starts with in a reply's graph, so that no node's label is one. */
 const GROUP_ID = 'group:'
 
@@ -125,8 +125,10 @@ export function partsOf(reply: string): Part[] {
  * written in bold, `**Valid?**`, gives its node a priority of 1, and its
  * asterisks are not part of it. A blank label is passed over, and pipes left
  * at a label's ends are not part of it. A line that is a name and a colon
- * alone, `Backend:`, opens a group for the lines indented under it, and so
- * does `subgraph Backend`, as Mermaid writes it, for the lines up to `end`;
+ * alone, `Backend:`, opens a group for the lines indented under it, where
+ * the next is, and is a node where it is not; and so does a line `subgraph
+ * Backend`, as Mermaid writes it, with no link on it, for the lines up to a
+ * line `end`;
  * a node is in the first group it is named under, wherever else it is
  * named, and blank lines are passed over.
  */
@@ -158,20 +160,23 @@ export function graphOf(lines: readonly string[]): GraphletGraph {
     nodes.set(id, node)
     return [id]
   }
-  for (const line of lines) {
+  const indentOf = (line: string): number => line.length - line.trimStart().length
+  for (const [at, line] of lines.entries()) {
     if (line.trim() === '') continue
-    const indent = line.length - line.trimStart().length
+    const indent = indentOf(line)
     within = within.filter(group => group.isMermaid || group.indent < indent)
-    if (line.trim().toLowerCase() === 'end' && within.at(-1)?.isMermaid === true) {
+    if (line.trim() === 'end' && within.at(-1)?.isMermaid === true) {
       within = within.slice(0, -1)
       continue
     }
-    const opened = SUBGRAPH.exec(line) ?? (JOIN.test(line) ? null : HEADER.exec(line))
-    if (opened?.[1] !== undefined) {
-      const label = opened[1].trim()
+    const next = lines.slice(at + 1).find(one => one.trim() !== '')
+    const mermaid = JOIN.test(line) ? null : SUBGRAPH.exec(line)
+    const header = JOIN.test(line) || next === undefined || indentOf(next) <= indent ? null : HEADER.exec(line)
+    const label = (mermaid?.[1] ?? mermaid?.[2] ?? mermaid?.[3] ?? header?.[1])?.trim()
+    if (label !== undefined) {
       const id = `${GROUP_ID}${label}`
       if (!groups.has(id)) groups.set(id, { id, label })
-      within = [...within, { id, indent, isMermaid: SUBGRAPH.test(line) }]
+      within = [...within, { id, indent, isMermaid: mermaid !== null }]
       continue
     }
     const said = line.replace(SAID_BETWEEN, '->|$1|').split(JOIN)

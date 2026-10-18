@@ -25,6 +25,6 @@ A graph with no nodes gives a page that says there is nothing to draw.
 
 ## Opening It
 
-`openPage` writes the page into the system's temporary folder, `TMPDIR` or `TEMP` where either is set, as `graphlet-<pane>.html`, or for a graph in a reply `graphlet-reply.html`, and so over the page it last wrote for that pane, or for a reply. It then runs the system's own opener on the file, trying each system's in turn: `xdg-open`, `open`, and `start`. A toast says the page was opened, or, where nothing opened it, where the file is.
+`openPage` writes the page into the system's temporary folder, `TMPDIR` or `TEMP` where either is set, as `graphlet-<pane>.html`, and so over the page it last wrote for that pane, or for a graph in a reply as `graphlet-reply-<block>-<n>.html`, named for the reply block and the graph's place in it. It then runs the system's own opener on the file, trying each system's in turn: `xdg-open`, `open`, and `start`. A toast says the page was opened, or, where nothing opened it, where the file is.
 
 The page is headed with the pane's id, or `reply`. It is a picture of the graph as it was when the corner was clicked, and does not follow the pane after that.

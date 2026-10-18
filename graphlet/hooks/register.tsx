@@ -59,15 +59,16 @@ const OPENERS: ReadonlyArray<(path: string) => string[]> = [
 const OPEN_TIMEOUT_MS = 10_000
 
 /**
- * Writes a graph out as a web page in the system's temporary folder, named
- * for the pane it is drawn in, or `reply`, running as it runs there, and
- * opens it in the browser. Where nothing opens it, says where it is.
+ * Writes a graph out as a web page in the system's temporary folder, in a
+ * file named `name` and headed `title`, running as it runs where it is
+ * drawn, and opens it in the browser. Where nothing opens it, says where it
+ * is.
  */
-const openPage = async ($: EngineInterface, name: string, graph: Graph, direction: Direction): Promise<void> => {
+const openPage = async ($: EngineInterface, name: string, title: string, graph: Graph, direction: Direction): Promise<void> => {
   const folder = (await $.env.get('TMPDIR')) ?? (await $.env.get('TEMP')) ?? '/tmp'
   const path = `${folder.replace(/[\\/]+$/, '')}/graphlet-${name.replace(/[^A-Za-z0-9_-]/g, '-')}.html`
   try {
-    await $.fs.write(path, pageOf(graph, name, direction))
+    await $.fs.write(path, pageOf(graph, title, direction))
   } catch (error) {
     $.ui.toast(`graphlet: could not write the graph's page (${error instanceof Error ? error.message : String(error)}).`)
     return
@@ -243,7 +244,7 @@ export const register: Register = (on, options) => {
     const graph = reply?.graphs[Number(at)]
     if (reply === undefined || graph === undefined) return next(e)
     if (action === 'copy') await copyGraph($, graph, reply.room, e.surface)
-    else if (action === 'page') await openPage($, 'reply', graph, still.direction(graph, reply.room))
+    else if (action === 'page') await openPage($, `reply-${e.requestId.replace(/[^A-Za-z0-9]/g, '').slice(-8)}-${at}`, 'reply', graph, still.direction(graph, reply.room))
     else return next(e)
     return { element: e.element }
   })
@@ -268,9 +269,14 @@ export const register: Register = (on, options) => {
     const typed = key === 'space' ? ' ' : typeof key === 'string' && isChord !== true && charactersOf(key).length === 1 ? key : undefined
     /** Whether a node of the graph as drawn is the box of a collapsed group. */
     const isShut = (id: string): boolean => at.whole.nodes.some(one => one.id === id && one.holds !== undefined)
+    /** Opens a collapsed group, and where its box was selected, selects the first node it holds. */
+    const expand = async (group: string): Promise<void> => {
+      await $.graphlet.collapse({ pane, group, isCollapsed: false })
+      const first = at.given.nodes.find(one => one.group === group)
+      if (at.selected === group && first !== undefined) await $.graphlet.select({ pane, node: first.id })
+    }
     /** Opens a node: a collapsed group's box by opening the group, and any other by `open`. */
-    const open = async (id: string): Promise<void> =>
-      isShut(id) ? $.graphlet.collapse({ pane, group: id, isCollapsed: false }) : $.graphlet.open({ pane, node: id })
+    const open = async (id: string): Promise<void> => (isShut(id) ? expand(id) : $.graphlet.open({ pane, node: id }))
     /** Selects a node, opening the collapsed group it is in, where it is one and not the selected one already, and draws the pane again either way. */
     const pick = async (to: string | undefined): Promise<void> => {
       const shut = at.given.nodes.find(one => one.id === to)?.group
@@ -278,7 +284,9 @@ export const register: Register = (on, options) => {
       if (to !== undefined && to !== at.selected) await $.graphlet.select({ pane, node: to })
       else $.ui.invalidate('ui.render')
     }
-    if (typeof node === 'string') {
+    if (isChord === true) {
+      return {}
+    } else if (typeof node === 'string') {
       finding.delete(pane)
       if (node !== at.selected) await $.graphlet.select({ pane, node })
       else $.ui.invalidate('ui.render')
@@ -294,7 +302,7 @@ export const register: Register = (on, options) => {
       else dragged.set(pane, { grab, at: drag })
       if (before.x !== drag.x || before.y !== drag.y) await $.graphlet.scroll({ pane, by: { x: before.x - drag.x, y: before.y - drag.y } })
     } else if (page === true) {
-      await openPage($, pane, at.whole, view.direction(at.whole, at.room))
+      await openPage($, pane, pane, at.whole, view.direction(at.whole, at.room))
     } else if (query !== undefined && key === 'backspace' && query === '') {
       finding.delete(pane)
       $.ui.invalidate('ui.render')
@@ -307,15 +315,15 @@ export const register: Register = (on, options) => {
       await pick(found[(found.indexOf(at.selected ?? '') + 1) % Math.max(found.length, 1)])
     } else if (key === 'return' && at.selected !== null) {
       await open(at.selected)
-    } else if (key === 'space' && at.selected !== null && (isShut(at.selected) || at.given.nodes.some(one => one.id === at.selected && one.group !== undefined))) {
-      const shut = isShut(at.selected)
-      await $.graphlet.collapse({ pane, group: shut ? at.selected : (at.given.nodes.find(one => one.id === at.selected)?.group ?? ''), isCollapsed: !shut })
+    } else if (key === 'space' && at.selected !== null && isShut(at.selected)) {
+      await expand(at.selected)
+    } else if (key === 'space' && at.selected !== null && at.given.nodes.some(one => one.id === at.selected && one.group !== undefined)) {
+      await $.graphlet.collapse({ pane, group: at.given.nodes.find(one => one.id === at.selected)?.group ?? '', isCollapsed: true })
     } else if (key === '/') {
       finding.set(pane, '')
       $.ui.invalidate('ui.render')
     } else if (key === 'c') {
-      const whole = { ...at.whole, direction: view.direction(at.whole, at.room) }
-      await copyGraph($, whole, { columns: cellsOf(view.measure(whole, at.room.columns).columns), rows: MOST_CELLS })
+      await copyGraph($, { ...at.whole, direction: view.direction(at.whole, at.room) }, { columns: MOST_CELLS, rows: MOST_CELLS }, e.surface)
     } else if (key === 'f') {
       if (focused.has(pane)) focused.delete(pane)
       else focused.add(pane)

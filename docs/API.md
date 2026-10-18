@@ -100,7 +100,7 @@ A pane draws each group collapsed or open as `$.graphlet.collapse` was last call
 - a click on a frame's label collapses its group;
 - finding a node in a collapsed group, with `/`, opens the group.
 
-A node in a collapsed group is drawn as the group's box selected, and `show` answers the group's id as `selected`. A collapsed group's box is selected as a node is, so a click on it, a step onto it, and a key pressed with it selected all name the group's id, and so does `graphlet.select`. Opening a group the person had picked the box of picks its first node; a mod that says which node is selected and was told of the group's box picks one itself. The web page and `c` take the graph as the pane has it, its groups collapsed or open.
+A node in a collapsed group is drawn as the group's box selected, and `show` answers the group's id as `selected`. A collapsed group's box is selected as a node is, so a click on it, a step onto it, and a key pressed with it selected all name the group's id, and so does `graphlet.select`. Opening a group whose box is selected, by space, return, or a double click, selects the first node it holds with `select`, so a mod that says which node is selected hears which. The web page and `c` take the graph as the pane has it, its groups collapsed or open.
 
 ## Keys And The Wheel
 
@@ -115,7 +115,7 @@ The graph is drawn by a surface module, the only kind of element that receives a
 | `f` | Draws the graph in focus on the selected node, or draws it all again. |
 | `/` | Starts finding a node by its label. While finding, what is typed is what is looked for, the selection goes to the first node found, return goes to the next in place of opening one, and backspace takes back what was typed, or with nothing typed, stops finding. A click on a box stops it too. |
 
-It calls `$.graphlet.key` with every other key, and with no key typed while finding, along with the node selected as it was pressed, `selected`, or null where none is. That method does nothing: a mod with keys of its own hooks `graphlet.key` to answer them.
+A key pressed with ctrl or meta held is neither answered nor handed on. It calls `$.graphlet.key` with every other key, and with no key typed while finding, along with the node selected as it was pressed, `selected`, or null where none is. That method does nothing: a mod with keys of its own hooks `graphlet.key` to answer them.
 
 A drag from where a click does nothing, on no box, name, count or corner, moves the graph with the pointer, as far as its window goes; graphlet answers it itself. The surface posts how far the pointer has gone since the button went down, so a move lost when two fall in one frame is made up by the next. Where the terminal did not report a release, the next press of a button, or a move with no button held, ends the drag where it is.
 

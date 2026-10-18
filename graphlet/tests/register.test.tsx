@@ -313,7 +313,7 @@ test('return, or a double click on a box, opens its node: the owner hears which,
   await pane.unmount()
 })
 
-test('a group its owner says is collapsed is drawn as one box; space opens it and collapses it again, a double click on its box or return opens it, and a click on a frame\'s label collapses its group, each heard by the owner', WITH_HOST, async ($, on) => {
+test('a group its owner says is collapsed is drawn as one box; space opens it and collapses it again, a double click on its box or return opens it and selects its first node, and a click on a frame\'s label collapses its group, each heard by the owner', WITH_HOST, async ($, on) => {
   world(on)
   const pane = await mount($, 'grouped', NARROW)
   const screen = async (): Promise<string> => (await rowsOf(pane)).join('\n')
@@ -348,11 +348,14 @@ test('a group its owner says is collapsed is drawn as one box; space opens it an
   expect((await said(pane)).heard).toEqual([
     'select grouped data',
     'collapse grouped data false',
+    'select grouped db',
     'collapse grouped data true',
     'collapse grouped data false',
+    'select grouped db',
     'collapse grouped back true',
     'select grouped back',
     'collapse grouped back false',
+    'select grouped api',
   ])
   await pane.unmount()
 })
@@ -508,31 +511,32 @@ test('f draws the graph in focus on the selected node and its nearest, each sayi
   await pane.unmount()
 })
 
-test('c copies the whole graph as plain text, drawn still with nothing selected, and is not the owner\'s', WITH_HOST, async ($, on) => {
+test('c copies the whole graph as plain text, drawn still with nothing selected, and is not the owner\'s; a key held with ctrl is neither graphlet\'s nor the owner\'s', WITH_HOST, async ($, on) => {
   const seen = world(on)
   const pane = await mount($, 'free', NARROW)
   await click(pane, { x: 0, y: 0 })
+  await pane.key({ key: 'c', ctrl: true, in: 'graph' })
   await pane.key({ key: 'c', in: 'graph' })
   expect(seen.copied).toEqual([
     [
       '┌───────────────┐  ┌────────────────────┐',
       '│ ○ checkout.ts │  │ ○ pages/invoice.ts │',
-      '└─────┬─────────┘  └─────┬──────────────┘',
-      '      │                  │',
-      '      ▼                  ▼',
-      '┌───────────┐  ┌──────────────────┐  ┌─────────┐  ┌────────────┐',
-      '│ ● cart.ts │  │ ● src/invoice.ts │  │ ○ ui.ts │  │ ▲ email.ts │',
-      '└─────┬─────┘  └─────────┬────────┘  └────┬────┘  └──────┬─────┘',
-      '      └──────────────────┴───────┬────────┴──────────────┘',
-      '                                 ▼',
-      '                          ┌────────────┐',
-      '                          │ ◆ price.ts │',
-      '                          └──────┬─────┘',
-      '                                 │',
-      '                                 ▼',
-      '                         ┌───────────────┐',
-      '                         │ → money.ts  2 │',
-      '                         └───────────────┘',
+      '└─────────┬─────┘  └─────────┬──────────┘',
+      '          │                  │',
+      '          ▼                  ▼',
+      '    ┌───────────┐  ┌──────────────────┐  ┌─────────┐  ┌────────────┐',
+      '    │ ● cart.ts │  │ ● src/invoice.ts │  │ ○ ui.ts │  │ ▲ email.ts │',
+      '    └─────┬─────┘  └────────────────┬─┘  └────┬────┘  └──────┬─────┘',
+      '          └─────────────────────────┼─────────┴──────────────┘',
+      '                                    ▼',
+      '                             ┌────────────┐',
+      '                             │ ◆ price.ts │',
+      '                             └──────┬─────┘',
+      '                                    │',
+      '                                    ▼',
+      '                            ┌───────────────┐',
+      '                            │ → money.ts  2 │',
+      '                            └───────────────┘',
     ].join('\n'),
   ])
   expect(seen.toasts).toEqual(['graphlet: copied the graph as text.'])
@@ -855,10 +859,11 @@ test('a click on copy, in the corner under a reply\'s picture, copies the pictur
   expect(seen.copied).toEqual([FLOW.join('\n')])
   expect(seen.toasts).toEqual(['graphlet: copied the graph as text.'])
   await reply.press({ plugin: 'graphlet', key: 'page:1' })
-  expect(seen.written.map(file => file.path)).toEqual(['/var/tmp/graphlet-reply.html'])
+  expect(seen.written.map(file => file.path)).toEqual([expect.stringMatching(/^\/var\/tmp\/graphlet-reply-[A-Za-z0-9]*-1\.html$/)])
+  expect(seen.written[0]?.text).toContain('<title>reply</title>')
   expect(seen.written[0]?.text).toContain('>One</tspan>')
   expect(seen.written[0]?.text).not.toContain('Valid?')
-  expect(seen.ran).toEqual([['xdg-open', '/var/tmp/graphlet-reply.html']])
+  expect(seen.ran).toEqual([['xdg-open', seen.written[0]?.path]])
   await reply.unmount()
 })
 

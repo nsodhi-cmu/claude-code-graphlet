@@ -156,8 +156,9 @@ export type Graphlet = {
   /** Scrolls the graph a pane holds. A turn of the wheel reaches the pane, whose owner passes it on. */
   scroll(input: GraphletScroll): Promise<void>
   /**
-   * Selects a node. Graphlet calls this itself when the person clicks a node
-   * or moves with the arrow keys, so a hook on `graphlet.select` hears it. A
+   * Selects a node, or the box of a collapsed group, by its id. Graphlet
+   * calls this itself when the person clicks a node or moves with the arrow
+   * keys, so a hook on `graphlet.select` hears it. A
    * pane whose owner gives `show` no `selected` draws the node this was last
    * called with.
    */
@@ -166,7 +167,8 @@ export type Graphlet = {
    * Does nothing. Graphlet calls it when the person opens a node, by return
    * on the selected one or a double click on its box, for a hook on
    * `graphlet.open` to answer: the act a mod hosts a graph for, such as
-   * going to the file a node stands for.
+   * going to the file a node stands for. Those on the box of a collapsed
+   * group open the group instead, with `collapse`.
    */
   open(input: { pane: string; node: string }): Promise<void>
   /**
