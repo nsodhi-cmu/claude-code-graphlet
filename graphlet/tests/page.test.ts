@@ -83,7 +83,7 @@ describe('the nodes of a page', () => {
     expect(beside).toBe(tall)
   })
 
-  test("the boxes stand in the layers and the order of the terminal's picture, each layer in the middle of the drawing", () => {
+  test("the boxes stand in the layers and the order of the terminal's picture, and across where it has them, so a box over the one box it links to stands over its middle", () => {
     const graph = graphOf(
       ['top1', 'top2', 'x', 'y', 'under'],
       [
@@ -95,11 +95,12 @@ describe('the nodes of a page', () => {
     const page = pageOf(graph, '')
     const stood = rows(graph, page)
     expect(stood.map(row => row.map(box => box.id))).toEqual([['top1', 'top2'], ['y', 'x'], ['under']])
-    const [width = NaN] = size(page)
-    for (const row of stood) {
-      const middle = ((row[0]?.x ?? NaN) + (row.at(-1)?.right ?? NaN)) / 2
-      expect(Math.abs(middle - width / 2)).toBeLessThanOrEqual(1)
+    const middleOf = (id: string): number => {
+      const box = stood.flat().find(one => one.id === id)
+      return ((box?.x ?? NaN) + (box?.right ?? NaN)) / 2
     }
+    expect(Math.abs(middleOf('under') - middleOf('x'))).toBeLessThan(1)
+    expect(Math.abs(middleOf('x') - middleOf('top2'))).toBeLessThan(1)
   })
 
   test('one node, a loop, and a graph of many nodes all draw, every box inside the drawing and none over another', () => {
@@ -303,6 +304,24 @@ describe('the page as a document', () => {
     const [toB] = links(page)
     expect(toB?.xs[0]).toBe(a?.right)
     expect(toB?.tip.x).toBe(b?.x)
+  })
+
+  test('a group is drawn as a frame around its nodes, its label at its top, and no other node within it', () => {
+    const graph = readGraph({
+      nodes: [{ id: 'in', label: 'in' }, { id: 'a', label: 'a', group: 'g' }, { id: 'b', label: 'b', group: 'g' }, { id: 'out', label: 'out' }],
+      links: [{ from: 'in', to: 'a' }, { from: 'in', to: 'out' }, { from: 'a', to: 'b' }],
+      groups: [{ id: 'g', label: 'Group <1>' }],
+    })
+    const page = pageOf(graph, '')
+    const [hull] = [...page.matchAll(/<rect class="hull" ([^>]*)>/g)].map(([, sizes = '']) => {
+      const [x = NaN, y = NaN, width = NaN, height = NaN] = numbers(sizes)
+      return { x, y, right: x + width, bottom: y + height }
+    })
+    const [inBox, a, b, out] = boxes(page)
+    const isWithin = (box: Box | undefined): boolean => box !== undefined && hull !== undefined && box.x > hull.x && box.right < hull.right && box.y > hull.y && box.bottom < hull.bottom
+    expect([inBox, a, b, out].map(isWithin)).toEqual([false, true, true, false])
+    expect(page).toContain('<text class="title"')
+    expect(page).toContain('>Group &lt;1&gt;</text>')
   })
 
   test('what a graph and a title say is escaped, a tone the page does not know is drawn plain, and an id is never written', () => {

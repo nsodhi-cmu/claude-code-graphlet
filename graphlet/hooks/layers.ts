@@ -1,4 +1,4 @@
-import type { GraphletDirection, GraphletGraph, GraphletLink, GraphletNode, GraphletTone } from '../types'
+import type { GraphletDirection, GraphletGraph, GraphletGroup, GraphletLink, GraphletNode, GraphletTone } from '../types'
 
 // A graph in layers: every node in a row of the drawing, every link cut into
 // the stretches that cross from one layer to the next, with a lane kept for
@@ -12,12 +12,16 @@ export type Node = GraphletNode & { isForemost: boolean }
 /** A link as it is drawn: between two nodes, and whether it runs one way, from `from` to `to`, or only joins them. */
 export type Link = GraphletLink & { isDirected: boolean }
 
+/** A group as it is drawn: its id, what its frame says, and its tone where it has one. */
+export type Group = { id: string; label: string; tone?: GraphletTone }
+
 /**
  * A graph as it is drawn: every node once, every link once, between two of
- * its nodes, how many nodes and links it was given past the most that are
- * read, which are left out, and which way it runs, where it says.
+ * its nodes, the groups that hold any of its nodes, how many nodes and links
+ * it was given past the most that are read, which are left out, and which way
+ * it runs, where it says.
  */
-export type Graph = { nodes: Node[]; links: Link[]; unread: { nodes: number; links: number }; direction?: GraphletDirection }
+export type Graph = { nodes: Node[]; links: Link[]; groups: Group[]; unread: { nodes: number; links: number }; direction?: GraphletDirection }
 
 /** How many times the layers are ordered against their neighbors, down and back up, before the best ordering is kept. */
 const SWEEPS = 4
@@ -45,10 +49,15 @@ const tidy = (text: unknown): string =>
  * that says its links do not. A link from a node to itself is kept, and
  * drawn as a sign on the node. Nodes and links past the most that are read
  * are left out, and counted. A direction that is neither way is dropped.
+ * A group needs an id that no group before it and no node has; a node's
+ * group that the graph does not list is a group labelled by its id, unless
+ * a node has that id, and then the node is in none. A group no node is in
+ * is left out.
  */
 export function readGraph(graph: GraphletGraph): Graph {
   const nodes: GraphletNode[] = []
   const [ids, given] = [new Set<string>(), new Set<string>()]
+  const named = new Map<GraphletNode, unknown>()
   for (const node of Array.isArray(graph?.nodes) ? graph.nodes : []) {
     if (typeof node?.id !== 'string' || node.id === '' || given.has(node.id)) continue
     given.add(node.id)
@@ -64,7 +73,23 @@ export function readGraph(graph: GraphletGraph): Graph {
       ...(Number.isFinite(node.layer) ? { layer: node.layer } : {}),
       ...(Number.isInteger(node.priority) && node.priority !== 0 ? { priority: node.priority } : {}),
     })
+    named.set(nodes.at(-1) as GraphletNode, node.group)
   }
+  const listed = new Map<string, GraphletGroup>()
+  for (const group of Array.isArray(graph?.groups) ? graph.groups : []) {
+    if (typeof group?.id === 'string' && group.id !== '' && !given.has(group.id) && !listed.has(group.id)) listed.set(group.id, group)
+  }
+  for (const node of nodes) {
+    const group = named.get(node)
+    if (typeof group !== 'string' || group === '' || given.has(group)) continue
+    node.group = group
+    if (!listed.has(group)) listed.set(group, { id: group })
+  }
+  const held = new Set(nodes.map(node => node.group))
+  const groups: Group[] = [...listed.values()].filter(group => held.has(group.id)).map(group => {
+    const label = tidy(group.label) || tidy(group.id) || NAMELESS
+    return { id: group.id, label, ...(TONES.includes(group.tone as GraphletTone) ? { tone: group.tone } : {}) }
+  })
   const priorities = nodes.map(priorityOf)
   const [top, lowest] = [Math.max(...priorities), Math.min(...priorities)]
   const links: Link[] = []
@@ -87,6 +112,7 @@ export function readGraph(graph: GraphletGraph): Graph {
   return {
     nodes: nodes.map(node => ({ ...node, isForemost: priorityOf(node) === top && top > 0 && top > lowest })),
     links,
+    groups,
     unread: { nodes: given.size - nodes.length, links: unreadLinks },
     ...(graph?.direction === 'down' || graph?.direction === 'right' ? { direction: graph.direction } : {}),
   }
@@ -429,7 +455,8 @@ const endsOf = (link: Link, ranks: Map<string, number>): [string, string] =>
  * The lane each link passes each layer between its ends in, as a key the
  * links that share the lane have in common, from the layer under its higher
  * end down. In a layer, the links of one kind that pass it the one way, with
- * one label and one tone, bound for the same node share a lane, which carries what
+ * one label and one tone, both within one group or not, bound for the same
+ * node share a lane, which carries what
  * reaches that node from many; of the links that share no such lane
  * anywhere, those from the same node share one, which carries what leaves it
  * for many; and a link that shares with none has one of its own. Neither
@@ -438,6 +465,7 @@ const endsOf = (link: Link, ranks: Map<string, number>): [string, string] =>
  * where their lines would meet.
  */
 function laneKeys(graph: Graph, ranks: Map<string, number>): Map<Link, string[]> {
+  const within = innerGroups(graph)
   const spans = graph.links.flatMap(link => {
     const [from, to] = [ranks.get(link.from) ?? 0, ranks.get(link.to) ?? 0]
     const layers = Array.from({ length: Math.max(0, Math.abs(from - to) - 1) }, (_, step) => Math.min(from, to) + 1 + step)
@@ -447,8 +475,8 @@ function laneKeys(graph: Graph, ranks: Map<string, number>): Map<Link, string[]>
     for (const key of keys) counts.set(key, (counts.get(key) ?? 0) + 1)
   }
   const [toward, from] = [new Map<string, number>(), new Map<string, number>()]
-  const towardKey = (span: (typeof spans)[number], layer: number): string => JSON.stringify([layer, span.isUp, span.link.isDirected, span.link.label, span.link.tone, 'to', span.ends[1]])
-  const fromKey = (span: (typeof spans)[number], layer: number): string => JSON.stringify([layer, span.isUp, span.link.isDirected, span.link.label, span.link.tone, 'from', span.ends[0]])
+  const towardKey = (span: (typeof spans)[number], layer: number): string => JSON.stringify([layer, span.isUp, span.link.isDirected, span.link.label, span.link.tone, within(span.link), 'to', span.ends[1]])
+  const fromKey = (span: (typeof spans)[number], layer: number): string => JSON.stringify([layer, span.isUp, span.link.isDirected, span.link.label, span.link.tone, within(span.link), 'from', span.ends[0]])
   for (const span of spans) count(span.layers.map(layer => towardKey(span, layer)), toward)
   const isBound = (span: (typeof spans)[number]): boolean => span.layers.some(layer => (toward.get(towardKey(span, layer)) ?? 0) > 1)
   for (const span of spans) if (!isBound(span)) count(span.layers.map(layer => fromKey(span, layer)), from)
@@ -502,7 +530,7 @@ function crossingsOf(pieces: Piece[], upper: Slot[], lower: Slot[]): number {
  * layer's length. A slot joined to nothing there keeps its own place, and
  * slots that tie keep their order.
  */
-function sorted(layer: Slot[], beside: Slot[], pieces: Piece[]): Slot[] {
+function sorted(layer: Slot[], beside: Slot[], pieces: Piece[], groupOf: (slot: Slot) => string | undefined): Slot[] {
   const scale = beside.length > 1 && layer.length > 1 ? (layer.length - 1) / (beside.length - 1) : 1
   const placeOf = new Map(beside.map((slot, place) => [slot, place]))
   const joined = new Map<Slot, number[]>()
@@ -519,7 +547,72 @@ function sorted(layer: Slot[], beside: Slot[], pieces: Piece[]): Slot[] {
       return [slot, pull]
     }),
   )
-  return [...layer].sort((a, b) => (pulls.get(a) ?? 0) - (pulls.get(b) ?? 0))
+  return together([...layer].sort((a, b) => (pulls.get(a) ?? 0) - (pulls.get(b) ?? 0)), slot => pulls.get(slot) ?? 0, groupOf)
+}
+
+/** Each slot's group: a node's, or a lane's whose links are within one group. */
+export function slotGroups(graph: Graph): (slot: Slot) => string | undefined {
+  const within = innerGroups(graph)
+  return slot => ('node' in slot ? slot.node.group : slot.lane[0] === undefined ? undefined : within(slot.lane[0]))
+}
+
+/** Which group each link is within: the group of both its nodes, where they are of one; else none. */
+function innerGroups(graph: Graph): (link: GraphletLink) => string | undefined {
+  const groupOf = new Map(graph.nodes.map(node => [node.id, node.group]))
+  return link => {
+    const group = groupOf.get(link.from)
+    return group !== undefined && group === groupOf.get(link.to) ? group : undefined
+  }
+}
+
+/**
+ * A layer with the slots of each group together, standing where the group's
+ * own slots stand on average by `pullOf`, each group's in the order they
+ * stood, and the rest as they stood. A layer with no group is as it was.
+ */
+function together(layer: Slot[], pullOf: (slot: Slot) => number, groupOf: (slot: Slot) => string | undefined): Slot[] {
+  const blocks = new Map<string, Slot[]>()
+  for (const slot of layer) {
+    const group = groupOf(slot)
+    if (group !== undefined) blocks.set(group, [...(blocks.get(group) ?? []), slot])
+  }
+  if (blocks.size === 0) return layer
+  const items = layer.flatMap(slot => {
+    const group = groupOf(slot)
+    const block = group === undefined ? [slot] : (blocks.get(group) ?? [])
+    return block[0] === slot ? [{ pull: block.reduce((sum, one) => sum + pullOf(one), 0) / block.length, block }] : []
+  })
+  return items.sort((a, b) => a.pull - b.pull).flatMap(item => item.block)
+}
+
+/**
+ * The layers with the groups in one order across all of them, so that no
+ * two groups' frames cross: each layer's groups, where they stand, put in
+ * the order of where each group stands on average over the layers it is in,
+ * and of two that stand alike, the one met first from the top.
+ */
+function inOrder(slots: Slot[][], groupOf: (slot: Slot) => string | undefined): Slot[][] {
+  const stands = new Map<string, number[]>()
+  slots.forEach(layer => layer.forEach((slot, index) => {
+    const group = groupOf(slot)
+    if (group !== undefined) stands.set(group, [...(stands.get(group) ?? []), (index + 0.5) / layer.length])
+  }))
+  const average = (group: string): number => {
+    const at = stands.get(group) ?? []
+    return at.reduce((sum, one) => sum + one, 0) / Math.max(at.length, 1)
+  }
+  const first = [...stands.keys()]
+  const ranked = new Map(first.toSorted((a, b) => average(a) - average(b) || first.indexOf(a) - first.indexOf(b)).map((group, rank) => [group, rank]))
+  return slots.map(layer => {
+    const order = [...new Set(layer.flatMap(slot => groupOf(slot) ?? []))]
+    const placed = order.toSorted((a, b) => (ranked.get(a) ?? 0) - (ranked.get(b) ?? 0))
+    const blockOf = (group: string): Slot[] => layer.filter(slot => groupOf(slot) === group)
+    return layer.flatMap(slot => {
+      const group = groupOf(slot)
+      if (group === undefined) return [slot]
+      return layer.find(one => groupOf(one) === group) === slot ? blockOf(placed[order.indexOf(group)] ?? group) : []
+    })
+  })
 }
 
 /**
@@ -529,8 +622,9 @@ function sorted(layer: Slot[], beside: Slot[], pieces: Piece[]): Slot[] {
  * layers are then ordered against the layer above on the way down and the
  * layer below on the way back up, a few times over, and the ordering whose
  * stretches cross least is the one kept; with nothing crossing, every layer
- * keeps the order the graph names its nodes in. Given a room to `fold` into,
- * the layers are folded into it first.
+ * keeps the order the graph names its nodes in. The slots of a group stand
+ * together in each layer, and the groups in one order across the layers.
+ * Given a room to `fold` into, the layers are folded into it first.
  */
 export function layersOf(graph: Graph, fold?: Fold): Layers {
   const ranks = fold === undefined ? ranksOf(graph) : folded(graph, ranksOf(graph), fold)
@@ -542,6 +636,7 @@ export function layersOf(graph: Graph, fold?: Fold): Layers {
   const flats: Link[][] = Array.from({ length: count }, () => [])
   const lanes = new Map<string, Slot & { lane: Link[] }>()
   const laneKeysOf = laneKeys(graph, ranks)
+  const groupOf = slotGroups(graph)
 
   for (const link of graph.links) {
     const [from, to] = [ranks.get(link.from) ?? 0, ranks.get(link.to) ?? 0]
@@ -577,10 +672,11 @@ export function layersOf(graph: Graph, fold?: Fold): Layers {
     if (now < best.crossings) best = { slots: [...slots], crossings: now }
   }
   for (let sweep = 0; sweep < SWEEPS && best.crossings > 0; sweep += 1) {
-    for (let index = 1; index < count; index += 1) slots[index] = sorted(slots[index] ?? [], slots[index - 1] ?? [], pieces[index - 1] ?? [])
+    for (let index = 1; index < count; index += 1) slots[index] = sorted(slots[index] ?? [], slots[index - 1] ?? [], pieces[index - 1] ?? [], groupOf)
     keepBest()
-    for (let index = count - 2; index >= 0; index -= 1) slots[index] = sorted(slots[index] ?? [], slots[index + 1] ?? [], pieces[index] ?? [])
+    for (let index = count - 2; index >= 0; index -= 1) slots[index] = sorted(slots[index] ?? [], slots[index + 1] ?? [], pieces[index] ?? [], groupOf)
     keepBest()
   }
-  return { slots: best.slots, pieces, flats }
+  const kept = best.slots.map(layer => together(layer, slot => layer.indexOf(slot), groupOf))
+  return { slots: graph.groups.length === 0 ? kept : inOrder(kept, groupOf), pieces, flats }
 }

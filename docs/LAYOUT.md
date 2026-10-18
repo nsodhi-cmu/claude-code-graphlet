@@ -45,6 +45,12 @@ The shelves are then seated again, by `reseat`, `RESEATS` times over: each time,
 
 How wide a shelf is laid out is the `scroll` setting's to say. `pinned`: across the room's columns where it fits them, and where it is longer, across the longest shelf, together with every other shelf longer than the room, so that the long shelves lie on one sheet and their links run between them as laid out. `sheet`: every shelf across the longest.
 
+## Frames
+
+A group's frame is a box with round corners around every place of the group: its nodes, and the lanes of the links within it. `framesOf` stands it `FRAME_MARGIN` out from them across their shelves, its border and a blank inside it, and wide enough for the group's label in its top border where the graph runs down. Along the layers, its top border takes a row of the channel over its first shelf, over the rows for arrowheads there, and its bottom border a row of the channel under its last shelf, under the rows for arrowheads and labels there; a group that starts on the first shelf has a row over all the shelves for it. Running right, where a row is a column, each takes a column and a blank one inside it, `FRAME_ENDS`.
+
+Nothing else stands inside a frame. After the shelves are seated, on each shelf a frame spans, what is not the group's is moved clear of it, a gap from its border: what stands before it in the shelf's order is moved back where it can be, and else the frame, with all it holds, is moved on; and what stands after it is moved on. That is done over and over, frames only ever moving on, until nothing moves. A shelf a frame passes with nothing of its group on it takes the frame where it stands among its places. So a frame may push the layout wider than its room, and a graph with groups that is wider than its room is laid out on one sheet, every shelf across all of it, so that a frame stands at one place on every shelf it spans. A channel keeps a jog off the columns the sides of frames run down through it, `walls`.
+
 ## Channels
 
 A channel is the rows between two shelves. The stretches of links that cross it are its wires, and so are the links between two nodes of the shelf above, which run under that shelf and back up to it. The last shelf has a channel under it only for those.

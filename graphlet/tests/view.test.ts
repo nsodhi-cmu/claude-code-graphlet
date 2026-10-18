@@ -24,6 +24,7 @@ test('any graph, in any room, under any settings, is drawn inside its room with 
         label: `${LABELS[pick(LABELS.length)]}${index}`,
         ...(hasLayers ? { layer: pick(4) } : {}),
         ...(pick(4) === 0 ? { mark: '◆', badge: String(pick(30)) } : {}),
+        ...(pick(3) === 0 ? { group: `g${pick(3)}` } : {}),
       })),
       links: Array.from({ length: pick(count * 2 + 1) }, () => ({ from: `n${pick(count)}`, to: `n${pick(count)}` })),
       isDirected: run % 3 !== 1,

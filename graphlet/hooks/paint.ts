@@ -3,7 +3,7 @@ import type { Canvas, Cell, Drawing, Hit, Paint, Pan, Room } from './draw'
 import { isJoined, priorityOf } from './layers'
 import type { Graph, Link, Node } from './layers'
 import { labelOf, layTracks, routeOf } from './layout'
-import type { Channel, End, Layout, Place, Shelf } from './layout'
+import type { Channel, End, Frame as GroupFrame, Layout, Place, Shelf } from './layout'
 import { sightOf, slideOf, within } from './window'
 
 // The picture: a layout painted through a window, the boxes in box
@@ -144,6 +144,55 @@ function paintShelf(canvas: Canvas, graph: Graph, shelf: Shelf, selected: string
   return hits
 }
 
+/** A group's frame on the picture: its corners. */
+type FrameBox = { frame: GroupFrame; left: number; right: number; top: number; bottom: number }
+
+/** Where a group's frame stands on the picture, at `x` across the window. */
+const frameBoxOf = (frame: GroupFrame, x: number, seen: Seen): FrameBox => {
+  const [start, end] = [seen.realOf(x, seen.yOf(frame.top)), seen.realOf(x + frame.width - 1, seen.yOf(frame.bottom))]
+  return { frame, left: Math.min(start.x, end.x), right: Math.max(start.x, end.x), top: Math.min(start.y, end.y), bottom: Math.max(start.y, end.y) }
+}
+
+/**
+ * Paints a group's frame: a box with round corners around all the group
+ * holds, in the group's tone, or dim. The lines that cross it are painted
+ * over it after, and its label after them.
+ */
+function paintFrame(canvas: Canvas, box: FrameBox): void {
+  const { left, right, top, bottom } = box
+  const border = { paint: box.frame.group.tone ?? ('dim' as const) }
+  const bar = '─'.repeat(Math.max(0, right - left - 1))
+  canvas.put(left, top, `╭${bar}╮`, border)
+  canvas.put(left, bottom, `╰${bar}╯`, border)
+  for (let y = top + 1; y < bottom; y += 1) {
+    canvas.put(left, y, '│', border)
+    canvas.put(right, y, '│', border)
+  }
+}
+
+/**
+ * Writes a group's label in its frame's top border, a blank on either side,
+ * as near its left corner as it can stand where no line crosses the border
+ * there or in the cell after it, or else in any such stretch it fits, and
+ * cut in its middle where the border has none long enough: then in the
+ * longest it has. It is in the group's tone, or plain.
+ */
+function writeTitle(canvas: Canvas, box: FrameBox): void {
+  const row = canvas.cells[box.top] ?? []
+  const runs: Array<{ start: number; length: number }> = []
+  for (let x = box.left + 2; x < box.right - 1; x += 1) {
+    const isFree = row[x]?.char === '─'
+    const last = runs.at(-1)
+    if (!isFree) continue
+    if (last !== undefined && last.start + last.length === x) last.length += 1
+    else runs.push({ start: x, length: 1 })
+  }
+  const label = box.frame.group.label
+  const run = runs.find(one => one.length >= sizeOf(label) + 3) ?? runs.find(one => one.length >= sizeOf(label) + 2) ?? runs.toSorted((a, b) => b.length - a.length)[0]
+  if (run === undefined || run.length < 5) return
+  canvas.put(run.start, box.top, ` ${clipMiddle(label, Math.min(sizeOf(label), run.length - 2))} `, { paint: box.frame.group.tone ?? 'plain' })
+}
+
 /** Which ways a wire leaves a cell; a cell several wires share shows all of theirs. */
 const UP = 1
 const DOWN = 2
@@ -202,7 +251,7 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
   const borderOfEnd = (end: End): number =>
     end.isAbove ? seen.yOf(layout.shelves[end.place.shelf]?.top ?? 0) + end.place.rows - 1 : below
 
-  const tracks = first + channel.topRows
+  const tracks = first + channel.topRows + channel.frameBottom
   for (const wire of channel.wires) {
     const turn = tracks + wire.track
     const jog = wire.jog === null ? null : { x: seen.xOf(wire.from.place) + wire.jog.at, turn: tracks + wire.jog.track }
@@ -418,15 +467,18 @@ export function paint(layout: Layout, graph: Graph, selected: string | null, roo
   const found = new Set(finding?.found)
   const directed = new Set(graph.links.filter(link => link.isDirected).map(link => JSON.stringify([link.from, link.to])))
   const motion: Moving | null = isFlowing ? { isOneWay: link => link.isDirected && !directed.has(JSON.stringify([link.to, link.from])) } : null
+  const frames = layout.frames.map(frame => frameBoxOf(frame, frame.x - slideOf(layout, layout.shelves[frame.first], at.x), seen))
+  for (const frame of frames) paintFrame(canvas, frame)
   const hits = layout.shelves.flatMap(shelf => paintShelf(canvas, graph, shelf, selected, seen, found, motion))
   const isInView = (top: number, rows: number): boolean => seen.yOf(top) < seen.rows && seen.yOf(top + rows) > 0
   layout.channels.forEach((channel, index) => {
     const [above, below] = [layout.shelves[index], layout.shelves[index + 1]]
     const isNear = [above, below].some(shelf => shelf !== undefined && isInView(shelf.top, shelf.rows))
     if (!isInView(channel.top, channel.rows) && !isNear) return
-    if (channel.isLoose) layTracks(channel, seen.xOf, channel.rows - channel.topRows - channel.bottomRows)
+    if (channel.isLoose) layTracks(channel, seen.xOf, channel.rows - channel.topRows - channel.bottomRows - channel.frameBottom - channel.frameTop)
     paintChannel(canvas, graph, layout, channel, selected, seen, motion)
   })
+  for (const frame of frames) writeTitle(canvas, frame)
 
   const boxes: Box[] = layout.shelves.flatMap(shelf => shelf.places.filter(place => 'node' in place.slot).map(place => boxOf(seen, place, seen.yOf(shelf.top))))
   const signs = paintSigns(canvas, graph, boxes, selected, seen)

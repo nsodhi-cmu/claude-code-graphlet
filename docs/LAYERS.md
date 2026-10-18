@@ -13,6 +13,7 @@ A graph is drawn in layers: every node in a row of the drawing, and every link r
 - A link runs one way unless its `isDirected` is `false`, or it has none and its graph's is `false`. Anything else there reads as running one way. A graph whose links all run no way is undirected; a graph may have links of both kinds.
 - A link is kept where both its ends are nodes of the graph, and once for each label it is given however many times it is given, so the same two nodes may be linked under several labels. A link that runs no way is kept once whichever way round it names its nodes, and a link of each kind between the same two nodes is two links.
 - A link from a node to itself is kept. It is drawn as a sign in the node's box, not as a line.
+- A node is in the group its `group` names, where that is the id of a group the graph lists or of none of its nodes; a group it does not list is labelled by its id. A group needs an id that no group before it and no node has, and a group no node is in is left out.
 - What is no graph at all reads as an empty one.
 - At most `MOST_NODES` nodes and `MOST_LINKS` links are read, 1000 and 2000, and what is past them is left out and counted: the nodes, and the links that are past the most, or that join a node left out. A graph larger than that is slow to lay out, and no picture a person can follow.
 
@@ -59,3 +60,5 @@ A link between two nodes of one layer is no stretch. Those are kept apart, by la
 A layer starts in the order the graph names its nodes in, with its lanes after them. While any two stretches cross, the layers are ordered against their neighbors: on the way down each layer by the layer above it, and on the way back up each by the layer below, a slot going to the middle of the places of what it is joined to there. That is done a few times over, and the ordering whose stretches cross least is the one kept.
 
 With nothing crossing, nothing is reordered, so the nodes of a layer stay in the order the graph names them in. The order never depends on what is selected or where the window stands.
+
+Where the graph has groups, `together` keeps the slots of each group side by side in every ordering, where the group's own would stand on average, and a lane carries links within one group or none, so the lanes of the links within a group stand among its nodes. Last, `inOrder` puts the groups in one order across all the layers, by where each stands on average over the layers it is in, so that no two groups' frames cross.

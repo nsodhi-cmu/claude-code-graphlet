@@ -27,6 +27,22 @@ export type GraphletNode = {
    * more in rows and bent links.
    */
   priority?: number
+  /** The id of the group the node is drawn in, framed with the group's other nodes. Left out, it is in none. */
+  group?: string
+}
+
+/**
+ * A set of nodes drawn together in a frame, the nodes that name it as their
+ * `group`: a tier of services, a package of files, a phase of states. A
+ * group holds nodes, not groups.
+ */
+export type GraphletGroup = {
+  /** Unique among the graph's groups and its nodes. */
+  id: string
+  /** What its frame says, and its box where it is collapsed. Left out, its id. */
+  label?: string
+  /** How its frame is painted; dim when left out. */
+  tone?: GraphletTone
 }
 
 /** A link between two nodes, by their ids: from one to the other, where it runs one way. */
@@ -60,6 +76,8 @@ export type GraphletDirection = 'down' | 'right'
 export type GraphletGraph = {
   nodes: GraphletNode[]
   links: GraphletLink[]
+  /** The groups its nodes are drawn in. A node may name a group not listed here, which is then labelled by its id. */
+  groups?: GraphletGroup[]
   /**
    * Which way the graph runs. Left out, graphlet runs it down, or right
    * where that fits its room's columns in half the rows or fewer, or fits

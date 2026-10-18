@@ -1,9 +1,8 @@
 import type { GraphletNode, GraphletTone } from '../types'
-import { sizeOf } from './draw'
-import { layersOf } from './layers'
+import { MOST_CELLS, sizeOf } from './draw'
 import type { Graph, Link, Node, Slot } from './layers'
-import { labelOf, linesOf } from './layout'
-import type { Direction } from './layout'
+import { labelOf, layoutOf, linesOf } from './layout'
+import type { Direction, Frame, Look, Layout } from './layout'
 
 // The page: a graph as one HTML document that draws it in SVG, in the layers
 // and the order the terminal's picture has. The document fetches nothing,
@@ -118,6 +117,10 @@ text { text-anchor: middle; fill: var(--ink); }
 .link text { font-size: ${BADGE_SIZE}px; fill: currentColor; paint-order: stroke; stroke: var(--page); stroke-width: 4px; }
 .link.lit { color: var(--ink); }
 .quieted .node:not(.lit), .quieted .link:not(.lit) { opacity: 0.25; }
+.hull { fill: none; stroke: var(--tone); stroke-width: 1.25; }
+.title { text-anchor: start; font-size: ${BADGE_SIZE}px; font-weight: 600; fill: var(--soft); paint-order: stroke; stroke: var(--page); stroke-width: 6px; }
+.frame.dim .title { fill: var(--soft); }
+.frame:not(.dim) .title { fill: var(--tone); }
 `
 
 /**
@@ -247,36 +250,56 @@ function boxWidth(node: GraphletNode, lines: string[]): number {
   return Math.max(BOX_WIDTH, Math.ceil(widest) + 2 * BOX_PADDING.x)
 }
 
+/** How many pixels of the page a cell of the terminal's layout is across a layer, running down and running right: enough that no box of the page is wider than its box there. */
+const CELL: Readonly<Record<Direction, number>> = { down: 1.5 * CHAR_WIDTH, right: 16 }
+/** How the page has a graph laid out: as the terminal lays it out on one sheet, in a room wide enough for all of it. */
+const SHEET: Look = { scroll: 'sheet', labels: 'wrap', links: 'separate', motion: 'still' }
+const WIDE = { columns: MOST_CELLS, rows: MOST_CELLS }
+/** How far a group's frame stands out from its first and last layers, and how far from what it holds across them. */
+const FRAME_PAD = { along: 26, across: 12 }
+
+/** A group's frame on the page, around what it holds: across and along, how wide and how long. */
+type Hull = { frame: Frame; across: number; along: number; wide: number; long: number }
+
 /**
- * Every slot where it stands: the slots of a layer side by side across it
- * in their order, the layer in the middle of the widest one, and the layers
- * one after another along. Running down, a layer's boxes are as tall as its
- * tallest label; running right, as wide as its widest box, a lane across it
- * as wide as they are.
+ * Every slot where it stands, and every group's frame: each slot across its
+ * layer where the terminal's layout has it, its middle on the column its
+ * links there leave and reach it by, a cell of that a `CELL` of the page and
+ * the first of them at the page's margin; and the layers one after another
+ * along, each as long as its longest box, a gap apart. Running down, a
+ * layer's boxes are as tall as its tallest label; running right, as wide as
+ * its widest box, a lane across it as wide as they are. A frame takes its
+ * place across from the layout, and stands out along from its first and last
+ * layers.
  */
-function spotsOf(slots: Slot[][], direction: Direction): Spot[] {
-  const isRight = direction === 'right'
-  const sized = slots.map(row =>
-    row.map(slot => {
-      const lines = 'node' in slot ? linesOf(slot.node.label) : []
-      return { slot, lines, width: 'node' in slot ? boxWidth(slot.node, lines) : LANE_WIDTH, height: Math.max(1, lines.length) * LINE_HEIGHT + 2 * BOX_PADDING.y }
-    }),
-  )
-  const wideOf = (one: { width: number; height: number; slot: Slot }): number => (!isRight ? one.width : 'node' in one.slot ? one.height : LANE_WIDTH)
-  const lengthOf = (row: Array<{ width: number; height: number; slot: Slot }>): number => row.reduce((sum, one) => sum + wideOf(one) + GAP.x, -GAP.x)
-  const widest = Math.max(0, ...sized.map(lengthOf))
-  let along = MARGIN
-  return sized.flatMap((row, layer) => {
-    const long = isRight ? Math.max(LANE_WIDTH, ...row.filter(one => 'node' in one.slot).map(one => one.width)) : Math.max(...row.map(one => one.height), 2 * BOX_PADDING.y + LINE_HEIGHT)
-    let across = MARGIN + Math.round((widest - lengthOf(row)) / 2)
-    const spots = row.map(one => {
-      const spot: Spot = { slot: one.slot, lines: one.lines, layer, across, along, wide: wideOf(one), long }
-      across += spot.wide + GAP.x
-      return spot
+function spotsOf(layout: Layout): { spots: Spot[]; hulls: Hull[] } {
+  const isRight = layout.direction === 'right'
+  const cell = CELL[layout.direction]
+  const least = Math.min(...layout.shelves.flatMap(shelf => shelf.places.map(place => place.x)), ...layout.frames.map(frame => frame.x))
+  const layers: Array<{ along: number; long: number }> = []
+  let along = MARGIN + (layout.frames.some(frame => frame.first === 0) ? FRAME_PAD.along : 0)
+  const spots = layout.shelves.flatMap((shelf, layer) => {
+    const sized = shelf.places.map(place => {
+      const lines = 'node' in place.slot ? linesOf(place.slot.node.label) : []
+      return { place, lines, width: 'node' in place.slot ? boxWidth(place.slot.node, lines) : LANE_WIDTH, height: Math.max(1, lines.length) * LINE_HEIGHT + 2 * BOX_PADDING.y }
+    })
+    const wideOf = (one: (typeof sized)[number]): number => (!isRight ? one.width : 'node' in one.place.slot ? one.height : LANE_WIDTH)
+    const long = isRight ? Math.max(LANE_WIDTH, ...sized.filter(one => 'node' in one.place.slot).map(one => one.width)) : Math.max(...sized.map(one => one.height), 2 * BOX_PADDING.y + LINE_HEIGHT)
+    layers.push({ along, long })
+    const placed = sized.map(one => {
+      const wide = wideOf(one)
+      const middle = MARGIN + (one.place.x - least + Math.floor(one.place.width / 2) + 0.5) * cell
+      return { slot: one.place.slot, lines: one.lines, layer, across: middle - wide / 2, along, wide, long }
     })
     along += long + GAP.y
-    return spots
+    return placed
   })
+  const hulls = layout.frames.map(frame => {
+    const [first, last] = [layers[frame.first] ?? { along: 0, long: 0 }, layers[frame.last] ?? { along: 0, long: 0 }]
+    const across = MARGIN + (frame.x - least) * cell + FRAME_PAD.across
+    return { frame, across, along: first.along - FRAME_PAD.along, wide: frame.width * cell - 2 * FRAME_PAD.across, long: last.along + last.long - first.along + 2 * FRAME_PAD.along }
+  })
+  return { spots, hulls }
 }
 
 /**
@@ -373,8 +396,8 @@ function arrowOf(turning: Turning, link: Link, from: Spot, to: Spot, spots: Spot
   return runOf(turning, from, isUp ? lanes.toReversed() : lanes, to, isUp, short, aside)
 }
 
-/** Where a spot's rectangle is on the page. */
-const rectOf = (turning: Turning, spot: Spot): { x: number; y: number; width: number; height: number } => {
+/** Where a spot's rectangle, or a frame's, is on the page. */
+const rectOf = (turning: Turning, spot: { across: number; along: number; wide: number; long: number }): { x: number; y: number; width: number; height: number } => {
   const [start, end] = [turning.pointOf(spot), turning.pointOf({ across: spot.across + spot.wide, along: spot.along + spot.long })]
   return { x: start.x, y: start.y, width: end.x - start.x, height: end.y - start.y }
 }
@@ -407,7 +430,7 @@ function boxOf(turning: Turning, node: Node, spot: Spot): string {
  */
 function drawingOf(graph: Graph, direction: Direction): string {
   const turning = turningOf(direction)
-  const spots = spotsOf(layersOf(graph).slots, direction)
+  const { spots, hulls } = spotsOf(layoutOf(graph, WIDE, SHEET, false, direction))
   const places = new Map<string, { index: number; spot: Spot }>()
   graph.nodes.forEach((node, index) => {
     const spot = spots.find(one => 'node' in one.slot && one.slot.node.id === node.id)
@@ -444,10 +467,16 @@ function drawingOf(graph: Graph, direction: Direction): string {
     const place = places.get(node.id)
     return place === undefined ? [] : [boxOf(turning, node, place.spot)]
   })
-  const rects = spots.map(spot => rectOf(turning, spot))
+  const frames = hulls.map(hull => {
+    const rect = rectOf(turning, hull)
+    const tone = TONES.find(one => one === hull.frame.group.tone) ?? 'dim'
+    const title = `<text class="title" x="${rect.x + BOX_RADIUS}" y="${rect.y + BASELINE}">${escaped(hull.frame.group.label)}</text>`
+    return `<g class="frame ${tone}"><rect class="hull" x="${rect.x}" y="${rect.y}" width="${rect.width}" height="${rect.height}" rx="${BOX_RADIUS}"/>${title}</g>`
+  })
+  const rects = [...spots, ...hulls].map(spot => rectOf(turning, spot))
   const width = Math.max(...rects.map(rect => rect.x + rect.width)) + MARGIN
   const height = Math.max(...rects.map(rect => rect.y + rect.height)) + MARGIN
-  return `<svg viewBox="0 0 ${width} ${height}">\n${[...links, ...nodes].join('\n')}\n</svg>`
+  return `<svg viewBox="0 0 ${width} ${height}">\n${[...frames, ...links, ...nodes].join('\n')}\n</svg>`
 }
 
 /** The graph as a web page: one self-contained HTML document, the graph running the way its picture in the terminal runs. */

@@ -5,7 +5,8 @@ graphlet adds one noun to `$`, `$.graphlet`, in the `engine.create` hook of `gra
 ## A Graph
 
 ```ts
-type GraphletGraph = { nodes: GraphletNode[]; links: GraphletLink[]; isDirected?: boolean; direction?: 'down' | 'right' }
+type GraphletGraph = { nodes: GraphletNode[]; links: GraphletLink[]; groups?: GraphletGroup[]; isDirected?: boolean; direction?: 'down' | 'right' }
+type GraphletGroup = { id: string; label?: string; tone?: GraphletTone }
 type GraphletLink = { from: string; to: string; label?: string; tone?: GraphletTone; isDirected?: boolean }
 ```
 
@@ -21,9 +22,12 @@ A graph runs the way its `direction` says: `down`, its layers one under another,
 | `tone` | How the mark and the label are painted: `plain`, `dim`, `note`, `good`, `warn`, or `bad`. A tone is a meaning, and the person's theme gives each its color. Optional; `plain` when left out. |
 | `badge` | A few characters drawn dim after the label: a count, a tag. Optional. |
 | `priority` | A whole number for how much the graph is about the node, against its other nodes. Optional; 0 when left out. See below. |
+| `group` | The id of the group the node is drawn in. Optional; in none when left out. See below. |
 | `layer` | The layer the node stands in. The layers are drawn in the order of their numbers, the lowest at the top, and the numbers need not start anywhere or follow on. Optional: left out on any node of a graph, graphlet works every layer out from the links. |
 
 A node's `priority` matters as it compares with the priorities of the graph's other nodes, and with 0: a graph whose nodes all have one priority, or none, is drawn as one with none. The nodes of the highest priority, where it is above 0 and above another node's, are drawn with heavy frames and bold labels, in the terminal and on the web page. Where graphlet must choose between nodes, the one of higher priority goes first: it is the one a pane selects when nothing else says which, and among nodes that otherwise tie, the one kept in focus and the one named first at a window's edge. And the layout is seated again by the links of the nodes of higher priority first, and that seating is kept only where those links bend less and the drawing's rows and bent links, weighed together, weigh no more, as [LAYOUT.md](LAYOUT.md#shelves) tells. Such a seating may bend other links, or take another row for links it straightens, as any seating may that weighs no more.
+
+A group is a set of nodes drawn together in a frame: a tier of services, a package of files, a phase of states. A node is in the group its `group` names, and the graph's `groups` say what each frame says, its `label`, and how it is painted, its `tone`, dim when left out. A node may name a group the graph does not list; that group is labelled by its id. A group's id is unique among its graph's groups and nodes: a group whose id another group before it or a node has is dropped, and so is a node's group of a node's id, the node then in none. A group holds nodes, not groups. Its nodes stand together in each layer, its frame around all of them across the layers they stand in, and nothing else stands inside it, as [LAYOUT.md](LAYOUT.md#frames) tells.
 
 ## Showing A Graph
 

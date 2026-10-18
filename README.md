@@ -37,6 +37,7 @@ graphlet is a Claude Code mod that draws graphs, nodes and the links between the
 
 - **Any graph, directed or not, or both.** The nodes are laid out in layers down the drawing, or across it where that fits better, as a pipeline does. A directed graph runs along the way its links run, and the link that closes a loop runs back up, dashed. An undirected graph spreads down from the first node it names, and its links have no arrowheads. A graph may have links of both kinds, each drawn as what it is.
 - **Every link is drawn, and can be followed**, between neighboring layers, past layers, back up, and between two nodes of one layer. One box's links fan out on rows of their own, links from different boxes reach a box at arrowheads, or ticks, of their own, and a link that only crosses another passes over it.
+- **Nodes can be grouped.** A mod can put nodes in groups, each drawn in a frame with its name: a tier of services, a package of files, a phase of states. Nothing else stands inside a frame, and a link into a group crosses its border.
 - **A link can say what it means.** Its label, `yes` or `retry`, is written beside the line where it leaves its box, and the box makes room for it. A mod can give it a tone, as it gives a node one, to paint a failing dependency red or the path it found blue.
 - **It scrolls.** A graph larger than its room is seen through a window that follows the selection, and that the wheel moves.
 - **It answers the mouse and the keyboard.** A click selects a node, the arrow keys move from node to node along the links, return or a double click opens one, and the mod that owns the pane hears each pick and each open.
@@ -139,6 +140,7 @@ While developing, load both from disk: `claude --plugin-dir ./graphlet --plugin-
 - Lines that meet are joined: they leave the same box, or reach the same box. In an undirected graph, a line joins each box whose bottom it meets to each box whose top it meets, and a line that meets the bottoms of two boxes of one layer, and nothing else, joins those two. A link that only crosses another passes over it unbroken.
 - Words written beside a line, just past the box it leaves, are its label. A label is true of every link of the line it stands beside, since links with different labels never share a line. A line in color is a link in a tone, and the same holds of it.
 - `↺` in a box says the node links to itself.
+- A frame with round corners, `╭─ Backend ─╮`, holds the nodes of a group, and nothing else. A line that crosses it is a link into the group or out of it.
 - A box with a heavy frame, `┏━┓`, is a node the graph is about: one of the nodes its graph gives the highest priority.
 - The selected node's box has a double frame, and its links, their labels, and the boxes they reach are lit.
 - A graph that runs right reads the same way turned: its layers stand side by side, a solid line runs with the flow across the drawing, a dashed one back, and a link's label is written on its line, just past the box it leaves.

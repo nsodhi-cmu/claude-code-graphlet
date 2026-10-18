@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { graphOf, numbers, undirected } from './fixture'
-import { layersOf, loopLinks, ranksOf, readGraph } from '../hooks/layers'
+import { layersOf, loopLinks, ranksOf, readGraph, slotGroups } from '../hooks/layers'
 import type { Graph, Slot } from '../hooks/layers'
 
 const named = (slot: Slot): string => ('node' in slot ? slot.node.id : slot.lane.map(link => `${link.from}→${link.to}`).join(' '))
@@ -70,6 +70,31 @@ describe('reading a graph', () => {
     ])
   })
 
+  test('a node is in the group it names; a group the graph does not list is labelled by its id, one whose id another group or a node has is dropped, and a group no node is in is left out', () => {
+    const graph = readGraph({
+      nodes: [
+        { id: 'a', label: 'a', group: 'lib' },
+        { id: 'b', label: 'b', group: 'tests' },
+        { id: 'c', label: 'c', group: 'a' },
+        { id: 'd', label: 'd', group: 7 as never },
+        { id: 'e', label: 'e' },
+      ],
+      links: [],
+      groups: [
+        { id: 'lib', label: '  src/\nlib ', tone: 'note' },
+        { id: 'lib', label: 'again' },
+        { id: 'a', label: 'a node' },
+        { id: 'empty', label: 'nobody' },
+        { id: 'loud', tone: 'loud' as never },
+      ],
+    })
+    expect(graph.nodes.map(node => node.group)).toEqual(['lib', 'tests', undefined, undefined, undefined])
+    expect(graph.groups).toEqual([
+      { id: 'lib', label: 'src/ lib', tone: 'note' },
+      { id: 'tests', label: 'tests' },
+    ])
+  })
+
   test('a graph puts foremost the nodes of its highest priority, where that is above 0 and above another node\'s, and drops a priority that is no whole number', () => {
     const read = (priorities: unknown[]) => readGraph({ nodes: priorities.map((priority, index) => ({ id: `n${index}`, label: 'n', priority: priority as number })), links: [] }).nodes
     const foremost = (priorities: unknown[]): string[] => read(priorities).filter(node => node.isForemost).map(node => node.id)
@@ -93,7 +118,7 @@ describe('reading a graph', () => {
   })
 
   test('what is no graph at all reads as an empty one', () => {
-    const empty = { nodes: [], links: [], unread: { nodes: 0, links: 0 } }
+    const empty = { nodes: [], links: [], groups: [], unread: { nodes: 0, links: 0 } }
     expect(readGraph(undefined as never)).toEqual(empty)
     expect(readGraph({ nodes: 'many', links: null } as never)).toEqual(empty)
   })
@@ -190,6 +215,27 @@ describe('layers', () => {
     })
     expect(layersOf(graph).flats).toEqual([[{ from: 'a', to: 'b', isDirected: true }]])
     expect(layersOf(graph).pieces).toEqual([])
+  })
+
+  test('the slots of a group stand together in each layer, the lanes of links within it among them, and the groups stand in one order across the layers', () => {
+    const next = numbers(41)
+    const pick = (below: number): number => Math.floor(next() * below)
+    for (let run = 0; run < 200; run += 1) {
+      const count = 2 + pick(16)
+      const graph = readGraph({
+        nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: `n${index}`, ...(pick(3) === 0 ? {} : { group: `g${pick(3)}` }) })),
+        links: Array.from({ length: pick(count * 2) }, () => ({ from: `n${pick(count)}`, to: `n${pick(count)}` })),
+      })
+      const groupOf = slotGroups(graph)
+      const order: string[][] = []
+      for (const layer of layersOf(graph).slots) {
+        const groups = layer.map(groupOf)
+        const met = [...new Set(groups.flatMap(group => group ?? []))]
+        for (const group of met) expect(groups.lastIndexOf(group) - groups.indexOf(group) + 1).toBe(groups.filter(one => one === group).length)
+        order.push(met)
+      }
+      for (const a of order) for (const b of order) expect(a.filter(group => b.includes(group))).toEqual(b.filter(group => a.includes(group)))
+    }
   })
 
   test('a layer is ordered by what it is joined to in its neighbors, so links do not cross', () => {

@@ -28,6 +28,7 @@ A drawing is rows of painted text, and the rectangles of them that answer a clic
 - A box has an arrowhead of its own for each set of boxes whose links reach it together, so links from different boxes never run into one line on the way to it.
 - `↺` in a box says the node links to itself.
 - A box with a heavy frame, `┏━┓`, and a bold label is a node the graph puts foremost: one of the highest priority its nodes have, where that is above 0 and above another node's.
+- A frame with round corners, `╭─ Backend ─╮`, holds the nodes of a group, and nothing else. A line that crosses its border is a link into the group or out of it, and passes over the border, which is broken there.
 
 An undirected graph is drawn the same way, with no arrowheads and no flow, and in a graph with links of both kinds, each is drawn as its kind is:
 
@@ -71,6 +72,35 @@ A link's label is written beside its line, just past the box it leaves, in the p
 
 - The words beside a line where it leaves a box are the label of every link of that line, since links with different labels never share one.
 - A link down the drawing has its label under the box it leaves; a link back up, over the box it leaves, beside the dashed line.
+
+### Groups
+
+`paintFrame` draws each group's frame before anything else, in the group's tone, or dim, so the lines painted after pass over it. Last, `writeTitle` writes the group's label in the top border, a blank on either side, nearest its left corner where no line crosses the border there or in the cell after; else anywhere it fits; and where nothing is long enough, cut in its middle to the longest stretch there is. The label is in the group's tone, or plain.
+
+```
+                          ┌─────────┐
+                          │ Browser │
+                          └────┬────┘
+                               │
+               ╭─ Backend ─────│─────╮
+               │               ▼     │
+               │            ┌─────┐  │
+               │            │ API │  │
+               │            └──┬──┘  │
+               │     ┌─────────┼────────────┐
+               │     ▼         ▼     │      ▼
+               │ ┌──────┐  ┌───────┐ │  ┌──────┐
+               │ │ Auth │  │ Cache │ │  │ Logs │
+               │ └─┬────┘  └───┬───┘ │  └──────┘
+               ╰───│───────────│─────╯
+                   │           │
+           ╭───────│ Data ─────│─────╮
+           │       ▼           ▼     │
+           │ ┌──────────┐  ┌───────┐ │
+           │ │ Postgres │  │ Redis │ │
+           │ └──────────┘  └───────┘ │
+           ╰─────────────────────────╯
+```
 
 ### A Graph That Runs Right
 

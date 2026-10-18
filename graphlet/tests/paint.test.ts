@@ -4,7 +4,7 @@ import { LOOK, SHOP, cellsOf, graphOf, graphRows, numbers, picture, undirected }
 import type { GraphletLink } from '../types'
 import { BEATS, piecesOf, sizeOf } from '../hooks/draw'
 import type { Drawing, Hit, Span } from '../hooks/draw'
-import { readGraph } from '../hooks/layers'
+import { readGraph, slotGroups } from '../hooks/layers'
 import type { Graph } from '../hooks/layers'
 import { labelOf, layoutOf } from '../hooks/layout'
 import type { Layout, Look, Place } from '../hooks/layout'
@@ -798,6 +798,66 @@ describe('a graph that runs right', () => {
   })
 })
 
+describe('groups', () => {
+  const n = (id: string, group?: string) => ({ id, label: id, ...(group === undefined ? {} : { group }) })
+  const l = (from: string, to: string) => ({ from, to })
+  const tiers = (direction: 'down' | 'right'): Graph =>
+    readGraph({
+      nodes: [n('Browser'), n('API', 'back'), n('Auth', 'back'), n('Cache', 'back'), n('Postgres', 'data'), n('Redis', 'data'), n('Logs')],
+      links: [l('Browser', 'API'), l('API', 'Auth'), l('API', 'Cache'), l('Auth', 'Postgres'), l('Cache', 'Redis'), l('API', 'Logs')],
+      groups: [{ id: 'back', label: 'Backend' }, { id: 'data', label: 'Data' }],
+      direction,
+    })
+  const ROOM = { columns: 60, rows: 40 }
+
+  test('a group\'s nodes are drawn in a frame with round corners and its label in the top border, where no line crosses it; nothing else stands inside, and a link that crosses the frame passes over it', () => {
+    expect(graphRows(drawn(tiers('down'), null, ROOM))).toEqual([
+      '                          ┌─────────┐',
+      '                          │ Browser │',
+      '                          └────┬────┘',
+      '                               │',
+      '               ╭─ Backend ─────│─────╮',
+      '               │               ▼     │',
+      '               │            ┌─────┐  │',
+      '               │            │ API │  │',
+      '               │            └──┬──┘  │',
+      '               │     ┌─────────┼────────────┐',
+      '               │     ▼         ▼     │      ▼',
+      '               │ ┌──────┐  ┌───────┐ │  ┌──────┐',
+      '               │ │ Auth │  │ Cache │ │  │ Logs │',
+      '               │ └─┬────┘  └───┬───┘ │  └──────┘',
+      '               ╰───│───────────│─────╯',
+      '                   │           │',
+      '           ╭───────│ Data ─────│─────╮',
+      '           │       ▼           ▼     │',
+      '           │ ┌──────────┐  ┌───────┐ │',
+      '           │ │ Postgres │  │ Redis │ │',
+      '           │ └──────────┘  └───────┘ │',
+      '           ╰─────────────────────────╯',
+    ])
+  })
+
+  test('running right, a frame stands around its nodes the same way, a blank inside its border, its label in its top border', () => {
+    expect(graphRows(drawn(tiers('right'), null, ROOM))).toEqual([
+      '            ╭─ Backend ───────────╮ ╭─ Data ────────╮',
+      '            │                     │ │               │',
+      '            │           ┌──────┐  │ │  ┌──────────┐ │',
+      '            │         ┌▶│ Auth ├──────▶│ Postgres │ │',
+      '┌─────────┐ │         │ └──────┘  │ │  └──────────┘ │',
+      '│ Browser ├┐│         │           │ │               │',
+      '└─────────┘││  ┌─────┐│ ┌───────┐ │ │  ┌───────┐    │',
+      '           └──▶│ API ├┼▶│ Cache ├─────▶│ Redis │    │',
+      '            │  └─────┘│ └───────┘ │ │  └───────┘    │',
+      '            │         │           │ │               │',
+      '            ╰─────────│───────────╯ ╰───────────────╯',
+      '                      │',
+      '                      │ ┌──────┐',
+      '                      └▶│ Logs │',
+      '                        └──────┘',
+    ])
+  })
+})
+
 describe('what the window does not show', () => {
   const graph = graphOf(
     ['Checkout', 'Cart', 'Payments', 'Shipping', 'Receipts', 'Ledger'],
@@ -1197,7 +1257,12 @@ describe('what a picture says', () => {
 
   test('a graph drawn running right says every link it has, in every channel the link crosses, and no link it does not have, and writes each label on its own link\'s line', READING, () => {
     for (let run = 0; run < 400; run += 1) {
-      const graph: Graph = { ...anyGraph(run), direction: 'right' }
+      const base = anyGraph(run)
+      const graph = readGraph({
+        nodes: base.nodes.map(node => ({ ...node, ...(run % 2 === 0 || pick(3) === 0 ? {} : { group: `g${pick(2)}` }) })),
+        links: base.links,
+        direction: 'right',
+      })
       const look = someLook()
       const laid = layoutOf(graph, { columns: 1000, rows: 4 + pick(60) }, look, false, 'right')
       const layout = { ...laid, columns: Math.max(laid.columns, ...laid.shelves.map(shelf => shelf.across)) }
@@ -1209,6 +1274,16 @@ describe('what a picture says', () => {
         for (const place of shelf.places.filter(one => 'node' in one.slot)) {
           for (let along = shelf.top + 1; along < shelf.top + place.rows - 1; along += 1) {
             for (let across = xOf(place) + 1; across < xOf(place) + place.width - 1; across += 1) (turned[along] ?? [])[across] = ' '
+          }
+        }
+      }
+      for (const frame of layout.frames) {
+        for (let along = frame.top; along <= frame.bottom; along += 1) {
+          const row = turned[along] ?? []
+          for (let across = frame.x; across < frame.x + frame.width; across += 1) {
+            const isEnd = along === frame.top || along === frame.bottom
+            const isSide = across === frame.x || across === frame.x + frame.width - 1
+            if ((isEnd && row[across] === '─') || (isSide && !isEnd && (row[across] === '│' || WAYS[row[across] ?? ' '] === undefined))) row[across] = ' '
           }
         }
       }
@@ -1225,6 +1300,50 @@ describe('what a picture says', () => {
       }
       const said = readOff(graph, layout, { rows: [...turned.map(row => [{ text: row.join(''), paint: 'plain' as const }]), []], hits: [] }, xOf)
       expect(said.loose).toEqual([])
+      expect(said.links).toEqual([...new Set(linksOf(graph, layout))])
+    }
+  })
+
+  test('in any graph with groups, each frame holds every node of its group and no other, no two frames that share a shelf stand over each other, and the picture says every link it has', READING, () => {
+    for (let run = 0; run < 200; run += 1) {
+      const base = anyGraph(run)
+      const graph = readGraph({
+        nodes: base.nodes.map(node => ({ ...node, ...(pick(3) === 0 ? {} : { group: `g${pick(3)}` }) })),
+        links: base.links,
+        groups: [{ id: 'g0', label: 'zero' }, { id: 'g1', label: 'a longer name for a group' }],
+        direction: 'down',
+      })
+      const groupOf = slotGroups(graph)
+      const laid = layoutOf(graph, { columns: 40 + pick(100), rows: 0 }, someLook(), pick(2) === 0)
+      const layout = { ...laid, columns: Math.max(laid.columns, ...laid.shelves.map(shelf => shelf.across)) }
+      const isOn = (frame: (typeof layout.frames)[number], shelf: number): boolean => frame.first <= shelf && shelf <= frame.last
+      for (const frame of layout.frames) {
+        layout.shelves.forEach((shelf, index) => {
+          for (const place of shelf.places) {
+            const isInside = isOn(frame, index) && place.x >= frame.x + 2 && place.x + place.width <= frame.x + frame.width - 2
+            const isOver = isOn(frame, index) && place.x < frame.x + frame.width && place.x + place.width > frame.x
+            expect(groupOf(place.slot) === frame.group.id ? isInside : !isOver).toBe(true)
+          }
+        })
+        for (const other of layout.frames.filter(one => one !== frame && layout.shelves.some((_, index) => isOn(one, index) && isOn(frame, index)))) {
+          expect(other.x >= frame.x + frame.width || other.x + other.width <= frame.x).toBe(true)
+        }
+      }
+      const drawing = paint(layout, graph, null, { columns: layout.columns, rows: layout.rows + 1 }, ORIGIN)
+      const rows = picture(drawing).map(cellsOf)
+      for (const frame of layout.frames) {
+        for (let y = frame.top; y <= frame.bottom; y += 1) {
+          for (let x = frame.x; x < frame.x + frame.width; x += 1) {
+            const row = rows[y] ?? []
+            const isEdge = y === frame.top || y === frame.bottom
+            const isSide = x === frame.x || x === frame.x + frame.width - 1
+            if ((isEdge && (WAYS[row[x] ?? ' '] === undefined || '─╭╮╰╯'.includes(row[x] ?? ''))) || (!isEdge && isSide && row[x] === '│')) row[x] = ' '
+          }
+        }
+      }
+      const said = readOff(graph, layout, { rows: rows.map(row => [{ text: row.join(''), paint: 'plain' as const }]), hits: [] }, place => place.x)
+      expect(said.loose).toEqual([])
+      expect(said.labels).toEqual([])
       expect(said.links).toEqual([...new Set(linksOf(graph, layout))])
     }
   })
