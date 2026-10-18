@@ -295,6 +295,16 @@ describe('the page as a document', () => {
     expect(page).toContain('.link.toned { color: var(--tone); }')
   })
 
+  test('a graph that runs right is drawn with its layers side by side, a link leaving a box by its right side and reaching the next by its left', () => {
+    const graph = readGraph({ nodes: ['a', 'b', 'c'].map(id => ({ id, label: id })), links: [{ from: 'a', to: 'b' }, { from: 'a', to: 'c' }] })
+    const page = pageOf(graph, '', 'right')
+    const [a, b, c] = boxes(page)
+    expect((b?.x ?? 0) > (a?.right ?? 0) && b?.x === c?.x && (c?.y ?? 0) > (b?.bottom ?? 0)).toBe(true)
+    const [toB] = links(page)
+    expect(toB?.xs[0]).toBe(a?.right)
+    expect(toB?.tip.x).toBe(b?.x)
+  })
+
   test('what a graph and a title say is escaped, a tone the page does not know is drawn plain, and an id is never written', () => {
     const id = '"><img src=x>'
     const graph = readGraph({

@@ -35,7 +35,7 @@ graphlet is a Claude Code mod that draws graphs, nodes and the links between the
                                                           html ↗
 ```
 
-- **Any graph, directed or not, or both.** The nodes are laid out in layers down the drawing. A directed graph runs along the way its links run, and the link that closes a loop runs back up, dashed. An undirected graph spreads down from the first node it names, and its links have no arrowheads. A graph may have links of both kinds, each drawn as what it is.
+- **Any graph, directed or not, or both.** The nodes are laid out in layers down the drawing, or across it where that fits better, as a pipeline does. A directed graph runs along the way its links run, and the link that closes a loop runs back up, dashed. An undirected graph spreads down from the first node it names, and its links have no arrowheads. A graph may have links of both kinds, each drawn as what it is.
 - **Every link is drawn, and can be followed**, between neighboring layers, past layers, back up, and between two nodes of one layer. One box's links fan out on rows of their own, links from different boxes reach a box at arrowheads, or ticks, of their own, and a link that only crosses another passes over it.
 - **A link can say what it means.** Its label, `yes` or `retry`, is written beside the line where it leaves its box, and the box makes room for it. A mod can give it a tone, as it gives a node one, to paint a failing dependency red or the path it found blue.
 - **It scrolls.** A graph larger than its room is seen through a window that follows the selection, and that the wheel moves.
@@ -68,7 +68,7 @@ Ask for a correction -> Read the request
 
 With the **Graphs in replies** setting off, graphlet adds nothing to the system prompt and draws no block, for a person who wants it only as a library for the mods that use it.
 
-The block is drawn in its place in the reply, with the person's settings, its links always kept separate. A tone in brackets colors its node, a label in bold, `**Valid?**`, is drawn in a heavy frame where not every label is, and words in pipes after an arrow, `->|yes|`, are written on its link. Where links have no direction, Claude writes them as `--`, drawn with no arrowheads, alone or among arrows. The picture fits the reply: a layer too wide for it is folded onto more rows. The picture is still: it does not scroll or take a selection, and a graph that cannot be folded narrow enough counts the nodes past its edge. Under it, `copy` puts the picture on the clipboard as text, and `html ↗` opens the graph as a web page, where all of it can be seen. Where graphlet draws no picture, the block becomes the same picture as plain text. The conversation keeps the block as Claude wrote it.
+The block is drawn in its place in the reply, with the person's settings, its links always kept separate. A tone in brackets colors its node, a label in bold, `**Valid?**`, is drawn in a heavy frame where not every label is, and words in pipes after an arrow, `->|yes|`, are written on its link. Where links have no direction, Claude writes them as `--`, drawn with no arrowheads, alone or among arrows. The picture fits the reply: a layer too wide for it is folded onto more rows, and a graph that fits across the reply in half the rows or fewer, as a pipeline does, runs right. The picture is still: it does not scroll or take a selection, and a graph that cannot be folded narrow enough counts the nodes past its edge. Under it, `copy` puts the picture on the clipboard as text, and `html ↗` opens the graph as a web page, where all of it can be seen. Where graphlet draws no picture, the block becomes the same picture as plain text. The conversation keeps the block as Claude wrote it.
 
 [docs/REPLIES.md](docs/REPLIES.md) has the block's syntax, what the model is told, and why it is a block and not a tool.
 
@@ -141,8 +141,9 @@ While developing, load both from disk: `claude --plugin-dir ./graphlet --plugin-
 - `↺` in a box says the node links to itself.
 - A box with a heavy frame, `┏━┓`, is a node the graph is about: one of the nodes its graph gives the highest priority.
 - The selected node's box has a double frame, and its links, their labels, and the boxes they reach are lit.
+- A graph that runs right reads the same way turned: its layers stand side by side, a solid line runs with the flow across the drawing, a dashed one back, and a link's label is written on its line, just past the box it leaves.
 
-A click on a box selects its node. Once the graph has been clicked it has the keyboard, and the arrow keys, or `h` `j` `k` `l`, move the selection: left and right along a layer, up and down along a link. Return, or a double click on a box, opens the node, for the mod that owns the pane to act on: to go to the file it stands for, say. `c` copies the whole graph as plain text, to paste into a pull request or a chat.
+A click on a box selects its node. Once the graph has been clicked it has the keyboard, and the arrow keys, or `h` `j` `k` `l`, move the selection: left and right along a layer, up and down along a link; in a graph that runs right, the other way round. Return, or a double click on a box, opens the node, for the mod that owns the pane to act on: to go to the file it stands for, say. `c` copies the whole graph as plain text, to paste into a pull request or a chat.
 
 A graph too large to take in has two more keys:
 
@@ -205,7 +206,6 @@ It reads no file, stores nothing between sessions, calls no model, and makes no 
 - It draws pictures in the terminal only. Elsewhere a reply's graph is plain text, and a pane's is not drawn.
 - A graph in a reply is still. It does not scroll or take a selection; its web page shows all of it.
 - Where an organization manages Claude Code, the engine adds graphlet's section to the system prompt only if the organization lists graphlet in managed settings. Otherwise Claude is not told of graph blocks there, though graphlet still draws one Claude writes.
-- Layers run top to bottom only.
 - A graph has at most 1000 nodes and 2000 links, and a pane holds one. What is past those is left out, and the row under the graph says how much.
 - Where links between two layers must each pass over another and there is no free column to step one aside at, or a window slides two layers so that more of them need stepping aside than the rows between allow, two of them may share a stretch of line. Selecting a node lights its own.
 - A character is taken to be as wide as Unicode says a terminal draws it: two cells for the wide characters of East Asian scripts and for emoji, none for a mark on the character before it. A terminal or font that draws a character at another width pushes its row out of line.

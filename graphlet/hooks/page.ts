@@ -3,6 +3,7 @@ import { sizeOf } from './draw'
 import { layersOf } from './layers'
 import type { Graph, Link, Node, Slot } from './layers'
 import { labelOf, linesOf } from './layout'
+import type { Direction } from './layout'
 
 // The page: a graph as one HTML document that draws it in SVG, in the layers
 // and the order the terminal's picture has. The document fetches nothing,
@@ -212,12 +213,15 @@ const escaped = (text: string): string => text.replace(/[&<>"']/g, char => ESCAP
 /** A point of the drawing. */
 type Point = { x: number; y: number }
 
+/** A point as a layout has it: how far across its layers, and how far along them, which running right are down the page and across it. */
+type At = { across: number; along: number }
+
 /**
  * A slot where it stands in the drawing: its layer, the rectangle it takes
- * there, and for a node the lines of its label. A node's rectangle is its
- * box, and a lane's is the strip its link runs along.
+ * there, across and along, and for a node the lines of its label. A node's
+ * rectangle is its box, and a lane's is the strip its link runs along.
  */
-type Spot = { slot: Slot; layer: number; x: number; y: number; width: number; height: number; lines: string[] }
+type Spot = { slot: Slot; layer: number; across: number; along: number; wide: number; long: number; lines: string[] }
 
 /**
  * A link as it is drawn: the path of its shaft, the point where it reaches
@@ -229,7 +233,8 @@ type Arrow = { path: string; tip: Point; way: Point; middle: Point; isUp: boolea
 
 const widthOf = (text: string): number => sizeOf(text) * CHAR_WIDTH
 
-const middleOf = (spot: Spot): number => spot.x + spot.width / 2
+/** The middle of a spot, across its layer. */
+const middleOf = (spot: Spot): number => spot.across + spot.wide / 2
 
 /** The width of a node's box: its widest line, the mark counted with the first and the badge with the last, and the room around it. */
 function boxWidth(node: GraphletNode, lines: string[]): number {
@@ -243,37 +248,54 @@ function boxWidth(node: GraphletNode, lines: string[]): number {
 }
 
 /**
- * Every slot where it stands: the slots of a layer side by side in their
- * order, the layer in the middle of the widest one and as tall as its
- * tallest label, and the layers one under another.
+ * Every slot where it stands: the slots of a layer side by side across it
+ * in their order, the layer in the middle of the widest one, and the layers
+ * one after another along. Running down, a layer's boxes are as tall as its
+ * tallest label; running right, as wide as its widest box, a lane across it
+ * as wide as they are.
  */
-function spotsOf(slots: Slot[][]): Spot[] {
+function spotsOf(slots: Slot[][], direction: Direction): Spot[] {
+  const isRight = direction === 'right'
   const sized = slots.map(row =>
     row.map(slot => {
       const lines = 'node' in slot ? linesOf(slot.node.label) : []
-      return { slot, lines, width: 'node' in slot ? boxWidth(slot.node, lines) : LANE_WIDTH }
+      return { slot, lines, width: 'node' in slot ? boxWidth(slot.node, lines) : LANE_WIDTH, height: Math.max(1, lines.length) * LINE_HEIGHT + 2 * BOX_PADDING.y }
     }),
   )
-  const lengthOf = (row: Array<{ width: number }>): number => row.reduce((sum, one) => sum + one.width + GAP.x, -GAP.x)
+  const wideOf = (one: { width: number; height: number; slot: Slot }): number => (!isRight ? one.width : 'node' in one.slot ? one.height : LANE_WIDTH)
+  const lengthOf = (row: Array<{ width: number; height: number; slot: Slot }>): number => row.reduce((sum, one) => sum + wideOf(one) + GAP.x, -GAP.x)
   const widest = Math.max(0, ...sized.map(lengthOf))
-  let y = MARGIN
+  let along = MARGIN
   return sized.flatMap((row, layer) => {
-    const height = Math.max(1, ...row.map(one => one.lines.length)) * LINE_HEIGHT + 2 * BOX_PADDING.y
-    let x = MARGIN + Math.round((widest - lengthOf(row)) / 2)
+    const long = isRight ? Math.max(LANE_WIDTH, ...row.filter(one => 'node' in one.slot).map(one => one.width)) : Math.max(...row.map(one => one.height), 2 * BOX_PADDING.y + LINE_HEIGHT)
+    let across = MARGIN + Math.round((widest - lengthOf(row)) / 2)
     const spots = row.map(one => {
-      const spot: Spot = { ...one, layer, x, y, height }
-      x += one.width + GAP.x
+      const spot: Spot = { slot: one.slot, lines: one.lines, layer, across, along, wide: wideOf(one), long }
+      across += spot.wide + GAP.x
       return spot
     })
-    y += height + GAP.y
+    along += long + GAP.y
     return spots
   })
 }
 
-/** A curve from one point to another that leaves the first and reaches the second straight up or down. */
-function curveOf(from: Point, to: Point): string {
-  const turn = (from.y + to.y) / 2
-  return `C${from.x},${turn} ${to.x},${turn} ${to.x},${to.y}`
+/**
+ * The drawing's own geometry for a direction: where a point across and
+ * along stands on the page, and a curve between two points that leaves the
+ * first and reaches the second straight along the layers.
+ */
+type Turning = { pointOf: (at: At) => Point; curveOf: (from: At, to: At) => string }
+
+const turningOf = (direction: Direction): Turning => {
+  const pointOf = (at: At): Point => (direction === 'right' ? { x: at.along, y: at.across } : { x: at.across, y: at.along })
+  return {
+    pointOf,
+    curveOf: (from, to) => {
+      const turn = (from.along + to.along) / 2
+      const [a, b, c] = [pointOf({ across: from.across, along: turn }), pointOf({ across: to.across, along: turn }), pointOf(to)]
+      return `C${a.x},${a.y} ${b.x},${b.y} ${c.x},${c.y}`
+    },
+  }
 }
 
 /** The corners of an arrowhead with its tip at `tip`, pointing along `way`: a step of one across, down, or up. */
@@ -286,74 +308,90 @@ function headOf(tip: Point, way: Point): string {
 /**
  * A link between two layers: a curve across each gap between two layers, and
  * straight along each lane it has in the layers it passes, stopping `short`
- * of its box. Down the page it leaves the bottom of a box and reaches the top
- * of one, by their middles; back up it does the reverse, by the ports beside
- * them; and `aside` farther out, down to the left and back up to the right.
+ * of its box. Along the page it leaves the far side of a box and reaches the
+ * near side of one, by their middles; back it does the reverse, by the ports
+ * beside them; and `aside` farther out, the way it runs to one side and back
+ * to the other.
  */
-function runOf(from: Spot, lanes: Spot[], to: Spot, isUp: boolean, short: number, aside: number): Arrow {
+function runOf(turning: Turning, from: Spot, lanes: Spot[], to: Spot, isUp: boolean, short: number, aside: number): Arrow {
   const way = isUp ? -1 : 1
   const port = isUp ? PORT_STEP + aside : -aside
-  const nearOf = (spot: Spot): number => (isUp ? spot.y + spot.height : spot.y)
-  const farOf = (spot: Spot): number => (isUp ? spot.y : spot.y + spot.height)
-  const tip = { x: middleOf(to) + port, y: nearOf(to) }
-  let at = { x: middleOf(from) + port, y: farOf(from) }
-  const [next = tip] = lanes.map(lane => ({ x: middleOf(lane), y: nearOf(lane) }))
-  const middle = { x: (at.x + next.x) / 2, y: (at.y + next.y) / 2 }
-  let path = `M${at.x},${at.y}`
+  const nearOf = (spot: Spot): number => (isUp ? spot.along + spot.long : spot.along)
+  const farOf = (spot: Spot): number => (isUp ? spot.along : spot.along + spot.long)
+  const tip: At = { across: middleOf(to) + port, along: nearOf(to) }
+  let at: At = { across: middleOf(from) + port, along: farOf(from) }
+  const [next = tip] = lanes.map(lane => ({ across: middleOf(lane), along: nearOf(lane) }))
+  const middle = turning.pointOf({ across: (at.across + next.across) / 2, along: (at.along + next.along) / 2 })
+  const start = turning.pointOf(at)
+  let path = `M${start.x},${start.y}`
   for (const lane of lanes) {
-    path += `${curveOf(at, { x: middleOf(lane), y: nearOf(lane) })}L${middleOf(lane)},${farOf(lane)}`
-    at = { x: middleOf(lane), y: farOf(lane) }
+    const end = turning.pointOf({ across: middleOf(lane), along: farOf(lane) })
+    path += `${turning.curveOf(at, { across: middleOf(lane), along: nearOf(lane) })}L${end.x},${end.y}`
+    at = { across: middleOf(lane), along: farOf(lane) }
   }
-  path += curveOf(at, { x: tip.x, y: tip.y - way * short })
-  return { path, tip, way: { x: 0, y: way }, middle, isUp }
+  path += turning.curveOf(at, { across: tip.across, along: tip.along - way * short })
+  return { path, tip: turning.pointOf(tip), way: turning.pointOf({ across: 0, along: way }), middle, isUp }
 }
 
-/** A link between two nodes of one layer: an arc under the layer, `aside` deeper, out of the middle of the first box's bottom and up into the port beside the second's, stopping `short` of it. */
-function arcOf(from: Spot, to: Spot, short: number, aside: number): Arrow {
-  const [y, depth] = [from.y + from.height, ARC_DEPTH + aside]
+/** A link between two nodes of one layer: an arc past the layer, `aside` deeper, out of the middle of the first box's far side and back into the port beside the second's, stopping `short` of it. */
+function arcOf(turning: Turning, from: Spot, to: Spot, short: number, aside: number): Arrow {
+  const [along, depth] = [from.along + from.long, ARC_DEPTH + aside]
   const [out, into] = [middleOf(from), middleOf(to) + PORT_STEP]
-  const path = `M${out},${y}C${out},${y + depth} ${into},${y + depth} ${into},${y + short}`
-  return { path, tip: { x: into, y }, way: { x: 0, y: -1 }, middle: { x: (out + into) / 2, y: y + depth * 0.75 }, isUp: false }
+  const points = [{ across: out, along }, { across: out, along: along + depth }, { across: into, along: along + depth }, { across: into, along: along + short }].map(turning.pointOf)
+  const [first, ...rest] = points as [Point, Point, Point, Point]
+  const path = `M${first.x},${first.y}C${rest.map(point => `${point.x},${point.y}`).join(' ')}`
+  const middle = turning.pointOf({ across: (out + into) / 2, along: along + depth * 0.75 })
+  return { path, tip: turning.pointOf({ across: into, along }), way: turning.pointOf({ across: 0, along: -1 }), middle, isUp: false }
 }
 
-/** A link from a node to itself: a loop out of the right side of its box, reaching `aside` farther, and back into it, stopping `short` of it. */
-function loopOf(spot: Spot, short: number, aside: number): Arrow {
-  const [x, reach] = [spot.x + spot.width, LOOP.reach + aside]
-  const [out, into] = [spot.y + (spot.height - LOOP.span) / 2, spot.y + (spot.height + LOOP.span) / 2]
-  const path = `M${x},${out}C${x + reach},${out} ${x + reach},${into} ${x + short},${into}`
-  return { path, tip: { x, y: into }, way: { x: -1, y: 0 }, middle: { x: x + reach * 0.75, y: (out + into) / 2 }, isUp: false }
+/** A link from a node to itself: a loop out of the far side of its box across its layer, reaching `aside` farther, and back into it, stopping `short` of it. */
+function loopOf(turning: Turning, spot: Spot, short: number, aside: number): Arrow {
+  const [across, reach] = [spot.across + spot.wide, LOOP.reach + aside]
+  const [out, into] = [spot.along + (spot.long - LOOP.span) / 2, spot.along + (spot.long + LOOP.span) / 2]
+  const points = [{ across, along: out }, { across: across + reach, along: out }, { across: across + reach, along: into }, { across: across + short, along: into }].map(turning.pointOf)
+  const [first, ...rest] = points as [Point, Point, Point, Point]
+  const path = `M${first.x},${first.y}C${rest.map(point => `${point.x},${point.y}`).join(' ')}`
+  const middle = turning.pointOf({ across: across + reach * 0.75, along: (out + into) / 2 })
+  return { path, tip: turning.pointOf({ across, along: into }), way: turning.pointOf({ across: -1, along: 0 }), middle, isUp: false }
 }
 
 /**
  * A link as it is drawn between the boxes of its two ends: a loop, an arc, or
  * a run through its lanes in the order it passes them, `aside` from where it
  * would run. A link that runs one way stops short of its box by the length
- * of an arrowhead; one that runs no way reaches the box, and runs down the
+ * of an arrowhead; one that runs no way reaches the box, and runs along the
  * page whichever way round it names its ends.
  */
-function arrowOf(link: Link, from: Spot, to: Spot, spots: Spot[], aside: number): Arrow {
+function arrowOf(turning: Turning, link: Link, from: Spot, to: Spot, spots: Spot[], aside: number): Arrow {
   const { isDirected } = link
   const short = isDirected ? HEAD.length : 0
-  if (from === to) return loopOf(from, short, aside)
-  if (from.layer === to.layer) return arcOf(from, to, short, aside)
+  if (from === to) return loopOf(turning, from, short, aside)
+  if (from.layer === to.layer) return arcOf(turning, from, to, short, aside)
   const isUp = from.layer > to.layer
   const lanes = spots.filter(spot => 'lane' in spot.slot && spot.slot.lane.includes(link))
-  if (isUp && !isDirected) return runOf(to, lanes, from, false, short, aside)
-  return runOf(from, isUp ? lanes.toReversed() : lanes, to, isUp, short, aside)
+  if (isUp && !isDirected) return runOf(turning, to, lanes, from, false, short, aside)
+  return runOf(turning, from, isUp ? lanes.toReversed() : lanes, to, isUp, short, aside)
+}
+
+/** Where a spot's rectangle is on the page. */
+const rectOf = (turning: Turning, spot: Spot): { x: number; y: number; width: number; height: number } => {
+  const [start, end] = [turning.pointOf(spot), turning.pointOf({ across: spot.across + spot.wide, along: spot.along + spot.long })]
+  return { x: start.x, y: start.y, width: end.x - start.x, height: end.y - start.y }
 }
 
 /** A node as it is drawn: its box in its tone, heavy and its words bold where the graph puts it foremost, and in it its mark, the lines of its label, and its badge. */
-function boxOf(node: Node, spot: Spot): string {
+function boxOf(turning: Turning, node: Node, spot: Spot): string {
   const tone = TONES.find(one => one === node.tone) ?? 'plain'
-  const first = spot.y + (spot.height - (spot.lines.length - 1) * LINE_HEIGHT) / 2 + BASELINE
+  const rect = rectOf(turning, spot)
+  const first = rect.y + (rect.height - (spot.lines.length - 1) * LINE_HEIGHT) / 2 + BASELINE
   const lines = spot.lines.map((line, index) => {
     const mark = index > 0 || node.mark === undefined ? '' : `<tspan class="mark">${escaped(node.mark)}</tspan>`
     const label = mark === '' ? escaped(line) : `<tspan dx="${WORD_GAP}">${escaped(line)}</tspan>`
     const isLast = index === spot.lines.length - 1
     const badge = !isLast || node.badge === undefined ? '' : `<tspan class="badge" dx="${WORD_GAP}">${escaped(node.badge)}</tspan>`
-    return `<tspan x="${middleOf(spot)}" y="${first + index * LINE_HEIGHT}">${mark}${label}${badge}</tspan>`
+    return `<tspan x="${rect.x + rect.width / 2}" y="${first + index * LINE_HEIGHT}">${mark}${label}${badge}</tspan>`
   })
-  const box = `<rect class="box" x="${spot.x}" y="${spot.y}" width="${spot.width}" height="${spot.height}" rx="${BOX_RADIUS}"/>`
+  const box = `<rect class="box" x="${rect.x}" y="${rect.y}" width="${rect.width}" height="${rect.height}" rx="${BOX_RADIUS}"/>`
   return `<g class="node ${tone}${node.isForemost ? ' foremost' : ''}" tabindex="0">${box}<text>${lines.join('')}</text></g>`
 }
 
@@ -364,11 +402,12 @@ function boxOf(node: Node, spot: Spot): string {
  * terminal cuts it, written on its first stretch, and moved down past any
  * label written there before it; and over them every node, in the graph's
  * order. A link between the same two boxes as one before it, running the
- * same way, down the page or up it, runs `TWIN_STEP` farther aside for each.
+ * same way, along the page or back, runs `TWIN_STEP` farther aside for each.
  * A link from a node to itself has no label written, as in the terminal.
  */
-function drawingOf(graph: Graph): string {
-  const spots = spotsOf(layersOf(graph).slots)
+function drawingOf(graph: Graph, direction: Direction): string {
+  const turning = turningOf(direction)
+  const spots = spotsOf(layersOf(graph).slots, direction)
   const places = new Map<string, { index: number; spot: Spot }>()
   graph.nodes.forEach((node, index) => {
     const spot = spots.find(one => 'node' in one.slot && one.slot.node.id === node.id)
@@ -381,7 +420,7 @@ function drawingOf(graph: Graph): string {
     const pair = JSON.stringify([isUp, ...[link.from, link.to].sort()])
     const twin = twins.get(pair) ?? 0
     twins.set(pair, twin + 1)
-    return from === undefined || to === undefined ? [] : [{ link, from, to, arrow: arrowOf(link, from.spot, to.spot, spots, twin * TWIN_STEP) }]
+    return from === undefined || to === undefined ? [] : [{ link, from, to, arrow: arrowOf(turning, link, from.spot, to.spot, spots, twin * TWIN_STEP) }]
   })
   const written: Array<{ x: number; y: number; width: number }> = []
   const writtenAt = new Map<Link, Point>()
@@ -403,19 +442,20 @@ function drawingOf(graph: Graph): string {
   })
   const nodes = graph.nodes.flatMap(node => {
     const place = places.get(node.id)
-    return place === undefined ? [] : [boxOf(node, place.spot)]
+    return place === undefined ? [] : [boxOf(turning, node, place.spot)]
   })
-  const width = Math.max(...spots.map(spot => spot.x + spot.width)) + MARGIN
-  const height = Math.max(...spots.map(spot => spot.y + spot.height)) + MARGIN
+  const rects = spots.map(spot => rectOf(turning, spot))
+  const width = Math.max(...rects.map(rect => rect.x + rect.width)) + MARGIN
+  const height = Math.max(...rects.map(rect => rect.y + rect.height)) + MARGIN
   return `<svg viewBox="0 0 ${width} ${height}">\n${[...links, ...nodes].join('\n')}\n</svg>`
 }
 
-/** The graph as a web page: one self-contained HTML document. */
-export function pageOf(graph: Graph, title: string): string {
+/** The graph as a web page: one self-contained HTML document, the graph running the way its picture in the terminal runs. */
+export function pageOf(graph: Graph, title: string, direction: Direction = 'down'): string {
   const body =
     graph.nodes.length === 0
       ? '<p>Nothing to draw: the graph has no nodes.</p>'
-      : `<main>\n${drawingOf(graph)}\n</main>\n<script>${SCRIPT}</script>`
+      : `<main>\n${drawingOf(graph, direction)}\n</main>\n<script>${SCRIPT}</script>`
   return `<!doctype html>
 <html>
 <head>

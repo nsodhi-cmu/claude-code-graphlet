@@ -2,7 +2,7 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import { LOOK, SHOP, cellsOf, graphOf, graphRows, numbers, picture, undirected } from './fixture'
 import type { GraphletLink } from '../types'
-import { BEATS, piecesOf } from '../hooks/draw'
+import { BEATS, piecesOf, sizeOf } from '../hooks/draw'
 import type { Drawing, Hit, Span } from '../hooks/draw'
 import { readGraph } from '../hooks/layers'
 import type { Graph } from '../hooks/layers'
@@ -56,6 +56,7 @@ describe('the drawing', () => {
     const graph = readGraph({
       nodes: [{ id: 'A', label: 'A' }, { id: 'B', label: 'Build', priority: 1 }, { id: 'C', label: 'C' }],
       links: [{ from: 'A', to: 'B' }, { from: 'B', to: 'C' }, { from: 'B', to: 'A' }, { from: 'C', to: 'B', isDirected: false }],
+      direction: 'down',
     })
     expect(graphRows(drawn(graph))).toEqual([
       '                ┌─────┐',
@@ -743,6 +744,60 @@ describe('lines that flow', () => {
   })
 })
 
+describe('a graph that runs right', () => {
+  const loop = readGraph({ nodes: ['A', 'B', 'C'].map(id => ({ id, label: id })), links: [{ from: 'A', to: 'B' }, { from: 'B', to: 'C' }, { from: 'C', to: 'A' }], direction: 'right' })
+  const ROOM = { columns: 40, rows: 20 }
+
+  test('its layers stand side by side, each a column of boxes, its links run across the room into arrowheads that point right, and the link that closes a loop runs back dashed, along a lane past the layer between', () => {
+    expect(graphRows(drawn(loop, null, ROOM))).toEqual([
+      '┌─────┐   ┌─────┐  ┌─────┐',
+      '│     ├──▶│  B  ├─▶│     │',
+      '│  A  │   └─────┘  │  C  │',
+      '│     │◀┐        ┌┈┤     │',
+      '└─────┘ └┈┈┈┈┈┈┈┈┘ └─────┘',
+    ])
+  })
+
+  test('the selected box has a double frame its links leave through, and flowing, beads run along each lit line the way its link runs, back across the room too', () => {
+    const flowing = viewOf({ ...LOOK, motion: 'flowing' }).draw(loop, 'C', ROOM, ORIGIN)
+    const beadsAt = (step: number): string[] =>
+      graphRows({ ...flowing, rows: flowing.rows.map(row => row.flatMap(span => piecesOf(span, step).map(piece => ({ ...span, text: piece.glow === 'bright' ? '•'.repeat(cellsOf(piece.text).length) : piece.text })))) })
+    expect(beadsAt(0)).toEqual([
+      '┌─────┐   ┌─────┐  ╔═════╗',
+      '│     ├──▶│  B  ├─▶║     ║',
+      '│  A  │   └─────┘  ║  C  ║',
+      '│     │◀•        ┌┈╢     ║',
+      '└─────┘ •┈┈┈•┈┈┈•┘ ╚═════╝',
+    ])
+    expect(beadsAt(1)).toEqual([
+      '┌─────┐   ┌─────┐  ╔═════╗',
+      '│     ├──▶│  B  ├•▶║     ║',
+      '│  A  │   └─────┘  ║  C  ║',
+      '│     │◀┐        ┌┈╢     ║',
+      '└─────┘ └┈┈•┈┈┈•┈┘ ╚═════╝',
+    ])
+  })
+
+  test('a link\'s label lies on its own line, just past the box it leaves, and a box makes room down its side for its ports, its label in the middle', () => {
+    const graph = readGraph({
+      nodes: ['Valid?', 'Save', 'Ask again'].map(id => ({ id, label: id })),
+      links: [{ from: 'Valid?', to: 'Save', label: 'yes' }, { from: 'Valid?', to: 'Ask again', label: 'no' }, { from: 'Ask again', to: 'Valid?', label: 'retry' }],
+      direction: 'right',
+    })
+    expect(graphRows(drawn(graph, null, ROOM))).toEqual([
+      '                     ┌──────┐',
+      '              ┌─────▶│ Save │',
+      '┌────────┐    │      └──────┘',
+      '│        ├yes─┘',
+      '│        │           ┌───────────┐',
+      '│ Valid? ├no────────▶│           │',
+      '│        │           │ Ask again │',
+      '│        │◀┈┈┈┈┈retry┤           │',
+      '└────────┘           └───────────┘',
+    ])
+  })
+})
+
 describe('what the window does not show', () => {
   const graph = graphOf(
     ['Checkout', 'Cart', 'Payments', 'Shipping', 'Receipts', 'Ledger'],
@@ -1112,7 +1167,7 @@ describe('what a picture says', () => {
       ),
     })
   }
-  const anyGraph = (run: number): Graph => [someGraph, crowdedGraph, facingGraph][run % 3]?.() ?? someGraph()
+  const anyGraph = (run: number): Graph => ({ ...([someGraph, crowdedGraph, facingGraph][run % 3]?.() ?? someGraph()), direction: 'down' })
   const someLook = (scroll = pick(2) === 0 ? 'pinned' : 'sheet'): Look => ({ scroll: scroll as Look['scroll'], labels: pick(3) === 0 ? 'clip' : 'wrap', links: 'separate', motion: 'still' })
 
   /** How long a test that reads many pictures may take: a slow machine's while. */
@@ -1129,6 +1184,47 @@ describe('what a picture says', () => {
       const said = readOff(graph, layout, drawing, place => place.x - slideOf(layout, layout.shelves[place.shelf], 0))
       expect(said.loose).toEqual([])
       expect(said.labels).toEqual([])
+      expect(said.links).toEqual([...new Set(linksOf(graph, layout))])
+    }
+  })
+
+  /** Each character of a picture of a graph that runs right, as it would be drawn running down: its lines turned, every line one way where it ran the other. */
+  const TURNED: Readonly<Record<string, string>> = {
+    ...Object.fromEntries([...'─│┈┊┐└├┬┤┴◀▲▶▼┠┯┨┷╟╤╢╧━┃═║┓┗╗╚'].flatMap((char, index, all) => (index % 2 === 0 ? [[char, all[index + 1]], [all[index + 1], char]] : []))),
+    '▲': '◀',
+    '▼': '▶',
+  }
+
+  test('a graph drawn running right says every link it has, in every channel the link crosses, and no link it does not have, and writes each label on its own link\'s line', READING, () => {
+    for (let run = 0; run < 400; run += 1) {
+      const graph: Graph = { ...anyGraph(run), direction: 'right' }
+      const look = someLook()
+      const laid = layoutOf(graph, { columns: 1000, rows: 4 + pick(60) }, look, false, 'right')
+      const layout = { ...laid, columns: Math.max(laid.columns, ...laid.shelves.map(shelf => shelf.across)) }
+      const drawing = paint(layout, graph, null, { columns: layout.rows, rows: layout.columns + 1 }, ORIGIN)
+      const real = picture(drawing).slice(0, -1).map(cellsOf)
+      const turned = Array.from({ length: layout.rows }, (_, along) => Array.from({ length: layout.columns }, (_, across) => TURNED[real[across]?.[along] ?? ' '] ?? real[across]?.[along] ?? ' '))
+      const xOf = (place: Place): number => place.x - slideOf(layout, layout.shelves[place.shelf], 0)
+      for (const shelf of layout.shelves) {
+        for (const place of shelf.places.filter(one => 'node' in one.slot)) {
+          for (let along = shelf.top + 1; along < shelf.top + place.rows - 1; along += 1) {
+            for (let across = xOf(place) + 1; across < xOf(place) + place.width - 1; across += 1) (turned[along] ?? [])[across] = ' '
+          }
+        }
+      }
+      for (const channel of layout.channels) {
+        for (const wire of channel.wires) {
+          const text = labelOf(wire.link)
+          if (text === '' || 'lane' in wire.from.place.slot) continue
+          const shelf = layout.shelves[wire.from.place.shelf]
+          const border = wire.from.isAbove ? (shelf?.top ?? 0) + wire.from.place.rows - 1 : channel.top + channel.rows
+          const [start, port] = [wire.from.isAbove ? border + 1 : border - sizeOf(text), xOf(wire.from.place) + wire.from.at]
+          expect(real[port]?.slice(start, start + sizeOf(text)).join('')).toBe(text)
+          for (let along = start; along < start + sizeOf(text); along += 1) (turned[along] ?? [])[port] = wire.isUp ? '┊' : '│'
+        }
+      }
+      const said = readOff(graph, layout, { rows: [...turned.map(row => [{ text: row.join(''), paint: 'plain' as const }]), []], hits: [] }, xOf)
+      expect(said.loose).toEqual([])
       expect(said.links).toEqual([...new Set(linksOf(graph, layout))])
     }
   })
@@ -1162,7 +1258,7 @@ describe('what a picture says', () => {
       for (let x = 0; x <= sightOf(layout, room).most.x; x += 1) {
         const drawing = paint(layout, graph, null, { columns: room.columns, rows: layout.rows + 1 }, { x, y: 0 })
         for (const channel of layout.channels) {
-          const tracks = channel.rows - Number(channel.hasTopRow) - Number(channel.hasBottomRow)
+          const tracks = channel.rows - channel.topRows - channel.bottomRows
           for (const wire of channel.wires) expect(Math.max(wire.track, wire.jog?.track ?? 0)).toBeLessThan(Math.max(1, tracks))
         }
         const said = readOff(graph, layout, drawing, place => place.x - slideOf(layout, layout.shelves[place.shelf], x), true)

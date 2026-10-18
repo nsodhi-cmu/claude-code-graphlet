@@ -108,7 +108,7 @@ test('a block whose links are all dashes is an undirected graph; in any other, a
   expect(mixed.isDirected).toBeUndefined()
   expect(mixed.links.map(link => `${link.from} ${link.isDirected === false ? '–' : '→'} ${link.to}`)).toEqual(['A → B', 'B – C', 'C → D', 'D → C', 'D → A', 'A → D', 'A → E', 'E → F'])
   expect(picture(pictureOf(still, readGraph(friends), { columns: 80, rows: 1000 })).join('\n')).not.toMatch(/[▲▼]/)
-  expect(picture(pictureOf(still, readGraph(graphOf(['Client -> API -> Database', 'API -- Cache', 'Cache -- Database'])), { columns: 60, rows: 1000 }))).toEqual([
+  expect(picture(pictureOf(still, readGraph({ ...graphOf(['Client -> API -> Database', 'API -- Cache', 'Cache -- Database']), direction: 'down' }), { columns: 60, rows: 1000 }))).toEqual([
     ' ┌────────┐',
     ' │ Client │',
     ' └────┬───┘',

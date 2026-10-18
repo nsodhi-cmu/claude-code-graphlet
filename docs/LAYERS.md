@@ -38,7 +38,7 @@ So a directed graph runs down the drawing from where it starts, and the link of 
 
 ### Folding Into A Room
 
-A graph drawn still, in a reply, cannot scroll, so its layers are folded into the room it has before anything else is laid out. `layersOf` is then given a `Fold`: the columns a layer may take, how wide each node's box is, and the gap between two neighbors. A layer's width is its boxes and the gaps between them, and a column for each lane that passes through it.
+A graph drawn still, in a reply, cannot scroll, so its layers are folded into the room it has before anything else is laid out. A graph that runs right is never folded: it runs right only where it fits as it is. `layersOf` is then given a `Fold`: the columns a layer may take, how wide each node's box is, and the gap between two neighbors. A layer's width is its boxes and the gaps between them, and a column for each lane that passes through it.
 
 `folded` goes down the layers from the top. A layer too wide for the room gives up a node at a time until it fits, has one node left, or giving up any of those left would not make it narrower, the lanes its links would then take past the layer being as wide as its box:
 

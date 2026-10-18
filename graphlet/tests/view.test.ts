@@ -27,6 +27,7 @@ test('any graph, in any room, under any settings, is drawn inside its room with 
       })),
       links: Array.from({ length: pick(count * 2 + 1) }, () => ({ from: `n${pick(count)}`, to: `n${pick(count)}` })),
       isDirected: run % 3 !== 1,
+      ...([{}, { direction: 'down' as const }, { direction: 'right' as const }][pick(3)] ?? {}),
     })
     const view = viewOf(LOOKS[pick(LOOKS.length)] ?? { scroll: 'pinned', labels: 'wrap', links: 'separate', motion: 'still' })
     const room = { columns: 40 + pick(140), rows: 2 + pick(50) }
@@ -86,4 +87,17 @@ test('in focus, of the nodes as near the selected one, those of highest priority
     links: leaves.map(id => ({ from: 'hub', to: id })),
   })
   expect(focusOf(star, 'hub').nodes.map(node => node.id)).toEqual(['hub', ...leaves.slice(1, FOCUS_NODES - 1), 'leaf29'])
+})
+
+test('a graph that says not which way it runs runs right where that fits its room\'s columns in half the rows or fewer, or fits its room whole where running down does not, and else down', () => {
+  const view = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate', motion: 'still' })
+  const chain = readGraph({ nodes: ['lint', 'test', 'build', 'deploy'].map(id => ({ id, label: id })), links: [['lint', 'test'], ['test', 'build'], ['build', 'deploy']].map(([from = '', to = '']) => ({ from, to })) })
+  const fan = readGraph({ nodes: ['root', 'a', 'b'].map(id => ({ id, label: id })), links: [{ from: 'root', to: 'a' }, { from: 'root', to: 'b' }] })
+  expect(view.direction(chain, { columns: 80, rows: 40 })).toBe('right')
+  expect(view.direction(chain, { columns: 30, rows: 40 })).toBe('down')
+  expect(view.direction(fan, { columns: 80, rows: 40 })).toBe('down')
+  expect(view.direction(fan, { columns: 80, rows: 8 })).toBe('right')
+  expect(view.direction({ ...chain, direction: 'down' }, { columns: 80, rows: 40 })).toBe('down')
+  expect(view.direction({ ...fan, direction: 'right' }, { columns: 20, rows: 40 })).toBe('right')
+  expect(view.measure(chain, 80)).toEqual({ columns: 41, rows: 4 })
 })

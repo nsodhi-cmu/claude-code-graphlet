@@ -80,6 +80,9 @@ export type Drawing = { rows: Span[][]; hits: Hit[] }
 /** The room a drawing may take, in cells. */
 export type Room = { columns: number; rows: number }
 
+/** The most columns, and the most rows, a room is taken to have. */
+export const MOST_CELLS = 1000
+
 /**
  * Where a window `size` long over `total` stands to show `start` to `end`. A
  * window at `from` that already shows them stays there; one that does not

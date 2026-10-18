@@ -1,4 +1,4 @@
-import type { GraphletGraph, GraphletLink, GraphletNode, GraphletTone } from '../types'
+import type { GraphletDirection, GraphletGraph, GraphletLink, GraphletNode, GraphletTone } from '../types'
 
 // A graph in layers: every node in a row of the drawing, every link cut into
 // the stretches that cross from one layer to the next, with a lane kept for
@@ -14,10 +14,10 @@ export type Link = GraphletLink & { isDirected: boolean }
 
 /**
  * A graph as it is drawn: every node once, every link once, between two of
- * its nodes, and how many nodes and links it was given past the most that
- * are read, which are left out.
+ * its nodes, how many nodes and links it was given past the most that are
+ * read, which are left out, and which way it runs, where it says.
  */
-export type Graph = { nodes: Node[]; links: Link[]; unread: { nodes: number; links: number } }
+export type Graph = { nodes: Node[]; links: Link[]; unread: { nodes: number; links: number }; direction?: GraphletDirection }
 
 /** How many times the layers are ordered against their neighbors, down and back up, before the best ordering is kept. */
 const SWEEPS = 4
@@ -44,7 +44,7 @@ const tidy = (text: unknown): string =>
  * link runs one way unless it says it does not, or says nothing in a graph
  * that says its links do not. A link from a node to itself is kept, and
  * drawn as a sign on the node. Nodes and links past the most that are read
- * are left out, and counted.
+ * are left out, and counted. A direction that is neither way is dropped.
  */
 export function readGraph(graph: GraphletGraph): Graph {
   const nodes: GraphletNode[] = []
@@ -88,6 +88,7 @@ export function readGraph(graph: GraphletGraph): Graph {
     nodes: nodes.map(node => ({ ...node, isForemost: priorityOf(node) === top && top > 0 && top > lowest })),
     links,
     unread: { nodes: given.size - nodes.length, links: unreadLinks },
+    ...(graph?.direction === 'down' || graph?.direction === 'right' ? { direction: graph.direction } : {}),
   }
 }
 

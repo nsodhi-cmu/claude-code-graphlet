@@ -1,4 +1,4 @@
-import type { GraphletLink, GraphletNode } from '../types'
+import type { GraphletDirection, GraphletLink, GraphletNode } from '../types'
 import { charactersOf, clipMiddle, fitting, sizeOf } from './draw'
 import type { Room } from './draw'
 import { layersOf, priorityOf } from './layers'
@@ -40,6 +40,27 @@ export type Motion = 'still' | 'flowing'
 export type Look = { scroll: Scroll; labels: Labels; links: Links; motion: Motion }
 
 /**
+ * Which way a graph runs: `down`, its layers one under another, each a row
+ * of boxes; or `right`, its layers side by side, each a column of them. A
+ * layout is worked out the same way for both, across a shelf and along the
+ * layers, and only its picture turns: running right, across is down the
+ * room and along is across it.
+ */
+export type Direction = GraphletDirection
+
+/**
+ * What a direction makes of a layout: the room between two neighbors of a
+ * shelf; how far apart two ports of one face stand, so that a column or a
+ * row between two is free to step a link aside at; and whether a link's
+ * label lies across the face it leaves, beside its port, as it does running
+ * down, or along its line, as it does running right.
+ */
+const GRAINS: Readonly<Record<Direction, { gap: number; portStep: number; isLabelAcross: boolean }>> = {
+  down: { gap: 2, portStep: 2, isLabelAcross: true },
+  right: { gap: 1, portStep: 2, isLabelAcross: false },
+}
+
+/**
  * The most cells a line of a wrapped label takes, the most a word may take
  * and still keep a line to itself, and the most lines a label is wrapped onto.
  */
@@ -54,17 +75,17 @@ const LINK_LABEL_CELLS = 16
 const BOX_PADDING = 4
 /** The narrowest box: one whose two ports stand apart. A shorter label is set in its middle. */
 const BOX_COLUMNS = 7
-/** The room between two neighbors on a shelf. */
-export const GAP = 2
-/** The narrowest room a graph is laid out for: a box of the widest kind, and a little over. */
+/** The room between two neighbors on a shelf of a graph that runs down. */
+export const GAP = GRAINS.down.gap
+/** The narrowest room a graph that runs down is laid out for: a box of the widest kind, and a little over. */
 export const LEAST_COLUMNS = 40
+/** The fewest rows a graph that runs right is laid out across: a room shorter than its boxes shows them through a window that slides down them. */
+const LEAST_ROWS = 1
 /** How many times a folded layout that its boxes' ports still make wider than its room is folded again, narrower by as much as it overflowed. */
 const REFOLDS = 2
 /** The most nodes, and the most links, a graph is folded into its room for: folding more takes long, and makes a picture longer than a reply can hold. */
 const FOLDED_NODES = 60
 const FOLDED_LINKS = 120
-/** How far apart two ports of one face of a box are. */
-const PORT_STEP = 2
 /** How many times the shelves are seated again, after they are first seated, each time down, back up, and against both neighbors at once; each seating tried lays every track again. */
 const RESEATS = 1
 /** How much more a lane's wire weighs than a box's where a shelf is balanced, so that a link through lanes keeps straight before a box sits square. */
@@ -197,13 +218,16 @@ export type Wire = {
 }
 
 /**
- * The rows between two shelves, or under the last: a row for the arrowheads
- * that point up and the labels of the links that leave the shelf above, when
- * there are any, then a row a track, then a row for the arrowheads that point
- * down and the labels of the links that leave the shelf below, when there are
- * any. Its wires turn in bundles, each on a track; with the wires merged it
- * has none, and one track. A channel `isLoose` where its two shelves slide
- * apart under a window.
+ * The rows between two shelves, or under the last: its `topRows`, for the
+ * arrowheads that point up and the labels of the links that leave the shelf
+ * above, when there are any, then a row a track, then its `bottomRows`, for
+ * the arrowheads that point down and the labels of the links that leave the
+ * shelf below, when there are any. Running down, a label lies across a row,
+ * so either is one row; running right, a label lies along its line, so
+ * either is as many as the longest label, and one more. Its wires turn in
+ * bundles, each on a track; with the wires merged it has none, and one
+ * track. A channel `isLoose` where its two shelves slide apart under a
+ * window.
  */
 export type Channel = {
   top: number
@@ -211,12 +235,15 @@ export type Channel = {
   wires: Wire[]
   bundles: Wire[][]
   isLoose: boolean
-  hasTopRow: boolean
-  hasBottomRow: boolean
+  topRows: number
+  bottomRows: number
 }
 
-/** A graph laid out for a room `columns` wide. Channel `n` is under shelf `n`. */
-export type Layout = { shelves: Shelf[]; channels: Channel[]; columns: number; rows: number }
+/**
+ * A graph laid out for a room `columns` across, the way it runs, with `gap`
+ * between two neighbors of a shelf. Channel `n` is under shelf `n`.
+ */
+export type Layout = { shelves: Shelf[]; channels: Channel[]; columns: number; rows: number; direction: Direction; gap: number }
 
 export const middleOf = (place: Place, x: number): number => x + Math.floor(place.width / 2)
 
@@ -318,7 +345,8 @@ function bundlesOf(wires: Wire[], links: Links): Wire[][] {
  * share a port, and so do the wires of one bundle that reach it, so two
  * bundles never run into one port. A port of wires with a label has the label
  * written after it along the face, and the next port stands past the label;
- * else a face's ports stand `PORT_STEP` apart. They stand across its middle, in
+ * else a face's ports stand the direction's `portStep` apart. Running right,
+ * a label lies along its line and takes nothing of the face. They stand across its middle, in
  * the order of where along their shelves the places at the wires' other ends
  * stand, so that wires from the left arrive on the left; of two that lead to
  * a place in common, the one with the flow is first, wherever their other
@@ -326,7 +354,10 @@ function bundlesOf(wires: Wire[], links: Links): Wire[][] {
  * order on both. A wire that leaves straight keeps clear of the face's other
  * ports and the columns beside them, and of their labels.
  */
-function dealPorts(shelves: Shelf[], channels: Channel[]): void {
+function dealPorts(shelves: Shelf[], channels: Channel[], direction: Direction): void {
+  const { portStep, isLabelAcross } = GRAINS[direction]
+  /** How many places across a face a label takes beside its port. */
+  const spanOf = (label: string): number => (isLabelAcross ? sizeOf(label) : 0)
   type Group = { ends: End[]; leaving: Wire[]; heading: number; isUp: boolean; far: Set<Place>; label: string }
   const faces = new Map<Place, { top: Group[]; bottom: Group[] }>()
   const indexOf = new Map(shelves.flatMap(shelf => shelf.places.map((place, index) => [place, index] as const)))
@@ -371,10 +402,10 @@ function dealPorts(shelves: Shelf[], channels: Channel[]): void {
   /** Where along a face its ports stand from the first, each far enough past the one before for that one's label and a gap; and the last column the last label takes. */
   const spread = (groups: Group[]): { steps: number[]; end: number } => {
     const steps = groups.reduce<number[]>(
-      (at, group, index) => (index === 0 ? [0] : [...at, (at[index - 1] ?? 0) + Math.max(PORT_STEP, sizeOf(groups[index - 1]?.label ?? '') + 2)]),
+      (at, group, index) => (index === 0 ? [0] : [...at, (at[index - 1] ?? 0) + Math.max(portStep, spanOf(groups[index - 1]?.label ?? '') + 2)]),
       [],
     )
-    return { steps, end: (steps.at(-1) ?? 0) + sizeOf(groups.at(-1)?.label ?? '') }
+    return { steps, end: (steps.at(-1) ?? 0) + spanOf(groups.at(-1)?.label ?? '') }
   }
   for (const [place, face] of faces) {
     if ('lane' in place.slot) continue
@@ -383,9 +414,9 @@ function dealPorts(shelves: Shelf[], channels: Channel[]): void {
     for (const groups of [top, bottom]) {
       const { steps, end } = spread(groups)
       const isLabeled = groups.some(group => group.label !== '')
-      const first = isLabeled ? Math.floor((place.width - 1 - end) / 2) : Math.floor(place.width / 2) - (groups.length - 1)
+      const first = isLabeled || !isLabelAcross ? Math.floor((place.width - 1 - end) / 2) : Math.floor(place.width / 2) - (groups.length - 1)
       const ports = steps.map(step => first + step)
-      const written = groups.flatMap((group, index) => Array.from({ length: group.label === '' ? 0 : sizeOf(group.label) + 1 }, (_, cell) => (ports[index] ?? 0) + 1 + cell))
+      const written = groups.flatMap((group, index) => Array.from({ length: group.label === '' ? 0 : spanOf(group.label) + 1 }, (_, cell) => (ports[index] ?? 0) + 1 + cell))
       groups.forEach((group, index) => {
         const own = ports[index] ?? 0
         const beside = group.leaving.length > 1 ? [own - 1, own + 1] : []
@@ -410,7 +441,7 @@ function dealPorts(shelves: Shelf[], channels: Channel[]): void {
  * or under what it is joined to. With nothing beside it to sit by, the shelf
  * is centered.
  */
-function seat(shelf: Shelf, columns: number, beside: Place[], wires: Wire[]): void {
+function seat(shelf: Shelf, columns: number, beside: Place[], wires: Wire[], gap: number): void {
   const { places } = shelf
   const isBeside = new Set(beside)
   /** For each place, the places beside it that a wire joins it to, with the port at each end of that wire. */
@@ -433,7 +464,7 @@ function seat(shelf: Shelf, columns: number, beside: Place[], wires: Wire[]): vo
     let x = Math.floor((columns - shelf.width) / 2)
     for (const place of places) {
       place.x = x
-      x += place.width + GAP
+      x += place.width + gap
     }
     return
   }
@@ -441,12 +472,12 @@ function seat(shelf: Shelf, columns: number, beside: Place[], wires: Wire[]): vo
   let x = 0
   places.forEach((place, index) => {
     place.x = Math.max(x, wanted[index] ?? x)
-    x = place.x + place.width + GAP
+    x = place.x + place.width + gap
   })
   let limit = columns
   for (const place of [...places].reverse()) {
     place.x = Math.max(0, Math.min(place.x, limit - place.width))
-    limit = place.x - GAP
+    limit = place.x - gap
   }
   const slideBy = (by: number): void => {
     const [first, last] = [places[0], places.at(-1)]
@@ -461,13 +492,13 @@ function seat(shelf: Shelf, columns: number, beside: Place[], wires: Wire[]): vo
   /** Moves a place toward `to`, one `way` along the shelf, pushing the places in its way; it stops at a lane already seated and at the shelf's end, and answers where it got to. */
   const shove = (index: number, to: number, way: number): number => {
     const place = places[index]
-    if (place === undefined) return way > 0 ? columns + GAP : -GAP
+    if (place === undefined) return way > 0 ? columns + gap : -gap
     if ((to - place.x) * way <= 0 || seated.has(place)) return place.x
     const next = places[index + way]
     if (way > 0) {
-      place.x = Math.min(to, shove(index + 1, to + place.width + GAP, way) - GAP - place.width)
+      place.x = Math.min(to, shove(index + 1, to + place.width + gap, way) - gap - place.width)
     } else {
-      place.x = Math.max(to, shove(index - 1, to - GAP - (next?.width ?? 0), way) + (next?.width ?? 0) + GAP)
+      place.x = Math.max(to, shove(index - 1, to - gap - (next?.width ?? 0), way) + (next?.width ?? 0) + gap)
     }
     return place.x
   }
@@ -522,10 +553,10 @@ function medianOf(wishes: Wish[]): number | undefined {
  * and any two that would stand out of order merged into one run at the
  * median of all their wires; a place with no wires joins the run before it.
  */
-function balance(shelf: Shelf, columns: number, beside: Place[], wires: Wire[], rankOf: (wire: Wire) => number): void {
+function balance(shelf: Shelf, columns: number, beside: Place[], wires: Wire[], rankOf: (wire: Wire) => number, gap: number): void {
   const { places } = shelf
   const isBeside = new Set(beside)
-  const offsets = places.map((_, index) => places.slice(0, index).reduce((sum, place) => sum + place.width + GAP, 0))
+  const offsets = places.map((_, index) => places.slice(0, index).reduce((sum, place) => sum + place.width + gap, 0))
   const indexOf = new Map(places.map((place, index) => [place, index]))
   const wishes: Wish[][] = places.map(() => [])
   for (const wire of wires) {
@@ -611,7 +642,7 @@ const isLess = (a: number[], b: number[]): boolean => {
  * more and its links of higher rank bend less. A layout whose shelves are
  * all laid out across its columns is then set in their middle.
  */
-function reseat(shelves: Shelf[], channels: Channel[], columns: number, rankOf: (wire: Wire) => number): void {
+function reseat(shelves: Shelf[], channels: Channel[], columns: number, rankOf: (wire: Wire) => number, gap: number): void {
   const ranks = [...new Set(channels.flatMap(channel => channel.wires.map(rankOf)))].sort((a, b) => b - a)
   const seating = (): number[][] => shelves.map(shelf => shelf.places.map(place => place.x))
   let best = { cost: costOf(channels, ranks, rankOf), seating: seating() }
@@ -626,7 +657,7 @@ function reseat(shelves: Shelf[], channels: Channel[], columns: number, rankOf: 
           if (shelf === undefined) continue
           const [above, below] = [shelves[index - 1], shelves[index + 1]].map(one => (one?.across === shelf.across ? one : undefined))
           const sides = [...(pass !== 'up' && above !== undefined ? [{ shelf: above, channel: channels[index - 1] }] : []), ...(pass !== 'down' && below !== undefined ? [{ shelf: below, channel: channels[index] }] : [])]
-          if (sides.length > 0) balance(shelf, shelf.across, sides.flatMap(side => side.shelf.places), sides.flatMap(side => side.channel?.wires ?? []), isRanked ? rankOf : () => 0)
+          if (sides.length > 0) balance(shelf, shelf.across, sides.flatMap(side => side.shelf.places), sides.flatMap(side => side.channel?.wires ?? []), isRanked ? rankOf : () => 0, gap)
         }
         const cost = costOf(channels, ranks, rankOf)
         const isBetter = isRanked
@@ -870,8 +901,14 @@ export function layTracks(channel: Channel, xOf: (place: Place) => number, under
  * every shelf longer than the room. The shelves are then seated again, as
  * `reseat` says, a wire ranked by the higher priority of its link's two
  * nodes, and the channels given the rows their wires need.
+ *
+ * Running right, the room across is the room's rows less the foot's, and a
+ * graph is laid out across no more of them than its longest shelf takes, so
+ * that it is as tall as it needs and no taller; its layers are never folded,
+ * since a room with too few columns for them is drawn running down.
  */
-export function layoutOf(graph: Graph, room: Room, look: Look, fold = false): Layout {
+export function layoutOf(graph: Graph, room: Room, look: Look, fold = false, direction: Direction = 'down'): Layout {
+  if (direction === 'right') return laidOut(graph, Math.max(room.rows - 1, LEAST_ROWS), look, undefined, direction)
   const columns = Math.max(room.columns, LEAST_COLUMNS)
   if (!fold || graph.nodes.length > FOLDED_NODES || graph.links.length > FOLDED_LINKS) return laidOut(graph, columns, look)
   const widestOf = (layout: Layout): number => Math.max(0, ...layout.shelves.map(shelf => shelf.width))
@@ -885,8 +922,9 @@ export function layoutOf(graph: Graph, room: Room, look: Look, fold = false): La
   return layout
 }
 
-/** A graph laid out across `columns`, its layers first folded `into` so many where they are to be. */
-function laidOut(graph: Graph, columns: number, look: Look, into?: number): Layout {
+/** A graph laid out across `room` running down, or across as much of it as it takes running right, its layers first folded `into` so many columns where they are to be. */
+function laidOut(graph: Graph, room: number, look: Look, into?: number, direction: Direction = 'down'): Layout {
+  const { gap } = GRAINS[direction]
   /** How wide a node's box is at least for the labels of the links it may leave by, each beside a port of its own, with a gap after all but the last. */
   const writtenOf = (node: GraphletNode): number => {
     const leaving = graph.links.filter(link => link.from !== link.to && (link.from === node.id || (!link.isDirected && link.to === node.id)))
@@ -895,38 +933,39 @@ function laidOut(graph: Graph, columns: number, look: Look, into?: number): Layo
   }
   const layers = layersOf(
     graph,
-    into === undefined ? undefined : { columns: into, widthOf: node => Math.max(widthOf(wordsOf(graph, node, look.labels)), writtenOf(node)), gap: GAP },
+    into === undefined ? undefined : { columns: into, widthOf: node => Math.max(widthOf(wordsOf(graph, node, look.labels)), writtenOf(node)), gap },
   )
   const placeOf = new Map<Slot, Place>()
   const shelves: Shelf[] = layers.slots.map((slots, shelf) => {
     const places = slots.map(slot => {
       const words = 'node' in slot ? wordsOf(graph, slot.node, look.labels) : undefined
-      const width = words === undefined ? 1 : widthOf(words)
-      const place: Place = { slot, shelf, x: 0, width, rows: (words?.lines.length ?? 0) + 2, ...(words === undefined ? {} : { words }) }
+      const [wide, tall] = words === undefined ? [1, 0] : [widthOf(words), words.lines.length + 2]
+      const [width, rows] = words === undefined || direction === 'down' ? [wide, tall] : [tall, wide]
+      const place: Place = { slot, shelf, x: 0, width, rows, ...(words === undefined ? {} : { words }) }
       placeOf.set(slot, place)
       return place
     })
     const rows = Math.max(...places.map(place => place.rows))
     for (const place of places) if ('lane' in place.slot) place.rows = rows
-    return { places, width: 0, across: columns, top: 0, rows }
+    return { places, width: 0, across: room, top: 0, rows }
   })
-  /** Whether a wire has a label, written where it leaves its box. */
-  const isWritten = (wire: Wire): boolean => 'node' in wire.from.place.slot && labelOf(wire.link) !== ''
+  /** What a wire has written where it leaves its box: its label; nothing where it leaves a lane. */
+  const saidOf = (wire: Wire): string => ('node' in wire.from.place.slot ? labelOf(wire.link) : '')
+  /** The rows a channel keeps on one side of its tracks for the arrowheads that point to that side's shelf and the labels of the links that leave it: one running down, and running right as many as the longest label takes, and one more. */
+  const bandOf = (wires: Wire[], isAbove: boolean): number => {
+    const labels = wires.filter(wire => wire.from.isAbove === isAbove).map(saidOf).filter(label => label !== '')
+    const hasHeads = wires.some(wire => wire.hasHead && wire.to.isAbove === isAbove)
+    if (labels.length === 0) return hasHeads ? 1 : 0
+    return GRAINS[direction].isLabelAcross ? 1 : Math.max(...labels.map(sizeOf)) + 1
+  }
   const channels: Channel[] = shelves.map((shelf, index) => {
     const wires = wiresOf(layers.pieces[index] ?? [], layers.flats[index] ?? [], shelf, placeOf)
-    return {
-      top: 0,
-      rows: 0,
-      wires,
-      bundles: bundlesOf(wires, look.links),
-      isLoose: false,
-      hasTopRow: wires.some(wire => (wire.hasHead && wire.to.isAbove) || (wire.from.isAbove && isWritten(wire))),
-      hasBottomRow: wires.some(wire => (wire.hasHead && !wire.to.isAbove) || (!wire.from.isAbove && isWritten(wire))),
-    }
+    return { top: 0, rows: 0, wires, bundles: bundlesOf(wires, look.links), isLoose: false, topRows: bandOf(wires, true), bottomRows: bandOf(wires, false) }
   })
-  dealPorts(shelves, channels)
+  dealPorts(shelves, channels, direction)
 
-  for (const shelf of shelves) shelf.width = shelf.places.reduce((sum, place) => sum + place.width + GAP, -GAP)
+  for (const shelf of shelves) shelf.width = shelf.places.reduce((sum, place) => sum + place.width + gap, -gap)
+  const columns = direction === 'down' ? room : Math.min(room, Math.max(LEAST_ROWS, ...shelves.map(shelf => shelf.width)))
   const widest = Math.max(columns, ...shelves.map(shelf => shelf.width))
   for (const shelf of shelves) shelf.across = look.scroll === 'sheet' || shelf.width > columns ? widest : columns
   const first = shelves.reduce((longest, shelf, index) => (shelf.width > (shelves[longest]?.width ?? 0) ? index : longest), 0)
@@ -936,7 +975,7 @@ function laidOut(graph: Graph, columns: number, look: Look, into?: number): Layo
       if (shelf === undefined) continue
       const nearer = step === 0 ? undefined : shelves[index < first ? index + 1 : index - 1]
       const between = channels[index < first ? index : index - 1]?.wires ?? []
-      seat(shelf, shelf.across, nearer?.across === shelf.across ? nearer.places : [], between)
+      seat(shelf, shelf.across, nearer?.across === shelf.across ? nearer.places : [], between, gap)
     }
   })
   channels.forEach((channel, index) => {
@@ -952,7 +991,7 @@ function laidOut(graph: Graph, columns: number, look: Look, into?: number): Layo
     })
   })
   const priority = new Map(graph.nodes.map(node => [node.id, priorityOf(node)]))
-  reseat(shelves, channels, columns, wire => Math.max(priority.get(wire.link.from) ?? 0, priority.get(wire.link.to) ?? 0))
+  reseat(shelves, channels, columns, wire => Math.max(priority.get(wire.link.from) ?? 0, priority.get(wire.link.to) ?? 0), gap)
 
   let top = 0
   shelves.forEach((shelf, index) => {
@@ -961,11 +1000,10 @@ function laidOut(graph: Graph, columns: number, look: Look, into?: number): Layo
     top += shelf.rows
     if (channel === undefined) return
     const tracks = layTracks(channel, place => place.x)
-    const heads = (channel.hasTopRow ? 1 : 0) + (channel.hasBottomRow ? 1 : 0)
     const spare = channel.isLoose && channel.bundles.length > 1 ? 1 : 0
     channel.top = top
-    channel.rows = channel.wires.length === 0 ? (next === undefined ? 0 : 1) : heads + tracks + spare
+    channel.rows = channel.wires.length === 0 ? (next === undefined ? 0 : 1) : channel.topRows + tracks + channel.bottomRows + spare
     top += channel.rows
   })
-  return { shelves, channels, columns, rows: top }
+  return { shelves, channels, columns, rows: top, direction, gap }
 }

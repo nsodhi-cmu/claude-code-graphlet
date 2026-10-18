@@ -1,10 +1,11 @@
 import type { EngineInterface, Register, RenderSurface } from 'claude-code'
 
 import type { Graphlet } from '../types'
-import { MOST_TREE_CHARS, bounded, charactersOf, rowText, sizeOf, styleOf } from './draw'
+import { MOST_CELLS, MOST_TREE_CHARS, bounded, charactersOf, rowText, sizeOf, styleOf } from './draw'
 import type { Drawing, Pan, Room } from './draw'
 import { readGraph } from './layers'
 import type { Graph } from './layers'
+import type { Direction } from './layout'
 import { pageOf } from './page'
 import { GUIDE, fencedOf, partsOf, pictureOf, stillOf } from './reply'
 import { MOVES, focusOf, leadOf, viewOf } from './view'
@@ -52,14 +53,14 @@ const OPEN_TIMEOUT_MS = 10_000
 
 /**
  * Writes a graph out as a web page in the system's temporary folder, named
- * for the pane it is drawn in, or `reply`, and opens it in the browser. Where
- * nothing opens it, says where it is.
+ * for the pane it is drawn in, or `reply`, running as it runs there, and
+ * opens it in the browser. Where nothing opens it, says where it is.
  */
-const openPage = async ($: EngineInterface, name: string, graph: Graph): Promise<void> => {
+const openPage = async ($: EngineInterface, name: string, graph: Graph, direction: Direction): Promise<void> => {
   const folder = (await $.env.get('TMPDIR')) ?? (await $.env.get('TEMP')) ?? '/tmp'
   const path = `${folder.replace(/[\\/]+$/, '')}/graphlet-${name.replace(/[^A-Za-z0-9_-]/g, '-')}.html`
   try {
-    await $.fs.write(path, pageOf(graph, name))
+    await $.fs.write(path, pageOf(graph, name, direction))
   } catch (error) {
     $.ui.toast(`graphlet: could not write the graph's page (${error instanceof Error ? error.message : String(error)}).`)
     return
@@ -73,9 +74,6 @@ const openPage = async ($: EngineInterface, name: string, graph: Graph): Promise
   }
   $.ui.toast(`graphlet: the graph's page is at ${path}`)
 }
-
-/** The most columns, and the most rows, a room is taken to have. */
-const MOST_CELLS = 1000
 
 /** A count of cells another mod handed over, as a whole number a room can have. */
 const cellsOf = (asked: unknown): number =>
@@ -226,7 +224,7 @@ export const register: Register = (on, options) => {
     const graph = reply?.graphs[Number(at)]
     if (reply === undefined || graph === undefined) return next(e)
     if (action === 'copy') await copyGraph($, graph, reply.room, e.surface)
-    else if (action === 'page') await openPage($, 'reply', graph)
+    else if (action === 'page') await openPage($, 'reply', graph, still.direction(graph, reply.room))
     else return next(e)
     return { element: e.element }
   })
@@ -267,7 +265,7 @@ export const register: Register = (on, options) => {
       else dragged.set(pane, { grab, at: drag })
       if (before.x !== drag.x || before.y !== drag.y) await $.graphlet.scroll({ pane, by: { x: before.x - drag.x, y: before.y - drag.y } })
     } else if (page === true) {
-      await openPage($, pane, at.whole)
+      await openPage($, pane, at.whole, view.direction(at.whole, at.room))
     } else if (query !== undefined && key === 'backspace' && query === '') {
       finding.delete(pane)
       $.ui.invalidate('ui.render')

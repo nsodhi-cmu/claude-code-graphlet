@@ -72,6 +72,28 @@ A link's label is written beside its line, just past the box it leaves, in the p
 - The words beside a line where it leaves a box are the label of every link of that line, since links with different labels never share one.
 - A link down the drawing has its label under the box it leaves; a link back up, over the box it leaves, beside the dashed line.
 
+### A Graph That Runs Right
+
+A graph that runs right has its layers side by side, each a column of boxes, and its links run across the room:
+
+```
+                     ┌──────┐
+              ┌─────▶│ Save │
+┌────────┐    │      └──────┘
+│        ├yes─┘
+│        │           ┌───────────┐
+│ Valid? ├no────────▶│           │
+│        │           │ Ask again │
+│        │◀┈┈┈┈┈retry┤           │
+└────────┘           └───────────┘
+```
+
+- A link leaves a box at a tick on its side and reaches the next at an arrowhead that points right. The link that closes a loop runs back dashed, to an arrowhead that points left.
+- A link's label is written on its line, just past the box it leaves.
+- A box is as tall as its ports down its side need, its label in its middle.
+
+`paint` works the picture out across and along the window, as the layout is laid out, and turns it where it writes it: a line's ways, its arrowheads, and the ticks of a box's frame are turned, `turnedOf`, while a box is drawn where it stands and its words, and a label, are written across the room as ever.
+
 ## What Is Selected
 
 The selected node's box has a double frame, in place of the heavy one of a node put foremost, and its label is bold and inverse in the node's own tone. Every link that touches the selected node is lit along its whole way, in the theme's accent color, and so are its label and the borders of the boxes at the other ends. Everything else keeps its own paint: a box's border takes its node's tone, and a link takes its own tone, in its line, its arrowhead, and its label, or is dim where it has none.
@@ -93,7 +115,7 @@ A graph larger than its room is seen through a window, and never laid out again 
 
 - A shelf longer than the room runs off its edge, in the order it always has. A box the edge cuts ends there in an ellipsis.
 - `showIn` says where the window stands to show the selected node. A window that already shows the whole box stays where it is. One that does not moves just far enough to show the box, the wires above and below it, and the start of the boxes beside it, or as much of those as a small room leaves it.
-- `scrollIn` scrolls the window by cells, or by turns of the wheel, which go the way the graph has more rooms' worth out of view: along it, or down it.
+- `scrollIn` scrolls the window by cells, or by turns of the wheel, which go the way the graph has more rooms' worth out of view: along its layers, or across them. A window stands as its layout is laid out, across and along, so a scroll by cells across the room and down it is turned to match for a graph that runs right.
 - A drag from a cell a click does nothing on moves the graph with the pointer, and so the window the other way, and the window stays where it is dropped.
 - Every shelf slides under the window together, each as far as its own end. With `scroll` at `pinned`, that leaves a shelf that fits the room where it is while a longer one slides, and the wires between the two follow. With `scroll` at `sheet`, the shelves move as one.
 
@@ -115,7 +137,7 @@ A still picture in a reply keeps the counts and what was left out, and its corne
 
 ## Moving The Selection
 
-`stepIn` says where a move lands. Left and right go along the selected node's shelf, past any lanes. Up and down go to the next shelf: to the node there that a link joins the selected one to, whichever way the link runs, the nearest of them in the window, or with none joined, to the nearest. So the keys reach every node, a shelf at a time. A move with nowhere to go stays where it is.
+`stepIn` says where a move lands. Left and right go along the selected node's shelf, past any lanes. Up and down go to the next shelf: to the node there that a link joins the selected one to, whichever way the link runs, the nearest of them in the window, or with none joined, to the nearest. So the keys reach every node, a shelf at a time. A move with nowhere to go stays where it is. In a graph that runs right, the keys turn with it: up and down go along a shelf, and left and right to the next.
 
 ## Focus
 

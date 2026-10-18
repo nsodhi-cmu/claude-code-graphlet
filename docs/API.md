@@ -5,11 +5,13 @@ graphlet adds one noun to `$`, `$.graphlet`, in the `engine.create` hook of `gra
 ## A Graph
 
 ```ts
-type GraphletGraph = { nodes: GraphletNode[]; links: GraphletLink[]; isDirected?: boolean }
+type GraphletGraph = { nodes: GraphletNode[]; links: GraphletLink[]; isDirected?: boolean; direction?: 'down' | 'right' }
 type GraphletLink = { from: string; to: string; label?: string; tone?: GraphletTone; isDirected?: boolean }
 ```
 
 A link names its two nodes by their ids, and the links may run in a loop. A link's `label`, a few words, is written beside it where it leaves the node it is drawn from: its `from` node, or for a link with no direction the one of its two that stands higher. A label longer than a link's labels may be is cut in its middle, in the terminal and on the web page. A link's `tone`, one of a node's tones, paints its line, its arrowhead, and its label where it is not lit: a link that fails in `bad`, the path a mod would show in `note`. A link with no tone, or `plain`, is a dim line, and links of different tones never share a line, as links of different labels never do. Two nodes may be linked more than once under different labels, and each such link is drawn as a line of its own with its label; a link given again under the same label, or with none again, is one link. A link from a node to itself, drawn as `↺`, has no label written. A link runs from one node to the other unless it says `isDirected: false`: then it only joins its two nodes, whichever it names first, and such a link given both ways round is one link. A link that says nothing takes its graph's `isDirected`, and a graph says nothing for a link that runs one way. A graph may have links of both kinds, and a link of each kind between the same two nodes is two links.
+
+A graph runs the way its `direction` says: `down`, its layers one under another, or `right`, its layers side by side, each a column of boxes. Left out, graphlet runs it down, unless running right fits the room's columns, no layer of it longer than the room, in half the rows of running down or fewer, or fits the room whole where running down does not; `isRighter` in `graphlet/hooks/view.ts` says which. A graph that names no way may so turn as it grows or its room changes, so a mod whose graph changes as the person looks names one.
 
 | Field of a node | What it holds |
 | :- | :- |
@@ -44,7 +46,7 @@ A mod runs before the mods it depends on, so its hook is the outer one and graph
 
 | Method | What it does |
 | :- | :- |
-| `measure({ graph, columns })` | Answers the size of the graph's drawing in a room `columns` wide and as tall as it needs: the rows it takes, and the columns its longest layer is laid out across, which are more than `columns` when the graph scrolls sideways. |
+| `measure({ graph, columns })` | Answers the size of the graph's drawing in a room `columns` wide and as tall as it needs: the rows it takes, and the columns it is laid out across, its longest layer's running down and all its layers' running right, which are more than `columns` when the graph scrolls sideways. |
 | `show({ pane, graph, columns, rows, selected? })` | Says what a pane holds and the room the drawing may take. Answers the rows the drawing takes, and the node drawn as selected. A drawing takes no more rows than it was given, and never fewer than two: a row of the graph, and its foot. |
 | `step({ pane, move })` | Answers the node a move from the selected one lands on, for a mod that has keys of its own: `left`, `right`, `up`, or `down`. |
 | `scroll({ pane, by })` | Scrolls the graph: by cells, `{ x, y }`, or by turns of the wheel, a number. |
@@ -88,7 +90,7 @@ The graph is drawn by a surface module, the only kind of element that receives a
 
 | Key | What it does |
 | :- | :- |
-| arrows, `h` `j` `k` `l` | Moves the selection. |
+| arrows, `h` `j` `k` `l` | Moves the selection: along a layer, or along a link to the next, as the graph runs. |
 | return | Opens the selected node. |
 | `c` | Copies the whole graph as plain text: drawn still, with nothing selected, as a reply draws it, in a room as wide as its longest layer. A toast says whether it was copied. |
 | `f` | Draws the graph in focus on the selected node, or draws it all again. |

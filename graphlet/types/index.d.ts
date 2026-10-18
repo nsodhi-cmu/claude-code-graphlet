@@ -50,10 +50,22 @@ export type GraphletLink = {
   isDirected?: boolean
 }
 
+/**
+ * Which way a graph runs: `down`, its layers one under another, or `right`,
+ * its layers side by side, each a column of boxes.
+ */
+export type GraphletDirection = 'down' | 'right'
+
 /** A graph. Its links may run in a loop. */
 export type GraphletGraph = {
   nodes: GraphletNode[]
   links: GraphletLink[]
+  /**
+   * Which way the graph runs. Left out, graphlet runs it down, or right
+   * where that fits its room's columns in half the rows or fewer, or fits
+   * the room whole where running down does not.
+   */
+  direction?: GraphletDirection
   /**
    * Whether a link that does not say runs from one node to the other. Left
    * out, it does. `false`, such a link only joins its two nodes.

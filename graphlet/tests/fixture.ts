@@ -8,9 +8,9 @@ import type { Look } from '../hooks/layout'
 /** How graphs are drawn unless a person's settings say otherwise. */
 export const LOOK: Look = { scroll: 'pinned', labels: 'wrap', links: 'separate', motion: 'still' }
 
-/** A graph of nodes labelled by their ids, with a link for each pair. */
+/** A graph of nodes labelled by their ids, with a link for each pair, that runs down. */
 export const graphOf = (ids: string[], links: Array<[from: string, to: string]>, rest: Partial<GraphletNode> = {}): Graph =>
-  readGraph({ nodes: ids.map(id => ({ id, label: id, ...rest })), links: links.map(([from, to]) => ({ from, to })) })
+  readGraph({ nodes: ids.map(id => ({ id, label: id, ...rest })), links: links.map(([from, to]) => ({ from, to })), direction: 'down' })
 
 /** A graph read again with its links undirected. */
 export const undirected = (graph: Graph): Graph => readGraph({ ...graph, links: graph.links.map(link => ({ ...link, isDirected: false })) })

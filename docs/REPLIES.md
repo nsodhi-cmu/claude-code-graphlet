@@ -86,6 +86,7 @@ A reply that opens with a graph has no text before it for the engine to draw, an
 
 `pictureOf` draws a graph for a reply, with the person's settings, as a pane's graph is drawn, but for two things. Its links are always kept separate, as the `links` setting's `separate` keeps them, since nothing in a reply can be selected to tell merged links apart. And its layers are folded into the reply's width.
 
+- **Its way.** It runs right where that fits the reply's width in half the rows of running down or fewer, as a pipeline does, and else down, as [API.md](API.md#a-graph) tells; the block has no way to say.
 - **Its width.** The room is the reply's width: the columns the surface measured, less the bullet's, or `REPLY_COLUMNS` less the bullet's where it measured none. A layer too wide for it is folded onto more layers, as [LAYERS.md](LAYERS.md#folding-into-a-room) tells, so the graph fits the reply where it can and is not cut off at its edge. The graph is laid out once, in the reply's width, and the columns blank down the whole of its left side are cut away, so a small graph stands at the reply's left edge, as the text does.
 - **Its height.** As tall as the graph needs, up to the most rows a room has, `MOST_CELLS`.
 - **It is still.** Nothing is selected or lit, no key or wheel moves it, and nothing in its rows answers a click. Its rows are plain `Text`, with no `Client` around them to take the pointer or the keyboard.

@@ -4,26 +4,33 @@ import type { Pan, Room } from './draw'
 import { isJoined } from './layers'
 import type { Graph } from './layers'
 import { GAP, middleOf } from './layout'
-import type { Layout, Place, Shelf } from './layout'
+import type { Direction, Layout, Place, Shelf } from './layout'
 
 // The window a layout is seen through: how much of it a room shows, where
 // the window stands to show the selected node, and where a scroll or a step
-// of the selection takes it.
+// of the selection takes it. A window stands as its layout is laid out, its
+// `x` across the shelves and its `y` along the layers, which for a graph
+// that runs right are down the room and across it; what the room hands it,
+// a scroll by cells and an arrow key, is turned to match.
 
-/** How much past the selected box a window that moves to it shows: sideways the gap and the start of the box beyond it, and up and down the wires nearest it. */
-const MARGIN = { x: GAP + 4, y: 2 }
-/** How far one turn of the wheel scrolls. */
+/** How much past the selected box a window that moves to it shows: across its shelf, the gap and the start of the box beyond it, and along the layers, the wires nearest it. */
+const MARGINS: Readonly<Record<Direction, Pan>> = { down: { x: GAP + 4, y: 2 }, right: { x: 2, y: 4 } }
+/** How far one turn of the wheel scrolls, across the room and down it. */
 const WHEEL = { x: 8, y: 2 }
+/** Where each arrow key moves the selection of a graph that runs right, as it would move it in one that runs down. */
+const TURNED: Readonly<Record<GraphletMove, GraphletMove>> = { up: 'left', down: 'right', left: 'up', right: 'down' }
 
 /**
- * How a layout is seen in a room: whether whole, through how many rows, and
- * the farthest the window goes. The room's last row is kept for the foot.
+ * How a layout is seen in a room: whether whole, through how many cells
+ * along its layers, and the farthest the window goes. The room's last row is
+ * kept for the foot, so a graph that runs down is seen through all its rows
+ * but that one, and one that runs right through all its columns.
  */
 export type Sight = { isWhole: boolean; rows: number; most: Pan }
 
 export function sightOf(layout: Layout, room: Room): Sight {
   const x = Math.max(0, ...layout.shelves.map(shelf => shelf.across - layout.columns))
-  const rows = Math.max(1, Math.min(layout.rows, room.rows - 1))
+  const rows = Math.max(1, Math.min(layout.rows, layout.direction === 'down' ? room.rows - 1 : room.columns))
   return { isWhole: x === 0 && rows >= layout.rows, rows, most: { x, y: Math.max(0, layout.rows - rows) } }
 }
 
@@ -57,27 +64,30 @@ export function showIn(layout: Layout, selected: string | null, room: Room, from
   const found = placeOf(layout, selected)
   if (found === undefined) return at
   const { shelf, place } = found
+  const margin = MARGINS[layout.direction]
   const slide = slideOf(layout, shelf, at.x)
-  const shown = reveal(slide, place.x, place.x + place.width, layout.columns, shelf.across, MARGIN.x)
+  const shown = reveal(slide, place.x, place.x + place.width, layout.columns, shelf.across, margin.x)
   return within(
     {
       x: shown === slide ? at.x : shown,
-      y: reveal(at.y, shelf.top, shelf.top + shelf.rows, sight.rows, layout.rows, MARGIN.y),
+      y: reveal(at.y, shelf.top, shelf.top + shelf.rows, sight.rows, layout.rows, margin.y),
     },
     sight.most,
   )
 }
 
 /**
- * Where the window stands after it is scrolled from `from`: by cells, or by
- * turns of the wheel, which go the way the graph has more rooms' worth out
- * of view, along it or down it.
+ * Where the window stands after it is scrolled from `from`: by cells across
+ * the room and down it, or by turns of the wheel, which go the way the graph
+ * has more rooms' worth out of view, along its layers or across them.
  */
 export function scrollIn(layout: Layout, room: Room, from: Pan, by: Pan | number): Pan {
   const { most, rows } = sightOf(layout, room)
   const at = within(from, most)
-  const isDown = most.y * layout.columns > most.x * rows
-  const step = typeof by !== 'number' ? by : isDown ? { x: 0, y: by * WHEEL.y } : { x: by * WHEEL.x, y: 0 }
+  const isRight = layout.direction === 'right'
+  const wheel = isRight ? { x: WHEEL.y, y: WHEEL.x } : WHEEL
+  const isAlong = most.y * layout.columns > most.x * rows
+  const step = typeof by !== 'number' ? (isRight ? { x: by.y, y: by.x } : by) : isAlong ? { x: 0, y: by * wheel.y } : { x: by * wheel.x, y: 0 }
   return within({ x: at.x + step.x, y: at.y + step.y }, most)
 }
 
@@ -85,16 +95,19 @@ export function scrollIn(layout: Layout, room: Room, from: Pan, by: Pan | number
  * The node a move from the selected one lands on. Left and right go along
  * its shelf, past any lanes. Up and down go to the next shelf: to the node
  * there that a link joins it to, the nearest of them in the window, or with
- * none joined, to the nearest. So every node can be reached by the keys.
+ * none joined, to the nearest. So every node can be reached by the keys. In
+ * a graph that runs right, the keys are turned with it: up and down go along
+ * a shelf, and left and right to the next.
  */
 export function stepIn(
   layout: Layout,
   graph: Graph,
   selected: string | null,
-  move: GraphletMove,
+  key: GraphletMove,
   room: Room,
   pan: Pan,
 ): string | null {
+  const move = layout.direction === 'right' ? TURNED[key] : key
   const found = placeOf(layout, selected)
   if (found === undefined || selected === null) return selected
   const { shelf, place } = found

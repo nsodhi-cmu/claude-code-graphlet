@@ -282,11 +282,32 @@ describe('moving the selection', () => {
     const passed = readGraph({
       nodes: ['A', 'B', 'C'].map((id, layer) => ({ id, label: id, layer })),
       links: [{ from: 'A', to: 'C' }],
+      direction: 'down',
     })
     expect(walk(passed, WHOLE, ORIGIN, 'A', 'down')).toBe('B')
     expect(walk(passed, WHOLE, ORIGIN, 'C', 'up')).toBe('B')
     expect(walk(passed, WHOLE, ORIGIN, 'B', 'right')).toBe('B')
     expect(walk(passed, WHOLE, ORIGIN, 'A', 'down', 'down')).toBe('C')
+  })
+
+  test('in a graph that runs right, the keys are turned with it: left and right follow its links, and up and down walk a layer', () => {
+    const graph = readGraph({ nodes: ['A', 'B', 'C', 'D'].map(id => ({ id, label: id })), links: [{ from: 'A', to: 'B' }, { from: 'A', to: 'C' }, { from: 'C', to: 'D' }], direction: 'right' })
+    expect(walk(graph, WHOLE, ORIGIN, 'A', 'right')).not.toBe('A')
+    expect(walk(graph, WHOLE, ORIGIN, 'B', 'down')).toBe('C')
+    expect(walk(graph, WHOLE, ORIGIN, 'C', 'up')).toBe('B')
+    expect(walk(graph, WHOLE, ORIGIN, 'C', 'right')).toBe('D')
+    expect(walk(graph, WHOLE, ORIGIN, 'D', 'left')).toBe('C')
+    expect(walk(graph, WHOLE, ORIGIN, 'A', 'down')).toBe('A')
+  })
+
+  test('a graph that runs right is scrolled by cells as the room asks, across it and down it, and by the wheel along its layers, across the room', () => {
+    const ids = Array.from({ length: 12 }, (_, index) => `step${index}`)
+    const chain = readGraph({ nodes: ids.map(id => ({ id, label: id })), links: ids.slice(1).map((id, index) => ({ from: ids[index] ?? '', to: id })), direction: 'right' })
+    const room = { columns: 40, rows: 6 }
+    expect(pinned.scroll(chain, room, ORIGIN, { x: 5, y: 0 })).toEqual({ x: 0, y: 5 })
+    expect(pinned.scroll(chain, room, ORIGIN, 1)).toEqual({ x: 0, y: 8 })
+    const moved = picture(pinned.draw(chain, null, room, pinned.scroll(chain, room, ORIGIN, { x: 11, y: 0 })))
+    expect(moved[1]?.startsWith('│ step1 ├')).toBe(true)
   })
 
   test('in an undirected graph, a step follows a link whichever way round it names its nodes, past a nearer node it does not join', () => {

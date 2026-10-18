@@ -746,6 +746,20 @@ test('a graph block in a reply is drawn in its place, in color, under the engine
   await reply.unmount()
 })
 
+test('a graph in a reply runs right where that fits the reply\'s width in half the rows or fewer, as a pipeline does', async ($, on) => {
+  replies(on)
+  const reply = await say($, 'terminal', 'The pipeline:\n\n```graphlet\nlint -> test -> build -> deploy\n```')
+  expect(screenOf(await reply.drawn())).toEqual([
+    '● The pipeline:',
+    '',
+    '  ┌──────┐  ┌──────┐  ┌───────┐  ┌────────┐',
+    '  │ lint ├─▶│ test ├─▶│ build ├─▶│ deploy │',
+    '  └──────┘  └──────┘  └───────┘  └────────┘',
+    `  ${'copy · html ↗'.padStart(41)}`,
+  ])
+  await reply.unmount()
+})
+
 test('a click on copy, in the corner under a reply\'s picture, copies the picture as text, and one on html ↗ opens the graph as a web page', async ($, on) => {
   const seen = world(on)
   replies(on)

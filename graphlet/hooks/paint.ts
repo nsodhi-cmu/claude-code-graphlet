@@ -1,5 +1,5 @@
 import { beatOf, bounded, canvasOf, clipMiddle, footRow, leftOut, sizeOf, spansOf } from './draw'
-import type { Canvas, Drawing, Hit, Paint, Pan, Room } from './draw'
+import type { Canvas, Cell, Drawing, Hit, Paint, Pan, Room } from './draw'
 import { isJoined, priorityOf } from './layers'
 import type { Graph, Link, Node } from './layers'
 import { labelOf, layTracks, routeOf } from './layout'
@@ -8,42 +8,68 @@ import { sightOf, slideOf, within } from './window'
 
 // The picture: a layout painted through a window, the boxes in box
 // characters and the wires in the channels between them, with the selected
-// node and everything linked to it lit.
+// node and everything linked to it lit. A layout is worked out across its
+// shelves and along its layers; running right, the picture turns it, so its
+// lines run the other way while every box and every word reads as ever.
 
 /** How much of a window stays in view when a click scrolls it: about a box sideways, and a few rows down. */
 const PAGE_OVERLAP = { x: 16, y: 3 }
 /** How many cells a node's name takes where it is written at the window's edge, cut in the middle past that. */
 const SIGN_CELLS = 20
 
-type Frame = { corners: string; across: string; down: string; exits: { above: string; below: string } }
+/** A box's frame: its corners, its sides, and the tick on each side where a link meets it. */
+type Frame = { corners: string; across: string; down: string; exits: { top: string; bottom: string; left: string; right: string } }
 
 const FRAMES = {
-  plain: { corners: '┌┐└┘', across: '─', down: '│', exits: { above: '┴', below: '┬' } },
-  foremost: { corners: '┏┓┗┛', across: '━', down: '┃', exits: { above: '┷', below: '┯' } },
-  selected: { corners: '╔╗╚╝', across: '═', down: '║', exits: { above: '╧', below: '╤' } },
+  plain: { corners: '┌┐└┘', across: '─', down: '│', exits: { top: '┴', bottom: '┬', left: '┤', right: '├' } },
+  foremost: { corners: '┏┓┗┛', across: '━', down: '┃', exits: { top: '┷', bottom: '┯', left: '┨', right: '┠' } },
+  selected: { corners: '╔╗╚╝', across: '═', down: '║', exits: { top: '╧', bottom: '╤', left: '╢', right: '╟' } },
 } as const satisfies Record<string, Frame>
 
 /** A node's frame: doubled where it is selected, heavy where the graph puts it foremost, else plain. */
 const frameOf = (node: Node, selected: string | null): Frame =>
   node.id === selected ? FRAMES.selected : node.isForemost ? FRAMES.foremost : FRAMES.plain
 
-/** Where a window puts things: each place's first column, and each row of the layout. */
-type Seen = { xOf: (place: Place) => number; yOf: (row: number) => number; columns: number; rows: number }
+/**
+ * Where a window puts things: how far across it each place starts and how
+ * far along it each cell of the layout is, how many cells it shows across
+ * and along, and where on the picture, `width` columns by `height` rows, a
+ * cell across and along stands.
+ */
+type Seen = {
+  xOf: (place: Place) => number
+  yOf: (row: number) => number
+  columns: number
+  rows: number
+  width: number
+  height: number
+  isRight: boolean
+  realOf: (across: number, along: number) => { x: number; y: number }
+}
 
 /** How the lit lines move, where they do: beads run along a link that runs one way, and the rest pulse. */
 type Moving = { isOneWay: (link: Link) => boolean }
 
-/** A node's box as the window has it: its place, its first column, its top row, and how many rows it takes. */
-type Box = { place: Place; x: number; y: number; rows: number }
+/** A node's box on the picture: its place, its first column, its top row, and how many columns and rows it takes. */
+type Box = { place: Place; x: number; y: number; width: number; height: number }
 
 const idOf = (place: Place): string | null => ('node' in place.slot ? place.slot.node.id : null)
 
-/** How far a box's label stands in from its border and the space after it, so that its widest line, with the badge after the last, is in the box's middle. */
-function insetOf(place: Place): number {
-  const words = place.words ?? { mark: '', lines: [], badge: '' }
-  const widest = Math.max(...words.lines.map((line, index) => sizeOf(line) + (index === words.lines.length - 1 ? sizeOf(words.badge) : 0)))
-  return Math.floor((place.width - 4 - sizeOf(words.mark) - widest) / 2)
+/** A place's box on the picture, for a shelf whose top is `top` along the window. */
+const boxOf = (seen: Seen, place: Place, top: number): Box => {
+  const { x, y } = seen.realOf(seen.xOf(place), top)
+  return seen.isRight ? { place, x, y, width: place.rows, height: place.width } : { place, x, y, width: place.width, height: place.rows }
 }
+
+/** How far a box's label stands in from its border and the space after it, so that its widest line, with the badge after the last, is in the box's middle. */
+function insetOf(box: Box): number {
+  const words = box.place.words ?? { mark: '', lines: [], badge: '' }
+  const widest = Math.max(...words.lines.map((line, index) => sizeOf(line) + (index === words.lines.length - 1 ? sizeOf(words.badge) : 0)))
+  return Math.floor((box.width - 4 - sizeOf(words.mark) - widest) / 2)
+}
+
+/** The row of a box's first line of label: under its top border, and in a box taller than its label, in its middle. */
+const firstRowOf = (box: Box): number => box.y + 1 + Math.floor((box.height - 2 - (box.place.words?.lines.length ?? 0)) / 2)
 
 
 /** The paint of a link's line where it is not lit: its tone, or dim. */
@@ -66,51 +92,53 @@ function borderOf(graph: Graph, place: Place, selected: string | null, found: Se
  * all of it. The selected node's label is bold and inverse, and a node the
  * graph puts foremost has its label bold. Answers where a click selects
  * which node, over as much of its box as the window shows. A box the
- * window's edge cuts ends there in an ellipsis.
+ * window's side cuts ends there in an ellipsis.
  */
 function paintShelf(canvas: Canvas, graph: Graph, shelf: Shelf, selected: string | null, seen: Seen, found: Set<string>, motion: Moving | null): Hit[] {
   const hits: Hit[] = []
   const top = seen.yOf(shelf.top)
   for (const place of shelf.places) {
-    const left = seen.xOf(place)
     if ('lane' in place.slot) {
       const { lane, isUp } = place.slot
       const lit = lane.filter(link => link.from === selected || link.to === selected)
       const isLit = lit.length > 0
       const flows = isLit && motion !== null && lit.some(motion.isOneWay)
       const pulses = isLit && motion !== null && !flows
+      const char = seen.isRight ? (isUp ? '┈' : '─') : isUp ? '┊' : '│'
       for (let row = 0; row < shelf.rows; row += 1) {
-        const y = top + row
-        canvas.put(left, y, isUp ? '┊' : '│', { paint: isLit ? 'accent' : lineOf(lane[0]), ...(flows ? { beat: beatOf(isUp ? -y : y) } : {}), ...(pulses ? { isPulsing: true as const } : {}) })
+        const along = top + row
+        const { x, y } = seen.realOf(seen.xOf(place), along)
+        canvas.put(x, y, char, { paint: isLit ? 'accent' : lineOf(lane[0]), ...(flows ? { beat: beatOf(isUp ? -along : along) } : {}), ...(pulses ? { isPulsing: true as const } : {}) })
       }
       continue
     }
     const { node } = place.slot
+    const box = boxOf(seen, place, top)
     const words = place.words ?? { mark: '', lines: [], badge: '' }
     const isSelected = node.id === selected
     const frame = frameOf(node, selected)
     const border = { paint: borderOf(graph, place, selected, found) }
     const [topLeft = '', topRight = '', bottomLeft = '', bottomRight = ''] = frame.corners
-    const bar = frame.across.repeat(place.width - 2)
-    canvas.put(left, top, `${topLeft}${bar}${topRight}`, border)
-    canvas.put(left, top + place.rows - 1, `${bottomLeft}${bar}${bottomRight}`, border)
-    const text = { paint: node.tone ?? 'plain', ...(isSelected || node.isForemost ? { isBold: true as const } : {}), ...(isSelected ? { isInverse: true as const } : {}) }
-    const inset = insetOf(place)
-    for (let row = 1; row < place.rows - 1; row += 1) {
-      canvas.put(left, top + row, frame.down, border)
-      canvas.put(left + place.width - 1, top + row, frame.down, border)
-      const line = words.lines[row - 1]
-      if (line === undefined) continue
-      const said = row === 1 ? `${words.mark}${line}` : line
-      const start = left + 2 + (row === 1 ? 0 : sizeOf(words.mark)) + inset
-      canvas.put(start, top + row, said, text)
-      if (row === words.lines.length) canvas.put(start + sizeOf(said), top + row, words.badge, { paint: 'dim' })
+    const bar = frame.across.repeat(box.width - 2)
+    canvas.put(box.x, box.y, `${topLeft}${bar}${topRight}`, border)
+    canvas.put(box.x, box.y + box.height - 1, `${bottomLeft}${bar}${bottomRight}`, border)
+    for (let row = 1; row < box.height - 1; row += 1) {
+      canvas.put(box.x, box.y + row, frame.down, border)
+      canvas.put(box.x + box.width - 1, box.y + row, frame.down, border)
     }
-    if (left < 0 && left + place.width > 0) canvas.put(0, top + 1, '…', { paint: 'dim' })
-    if (left < seen.columns && left + place.width > seen.columns) canvas.put(seen.columns - 1, top + 1, '…', { paint: 'dim' })
-    const [x, y] = [Math.max(left, 0), Math.max(top, 0)]
-    const width = Math.min(left + place.width, seen.columns) - x
-    const height = Math.min(top + place.rows, seen.rows) - y
+    const text = { paint: node.tone ?? 'plain', ...(isSelected || node.isForemost ? { isBold: true as const } : {}), ...(isSelected ? { isInverse: true as const } : {}) }
+    const [inset, first] = [insetOf(box), firstRowOf(box)]
+    words.lines.forEach((line, index) => {
+      const said = index === 0 ? `${words.mark}${line}` : line
+      const start = box.x + 2 + (index === 0 ? 0 : sizeOf(words.mark)) + inset
+      canvas.put(start, first + index, said, text)
+      if (index === words.lines.length - 1) canvas.put(start + sizeOf(said), first + index, words.badge, { paint: 'dim' })
+    })
+    if (box.x < 0 && box.x + box.width > 0) canvas.put(0, first, '…', { paint: 'dim' })
+    if (box.x < seen.width && box.x + box.width > seen.width) canvas.put(seen.width - 1, first, '…', { paint: 'dim' })
+    const [x, y] = [Math.max(box.x, 0), Math.max(box.y, 0)]
+    const width = Math.min(box.x + box.width, seen.width) - x
+    const height = Math.min(box.y + box.height, seen.height) - y
     if (width > 0 && height > 0) hits.push({ node: node.id, x, y, width, height })
   }
   return hits
@@ -143,21 +171,26 @@ const JUNCTIONS: Record<number, string> = {
 /** How a straight run of wire is drawn where every wire in the cell runs against the flow. */
 const DASHED: Record<string, string> = { '│': '┊', '─': '┈' }
 
+/** The ways a wire leaves a cell on the picture, from the ways it leaves it along the layers and across them: running right, along is across the room and across is down it. */
+const turnedOf = (ways: number, isRight: boolean): number =>
+  !isRight ? ways : (ways & UP ? LEFT : 0) | (ways & DOWN ? RIGHT : 0) | (ways & LEFT ? UP : 0) | (ways & RIGHT ? DOWN : 0)
+
 /** What the wires of one bundle make of one cell: the ways they leave it, whether any is lit, whether any runs with the flow, the paint of their line where it is not lit, the beat of the first lit one that flows, and whether a lit one pulses. */
 type Mark = { ways: number; isLit: boolean; isSolid: boolean; line: Paint; beat?: number; isPulsing?: true }
 
 /**
  * Paints the wires of one channel. A wire goes from the border it leaves to
  * its track, along it, and on to the border it reaches, or straight across
- * where it leaves and arrives in one column. A border shows a tick where a
+ * where it leaves and arrives in one column. All of it is worked out across
+ * and along the window, and turned where it is written. A border shows a tick where a
  * wire leaves it, and where one with no arrowhead reaches it. A wire against
  * the flow is dashed, what touches the selected node is lit over what does
  * not, what does not is in its link's tone or dim, and a wire to a place out
  * of the window runs off the window's edge.
  * Wires of one bundle that meet are joined, in a tee or a cross; a wire that
  * only crosses another bundle's passes over it unbroken, and breaks the line
- * it crosses. A wire's label is written just past its box, beside the port it
- * leaves by.
+ * it crosses. A wire's label is written just past its box: running down,
+ * beside the port it leaves by; running right, on its line.
  */
 function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Channel, selected: string | null, seen: Seen, motion: Moving | null): void {
   const first = seen.yOf(channel.top)
@@ -169,7 +202,7 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
   const borderOfEnd = (end: End): number =>
     end.isAbove ? seen.yOf(layout.shelves[end.place.shelf]?.top ?? 0) + end.place.rows - 1 : below
 
-  const tracks = first + (channel.hasTopRow ? 1 : 0)
+  const tracks = first + channel.topRows
   for (const wire of channel.wires) {
     const turn = tracks + wire.track
     const jog = wire.jog === null ? null : { x: seen.xOf(wire.from.place) + wire.jog.at, turn: tracks + wire.jog.track }
@@ -215,10 +248,10 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
     /** Marks where the wire meets a box's border, at `x` on the border's row `y`. */
     const tick = ({ place, isAbove }: End, x: number, y: number): void => {
       if ('lane' in place.slot) return
-      const frame = frameOf(place.slot.node, selected)
+      const { exits: sides } = frameOf(place.slot.node, selected)
       const key = `${x},${y}`
       exits.set(key, {
-        char: isAbove ? frame.exits.below : frame.exits.above,
+        char: seen.isRight ? (isAbove ? sides.right : sides.left) : isAbove ? sides.bottom : sides.top,
         isLit: isLit || (exits.get(key)?.isLit ?? false),
         paint: borderOf(graph, place, selected, new Set()),
       })
@@ -226,51 +259,51 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
     tick(wire.from, out, start)
     if (wire.hasHead) {
       const key = `${into},${wire.to.isAbove ? end + 1 : end - 1}`
-      heads.set(key, { char: wire.to.isAbove ? '▲' : '▼', isLit: isLit || (heads.get(key)?.isLit ?? false), line: lineOf(wire.link) })
+      const char = seen.isRight ? (wire.to.isAbove ? '◀' : '▶') : wire.to.isAbove ? '▲' : '▼'
+      heads.set(key, { char, isLit: isLit || (heads.get(key)?.isLit ?? false), line: lineOf(wire.link) })
     } else {
       tick(wire.to, into, end)
     }
   }
 
-  for (const [key, exit] of exits) {
-    const [x = 0, y = 0] = key.split(',').map(Number)
-    canvas.put(x, y, exit.char, { paint: exit.isLit ? 'accent' : exit.paint })
+  /** Writes at a cell across and along the window, where the picture has it. */
+  const put = (key: string, text: string, style: Omit<Cell, 'char'>): void => {
+    const [across = 0, along = 0] = key.split(',').map(Number)
+    const { x, y } = seen.realOf(across, along)
+    canvas.put(x, y, text, style)
   }
+  for (const [key, exit] of exits) put(key, exit.char, { paint: exit.isLit ? 'accent' : exit.paint })
   for (const [key, marks] of cells) {
-    const [x = 0, y = 0] = key.split(',').map(Number)
     const upright = [...marks.values()].filter(mark => (mark.ways & (UP | DOWN)) !== 0)
     const shown = upright.length > 0 ? upright : [...marks.values()]
-    const line = JUNCTIONS[shown.reduce((ways, mark) => ways | mark.ways, 0)] ?? ' '
+    const line = JUNCTIONS[turnedOf(shown.reduce((ways, mark) => ways | mark.ways, 0), seen.isRight)] ?? ' '
     const isSolid = shown.some(mark => mark.isSolid)
     const beat = shown.find(mark => mark.beat !== undefined)?.beat
     const isPulsing = beat === undefined && shown.some(mark => mark.isPulsing === true)
-    canvas.put(x, y, isSolid ? line : (DASHED[line] ?? line), {
+    put(key, isSolid ? line : (DASHED[line] ?? line), {
       paint: shown.some(mark => mark.isLit) ? 'accent' : (shown.find(mark => mark.line !== 'dim')?.line ?? 'dim'),
       ...(beat === undefined ? {} : { beat }),
       ...(isPulsing ? { isPulsing } : {}),
     })
   }
-  for (const [key, head] of heads) {
-    const [x = 0, y = 0] = key.split(',').map(Number)
-    canvas.put(x, y, head.char, { paint: head.isLit ? 'accent' : head.line })
-  }
+  for (const [key, head] of heads) put(key, head.char, { paint: head.isLit ? 'accent' : head.line })
   const labels = new Map<string, { text: string; isLit: boolean; tone: Paint }>()
   for (const wire of channel.wires) {
     const text = labelOf(wire.link)
     if (text === '' || 'lane' in wire.from.place.slot) continue
     const border = borderOfEnd(wire.from)
-    const key = `${seen.xOf(wire.from.place) + wire.from.at + 1},${wire.from.isAbove ? border + 1 : border - 1}`
+    const port = seen.xOf(wire.from.place) + wire.from.at
+    const key = seen.isRight
+      ? `${port},${wire.from.isAbove ? border + 1 : border - sizeOf(text)}`
+      : `${port + 1},${wire.from.isAbove ? border + 1 : border - 1}`
     const isLit = selected !== null && (wire.link.from === selected || wire.link.to === selected)
     labels.set(key, { text, isLit: isLit || (labels.get(key)?.isLit ?? false), tone: wire.link.tone ?? 'plain' })
   }
-  for (const [key, label] of labels) {
-    const [x = 0, y = 0] = key.split(',').map(Number)
-    canvas.put(x, y, label.text, { paint: label.isLit ? 'accent' : label.tone })
-  }
+  for (const [key, label] of labels) put(key, label.text, { paint: label.isLit ? 'accent' : label.tone })
 }
 
 /** What a name at the window's edge may be written over: a blank, a line, or an arrowhead. */
-const COVERABLE = /^[ \u2500-\u257f▲▼]$/u
+const COVERABLE = /^[ \u2500-\u257f▲▼◀▶]$/u
 /** The four edges of a window, and the arrow a name written at each points out with. */
 const EDGES = { top: '▴', bottom: '▾', left: '◂', right: '▸' } as const
 
@@ -292,29 +325,30 @@ function paintSigns(canvas: Canvas, graph: Graph, boxes: Box[], selected: string
   /** Whether the window shows some of a box's label, apart from the first and last columns, where a box the edge cuts ends in an ellipsis. */
   const isShown = (box: Box): boolean => {
     const words = box.place.words ?? { mark: '', lines: [], badge: '' }
-    const start = box.x + 2 + insetOf(box.place)
+    const start = box.x + 2 + insetOf(box)
     const end = start + sizeOf(words.mark) + sizeOf(words.lines[0] ?? '')
-    return box.y + 1 >= 0 && box.y + 1 < seen.rows && start < seen.columns - 1 && end > 1
+    const row = firstRowOf(box)
+    return row >= 0 && row < seen.height && start < seen.width - 1 && end > 1
   }
   const from = boxes.find(box => idOf(box.place) === selected)
   if (selected === null || from === undefined || !isShown(from)) return []
   const signs = boxes.flatMap(box => {
     const id = idOf(box.place)
     if (id === null || id === selected || isShown(box) || !isJoined(graph, id, selected)) return []
-    const row = box.y + 1
-    const edge: keyof typeof EDGES = row < 0 ? 'top' : row >= seen.rows ? 'bottom' : box.x < 0 ? 'left' : 'right'
+    const row = firstRowOf(box)
+    const edge: keyof typeof EDGES = row < 0 ? 'top' : row >= seen.height ? 'bottom' : box.x < 0 ? 'left' : 'right'
     const name = 'node' in box.place.slot ? clipMiddle(box.place.slot.node.label, SIGN_CELLS) : ''
     const text = edge === 'right' ? `${name} ${EDGES[edge]}` : `${EDGES[edge]} ${name}`
     const width = sizeOf(text)
     const isAcross = edge === 'top' || edge === 'bottom'
-    const along = isAcross ? Math.round(box.x + (box.place.width - width) / 2) : row
+    const along = isAcross ? Math.round(box.x + (box.width - width) / 2) : row
     return [{ id, edge, text, width, isAcross, along, priority: 'node' in box.place.slot ? priorityOf(box.place.slot.node) : 0 }]
   })
   const hits: Hit[] = []
   const boxed = new Set<string>()
   for (const box of boxes) {
-    for (let y = Math.max(box.y, 0); y < Math.min(box.y + box.rows, seen.rows); y += 1) {
-      for (let x = Math.max(box.x, 0); x < Math.min(box.x + box.place.width, seen.columns); x += 1) boxed.add(`${x},${y}`)
+    for (let y = Math.max(box.y, 0); y < Math.min(box.y + box.height, seen.height); y += 1) {
+      for (let x = Math.max(box.x, 0); x < Math.min(box.x + box.width, seen.width); x += 1) boxed.add(`${x},${y}`)
     }
   }
   /** Whether a name may be written over a cell: a line or a blank, not lit, and in no box. */
@@ -324,16 +358,16 @@ function paintSigns(canvas: Canvas, graph: Graph, boxes: Box[], selected: string
   }
   const isFree = (x: number, y: number, width: number): boolean =>
     x >= 0 &&
-    x + width <= seen.columns &&
+    x + width <= seen.width &&
     y >= 0 &&
-    y < seen.rows &&
+    y < seen.height &&
     !hits.some(hit => hit.y === y && x < hit.x + hit.width + 1 && hit.x < x + width + 1) &&
     Array.from({ length: width + 2 }, (_, index) => x - 1 + index).every(column => isCoverable(column, y))
   for (const sign of [...signs].sort((a, b) => Number(a.isAcross) - Number(b.isAcross) || b.priority - a.priority)) {
     const placeAt = (at: number): [number, number] =>
-      sign.isAcross ? [at, sign.edge === 'top' ? 0 : seen.rows - 1] : [sign.edge === 'left' ? 0 : seen.columns - sign.width, at]
-    const wanted = sign.isAcross ? Math.min(Math.max(sign.along, 0), seen.columns - sign.width) : sign.along
-    const reach = sign.isAcross ? seen.columns : seen.rows
+      sign.isAcross ? [at, sign.edge === 'top' ? 0 : seen.height - 1] : [sign.edge === 'left' ? 0 : seen.width - sign.width, at]
+    const wanted = sign.isAcross ? Math.min(Math.max(sign.along, 0), seen.width - sign.width) : sign.along
+    const reach = sign.isAcross ? seen.width : seen.height
     const near = Array.from({ length: 2 * reach }, (_, step) => wanted + (step % 2 === 0 ? step / 2 : -(step + 1) / 2))
     const at = near.find(one => isFree(...placeAt(one), sign.width))
     if (at === undefined) continue
@@ -367,12 +401,18 @@ export function paint(layout: Layout, graph: Graph, selected: string | null, roo
   if (layout.shelves.length === 0) return { rows: [], hits: [] }
   const sight = sightOf(layout, room)
   const at = within(pan, sight.most)
-  const canvas = canvasOf(layout.columns, sight.rows)
+  const isRight = layout.direction === 'right'
+  const [width, height] = isRight ? [Math.max(room.columns, sight.rows), layout.columns] : [layout.columns, sight.rows]
+  const canvas = canvasOf(width, height)
   const seen: Seen = {
     xOf: place => place.x - slideOf(layout, layout.shelves[place.shelf], at.x),
     yOf: row => row - at.y,
     columns: layout.columns,
     rows: sight.rows,
+    width,
+    height,
+    isRight,
+    realOf: (across, along) => (isRight ? { x: along, y: across } : { x: across, y: along }),
   }
 
   const found = new Set(finding?.found)
@@ -384,27 +424,25 @@ export function paint(layout: Layout, graph: Graph, selected: string | null, roo
     const [above, below] = [layout.shelves[index], layout.shelves[index + 1]]
     const isNear = [above, below].some(shelf => shelf !== undefined && isInView(shelf.top, shelf.rows))
     if (!isInView(channel.top, channel.rows) && !isNear) return
-    if (channel.isLoose) layTracks(channel, seen.xOf, channel.rows - Number(channel.hasTopRow) - Number(channel.hasBottomRow))
+    if (channel.isLoose) layTracks(channel, seen.xOf, channel.rows - channel.topRows - channel.bottomRows)
     paintChannel(canvas, graph, layout, channel, selected, seen, motion)
   })
 
-  const boxes: Box[] = layout.shelves.flatMap(shelf =>
-    shelf.places.filter(place => 'node' in place.slot).map(place => ({ place, x: seen.xOf(place), y: seen.yOf(shelf.top), rows: place.rows })),
-  )
+  const boxes: Box[] = layout.shelves.flatMap(shelf => shelf.places.filter(place => 'node' in place.slot).map(place => boxOf(seen, place, seen.yOf(shelf.top))))
   const signs = paintSigns(canvas, graph, boxes, selected, seen)
   const rows = canvas.cells.map(spansOf)
   const beyond = {
     left: boxes.filter(box => box.x < 0).length,
-    right: boxes.filter(box => box.x + box.place.width > layout.columns).length,
+    right: boxes.filter(box => box.x + box.width > width).length,
     above: boxes.filter(box => box.y < 0).length,
-    below: boxes.filter(box => box.y + box.rows > sight.rows).length,
+    below: boxes.filter(box => box.y + box.height > height).length,
   }
-  const page = { x: Math.max(1, layout.columns - PAGE_OVERLAP.x), y: Math.max(1, sight.rows - PAGE_OVERLAP.y) }
+  const page = { x: Math.max(1, width - PAGE_OVERLAP.x), y: Math.max(1, height - PAGE_OVERLAP.y) }
   const which = finding === undefined ? -1 : finding.found.indexOf(selected ?? '')
   const notes =
     finding === undefined
       ? leftOut(graph.unread)
       : [`/${finding.query} · ${finding.found.length === 0 ? 'no match' : `${Math.max(which, 0) + 1} of ${finding.found.length}`}`, `/${finding.query}`]
-  const foot = footRow(sight.isWhole ? undefined : beyond, layout.columns, page, rows.length, notes)
+  const foot = footRow(sight.isWhole ? undefined : beyond, width, page, rows.length, notes)
   return bounded({ rows: [...rows, foot.row], hits: [...signs, ...hits, ...foot.hits] })
 }

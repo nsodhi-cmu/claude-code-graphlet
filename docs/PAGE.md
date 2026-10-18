@@ -4,7 +4,7 @@ A click on `html ↗`, in the corner of a drawing's [foot](DRAWING.md#the-foot),
 
 ## The Page
 
-`pageOf` answers one HTML document that draws the graph as an inline SVG. It has the layers and the order within them that the terminal's picture has, since both come from [`layersOf`](LAYERS.md), and places them its own way: each layer in the middle of the widest, its boxes side by side.
+`pageOf` answers one HTML document that draws the graph as an inline SVG. It has the layers and the order within them that the terminal's picture has, since both come from [`layersOf`](LAYERS.md), and runs the way that picture runs, down or right. It places them its own way, across and along as the layout does, and turns them to draw: each layer in the middle of the widest, its boxes side by side across it, as tall as its tallest running down, and as wide as its widest running right. Below, down the page is along the layers and across is across them; running right, they are turned.
 
 - A node is a rounded box in its tone's color, with its mark, its label wrapped as the terminal wraps it, and its badge. A node put foremost has a border twice as heavy, and its words are bold.
 - A link is a curve with an arrowhead at the node it reaches, in its tone's color where it has one. Down the page it leaves the middle of a box's bottom and reaches the middle of a box's top. A link that runs back up is dashed, and uses the port beside the middle. A link past a layer runs through its lane there.
