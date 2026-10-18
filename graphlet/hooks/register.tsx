@@ -41,9 +41,10 @@ const dragged = new Map<string, { grab: unknown; at: Pan }>()
 const foundIn = (graph: Graph, query: string): string[] =>
   query.trim() === '' ? [] : graph.nodes.filter(node => node.label.toLowerCase().includes(query.trim().toLowerCase())).map(node => node.id)
 /**
- * How graphs are drawn: as the plugin's options say, in a pane, and in a
- * reply folded into the room it has, with its links kept separate, since
- * nothing in a reply can be selected to tell merged links apart.
+ * How graphs are drawn: as the plugin's options say, in a pane, and still,
+ * in a reply and as `c` copies them, folded into the room they have, with
+ * their links kept separate, since nothing still can be selected to tell
+ * merged links apart.
  */
 let view = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate', motion: 'still' })
 let still = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate', motion: 'still' }, true)
@@ -313,7 +314,8 @@ export const register: Register = (on, options) => {
       finding.set(pane, '')
       $.ui.invalidate('ui.render')
     } else if (key === 'c') {
-      await copyGraph($, at.whole, { columns: cellsOf(view.measure(at.whole, at.room.columns).columns), rows: MOST_CELLS })
+      const whole = { ...at.whole, direction: view.direction(at.whole, at.room) }
+      await copyGraph($, whole, { columns: cellsOf(view.measure(whole, at.room.columns).columns), rows: MOST_CELLS })
     } else if (key === 'f') {
       if (focused.has(pane)) focused.delete(pane)
       else focused.add(pane)

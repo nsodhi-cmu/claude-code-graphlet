@@ -4,7 +4,7 @@ The layout says where everything stands: a box a node, the boxes of a layer side
 
 ## Two Ways To Run
 
-A graph runs `down`, its shelves rows of boxes one under another, or `right`, its shelves columns of boxes side by side. The layout is worked out the same way for both, across a shelf and along the layers, and everything below is said as it is running down: a place's `x` is how far across its shelf it stands, and a row is a step along the layers. Running right, across is down the room and along is across it, and the [picture](DRAWING.md#a-graph-that-runs-right) turns it, so its lines run the other way while every box and every word reads as ever. What a direction changes of the layout itself is in `GRAINS`:
+A graph runs `down`, its shelves rows of boxes one under another, or `right`, its shelves columns of boxes side by side. The layout is worked out the same way for both, across a shelf and along the layers, and everything below is said as it is running down: a place's `x` is how far across its shelf it stands, and a row is a step along the layers. Running right, across is down the room and along is across it, and the [picture](DRAWING.md#a-graph-that-runs-right) turns it, so its lines run the other way while every box and every word reads as ever. What a direction changes of the layout itself is this, the gap, the step between ports, and where a label lies held in `GRAINS`:
 
 - **Boxes.** Running right, a box is as tall across its shelf as its label's lines and its border, and as long along the layers as its widest line; so a shelf is as long along as its widest box, and a narrower box stands at its start.
 - **Gaps.** Two neighbors of a shelf are `gap` apart: two columns running down, one row running right.

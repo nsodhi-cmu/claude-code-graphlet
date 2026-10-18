@@ -52,7 +52,7 @@ const ZOOM_RATE = 0.0015
 /** The most the wheel zooms the drawing in: this many times its own size. */
 const MOST_ZOOM = 4
 
-/** The tones a node may be drawn in, each a class of the page's style. One the page does not know is drawn plain. */
+/** The tones a node, a link, or a frame may be drawn in, each a class of the page's style. One the page does not know is drawn plain. */
 const TONES: readonly GraphletTone[] = ['plain', 'dim', 'note', 'good', 'warn', 'bad']
 
 /** How the page looks: the colors, once for a light scheme and once for a dark one, and each shape by its class. */
@@ -419,8 +419,8 @@ function boxOf(turning: Turning, node: Node, spot: Spot): string {
 }
 
 /**
- * The drawing: every link, each naming its two ends by their places in the
- * graph, in its tone where it has one, with an arrowhead where it runs one
+ * The drawing: every group's frame, under all the rest; every link, each
+ * naming its two ends by their places in the graph, in its tone where it has one, with an arrowhead where it runs one
  * way and its label, cut as the
  * terminal cuts it, written on its first stretch, and moved down past any
  * label written there before it; and over them every node, in the graph's

@@ -102,6 +102,8 @@ const BREAKS = '/-_.'
 const LOOP = '↺'
 /** How far a group's frame stands out from what it holds across a shelf: its border, and a blank inside it. */
 const FRAME_MARGIN = 2
+/** What a frame's top border takes besides its label: its two corners, a cell of border and a blank before the label, and a blank and a cell of border after. */
+const TITLE_CELLS = 6
 /** How many rows a frame's border takes along the layers, at each end of what it holds: its border, and running right, where a row is a column, a blank inside it. */
 const FRAME_ENDS: Readonly<Record<Direction, number>> = { down: 1, right: 2 }
 
@@ -363,9 +365,10 @@ function bundlesOf(wires: Wire[], links: Links): Wire[][] {
  * share a port, and so do the wires of one bundle that reach it, so two
  * bundles never run into one port. A port of wires with a label has the label
  * written after it along the face, and the next port stands past the label;
- * else a face's ports stand the direction's `portStep` apart. Running right,
- * a label lies along its line and takes nothing of the face. They stand across its middle, in
- * the order of where along their shelves the places at the wires' other ends
+ * else a face's ports stand the direction's `portStep` apart; running right,
+ * a label lies along its line and takes nothing of the face. The ports stand
+ * across the face's middle, in the order of where along their shelves the
+ * places at the wires' other ends
  * stand, so that wires from the left arrive on the left; of two that lead to
  * a place in common, the one with the flow is first, wherever their other
  * wires lead, so that the links two boxes have each way stand in the same
@@ -924,7 +927,7 @@ export function layTracks(channel: Channel, xOf: (place: Place) => number, under
  * Running right, the room across is the room's rows less the foot's, and a
  * graph is laid out across no more of them than its longest shelf takes, so
  * that it is as tall as it needs and no taller; its layers are never folded,
- * since a room with too few columns for them is drawn running down.
+ * since a graph that names no way runs right only where it fits as it is.
  */
 export function layoutOf(graph: Graph, room: Room, look: Look, fold = false, direction: Direction = 'down'): Layout {
   if (direction === 'right') return laidOut(graph, Math.max(room.rows - 1, LEAST_ROWS), look, undefined, direction)
@@ -1087,7 +1090,7 @@ function framesOf(graph: Graph, shelves: Shelf[], channels: Channel[], columns: 
       }
     }
     const [left, right] = spanOf(held.map(({ place }) => place))
-    const title = direction === 'down' ? sizeOf(group.label) + 6 : 0
+    const title = direction === 'down' ? sizeOf(group.label) + TITLE_CELLS : 0
     const [first, last] = [Math.min(...held.map(({ index }) => index)), Math.max(...held.map(({ index }) => index))]
     const frame: Frame = { group, first, last, x: left - FRAME_MARGIN, width: Math.max(right - left + 2 * FRAME_MARGIN, title), top: 0, bottom: 0 }
     const places = new Set(held.map(({ place }) => place))
@@ -1098,7 +1101,7 @@ function framesOf(graph: Graph, shelves: Shelf[], channels: Channel[], columns: 
       })
       const stops = [frame.x + 1, ...new Set(crossed.toSorted((a, b) => a - b)), frame.x + frame.width - 1]
       const room = Math.max(...stops.slice(1).map((stop, index) => stop - (stops[index] ?? 0) - 2))
-      const wanted = sizeOf(group.label) + 3
+      const wanted = sizeOf(group.label) + TITLE_CELLS - 3
       if (room < wanted) {
         frame.x -= wanted - Math.max(0, (stops[1] ?? 0) - frame.x - 2)
         frame.width = right + FRAME_MARGIN - frame.x

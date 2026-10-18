@@ -29,7 +29,7 @@ A drawing is rows of painted text, and the rectangles of them that answer a clic
 - `↺` in a box says the node links to itself.
 - A box with a heavy frame, `┏━┓`, and a bold label is a node the graph puts foremost: one of the highest priority its nodes have, where that is above 0 and above another node's.
 - A frame with round corners, `╭─ Backend ─╮`, holds the nodes of a group, and nothing else. A line that crosses its border is a link into the group or out of it, and passes over the border, which is broken there.
-- A box with round corners that says `▸` and a count, `▸ Backend  3`, is a collapsed group, standing for all its nodes: its links are theirs.
+- A box with round corners that says `▸` and a count, `▸ Backend  3`, is a collapsed group, standing for all its nodes: its links are theirs. Selected, it has a double frame, as any box does.
 
 An undirected graph is drawn the same way, with no arrowheads and no flow, and in a graph with links of both kinds, each is drawn as its kind is:
 
@@ -76,7 +76,7 @@ A link's label is written beside its line, just past the box it leaves, in the p
 
 ### Groups
 
-`paintFrame` draws each group's frame before anything else, in the group's tone, or dim, so the lines painted after pass over it. Last, `writeTitle` writes the group's label in the top border, a blank on either side, nearest its left corner where no line crosses the border there or in the cell after; else anywhere it fits; and where nothing is long enough, cut in its middle to the longest stretch there is. The label is in the group's tone, or plain, and a click on it collapses the group. A collapsed group is drawn by `collapsedOf` in `view.ts` as a node whose box has round corners, before anything is laid out.
+`paintFrame` draws each group's frame before anything else, in the group's tone, or dim, so the lines painted after pass over it. Last, `writeTitle` writes the group's label in the top border, a blank on either side, nearest its left corner where no line crosses the border there or in the cell after; else anywhere it fits; and where nothing is long enough, cut in its middle to the longest stretch there is, or left out where even that is shorter than `LEAST_TITLE_CELLS`, and then there is no label to click. The label is in the group's tone, or plain, and a click on it collapses the group. A collapsed group is drawn by `collapsedOf` in `view.ts` as a node whose box has round corners, before anything is laid out.
 
 ```
                           ┌─────────┐
@@ -142,7 +142,7 @@ With the `motion` setting at `flowing`, the lit lines move. A lit link that runs
 
 ## The Window
 
-A graph larger than its room is seen through a window, and never laid out again to fit: the layout depends only on the room's width.
+A graph larger than its room is seen through a window, and never laid out again to fit: the layout depends only on the room's width, and for a graph that runs right, on its rows.
 
 - A shelf longer than the room runs off its edge, in the order it always has. A box the edge cuts ends there in an ellipsis.
 - `showIn` says where the window stands to show the selected node. A window that already shows the whole box stays where it is. One that does not moves just far enough to show the box, the wires above and below it, and the start of the boxes beside it, or as much of those as a small room leaves it.

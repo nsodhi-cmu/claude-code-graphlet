@@ -16,6 +16,8 @@ import { sightOf, slideOf, within } from './window'
 const PAGE_OVERLAP = { x: 16, y: 3 }
 /** How many cells a node's name takes where it is written at the window's edge, cut in the middle past that. */
 const SIGN_CELLS = 20
+/** The fewest cells of a frame's top border its label is written in: a blank, a character of the label and an ellipsis, a blank, and a cell of border after. A frame with no stretch so long has no label. */
+const LEAST_TITLE_CELLS = 5
 
 /** A box's frame: its corners, its sides, and the tick on each side where a link meets it. */
 type Frame = { corners: string; across: string; down: string; exits: { top: string; bottom: string; left: string; right: string } }
@@ -27,9 +29,9 @@ const FRAMES = {
   collapsed: { corners: '╭╮╰╯', across: '─', down: '│', exits: { top: '┴', bottom: '┬', left: '┤', right: '├' } },
 } as const satisfies Record<string, Frame>
 
-/** A node's frame: doubled where it is selected, heavy where the graph puts it foremost, round where it stands for a collapsed group, else plain. */
+/** A node's frame: doubled where it is selected, round where it stands for a collapsed group, heavy where the graph puts it foremost, else plain. */
 const frameOf = (node: Node, selected: string | null): Frame =>
-  node.id === selected ? FRAMES.selected : node.isForemost ? FRAMES.foremost : node.holds !== undefined ? FRAMES.collapsed : FRAMES.plain
+  node.id === selected ? FRAMES.selected : node.holds !== undefined ? FRAMES.collapsed : node.isForemost ? FRAMES.foremost : FRAMES.plain
 
 /**
  * Where a window puts things: how far across it each place starts and how
@@ -176,7 +178,8 @@ function paintFrame(canvas: Canvas, box: FrameBox): void {
  * as near its left corner as it can stand where no line crosses the border
  * there or in the cell after it, or else in any such stretch it fits, and
  * cut in its middle where the border has none long enough: then in the
- * longest it has. It is in the group's tone, or plain. Answers where a click
+ * longest it has, where that is `LEAST_TITLE_CELLS` or more. It is in the
+ * group's tone, or plain. Answers where a click
  * collapses the group: on the label, where the window shows it.
  */
 function writeTitle(canvas: Canvas, box: FrameBox): Hit[] {
@@ -191,7 +194,7 @@ function writeTitle(canvas: Canvas, box: FrameBox): Hit[] {
   }
   const label = box.frame.group.label
   const run = runs.find(one => one.length >= sizeOf(label) + 3) ?? runs.find(one => one.length >= sizeOf(label) + 2) ?? runs.toSorted((a, b) => b.length - a.length)[0]
-  if (run === undefined || run.length < 5) return []
+  if (run === undefined || run.length < LEAST_TITLE_CELLS) return []
   const title = ` ${clipMiddle(label, Math.min(sizeOf(label), run.length - 2))} `
   canvas.put(run.start, box.top, title, { paint: box.frame.group.tone ?? 'plain' })
   const [start, end] = [Math.max(run.start, 0), Math.min(run.start + sizeOf(title), canvas.cells[0]?.length ?? 0)]

@@ -1,6 +1,6 @@
 # Layers
 
-A graph is drawn in layers: every node in a row of the drawing, and every link running between the layers of its two nodes. Putting a graph in layers is `graphlet/hooks/layers.ts`.
+A graph is drawn in layers: every node in a layer, a row of the drawing, or a column of a graph that runs right, and every link running between the layers of its two nodes. Putting a graph in layers is `graphlet/hooks/layers.ts`.
 
 ## Reading A Graph
 
@@ -59,6 +59,6 @@ A link between two nodes of one layer is no stretch. Those are kept apart, by la
 
 A layer starts in the order the graph names its nodes in, with its lanes after them. While any two stretches cross, the layers are ordered against their neighbors: on the way down each layer by the layer above it, and on the way back up each by the layer below, a slot going to the middle of the places of what it is joined to there. That is done a few times over, and the ordering whose stretches cross least is the one kept.
 
-With nothing crossing, nothing is reordered, so the nodes of a layer stay in the order the graph names them in. The order never depends on what is selected or where the window stands.
+With nothing crossing, nothing is reordered, so the nodes of a layer stay in the order the graph names them in, but for keeping each group's together. The order never depends on what is selected or where the window stands.
 
 Where the graph has groups, `together` keeps the slots of each group side by side in every ordering, where the group's own would stand on average, and a lane carries links within one group or none, so the lanes of the links within a group stand among its nodes. Last, `inOrder` puts the groups in one order across all the layers, by where each stands on average over the layers it is in, so that no two groups' frames cross.

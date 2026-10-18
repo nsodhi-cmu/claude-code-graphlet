@@ -14,7 +14,8 @@ export type GraphletNode = {
   /** A few characters drawn dim after the label: a count, a tag. */
   badge?: string
   /**
-   * The layer the node stands in, counted down from the top one. Left out on
+   * The layer the node stands in, counted from the first, at the top, or at
+   * the left of a graph that runs right. Left out on
    * any node of a graph, graphlet works the layers out from the links.
    */
   layer?: number
@@ -139,8 +140,9 @@ export type GraphletScroll = { pane: string; by: number | { x: number; y: number
 export type Graphlet = {
   /**
    * The size of a graph's drawing in a room `columns` wide and as tall as it
-   * needs: the rows it takes, and the columns its widest layer is laid out
-   * across, which are more than the room's when it scrolls sideways.
+   * needs: the rows it takes, and the columns it is laid out across, its
+   * widest layer's running down and all its layers' running right, which are
+   * more than the room's when it scrolls sideways.
    */
   measure(input: { graph: GraphletGraph; columns: number }): Promise<GraphletSize>
   /**

@@ -3,7 +3,7 @@ import { expect, test } from 'claude-code/testing'
 import { numbers } from './fixture'
 import type { GraphletMove } from '../types'
 import { rowText, sizeOf } from '../hooks/draw'
-import { readGraph } from '../hooks/layers'
+import { ranksOf, readGraph } from '../hooks/layers'
 import type { Look } from '../hooks/layout'
 import { FOCUS_NODES, MOVES, collapsedOf, focusOf, viewOf } from '../hooks/view'
 
@@ -121,4 +121,14 @@ test('collapsed, a group is one box where its first node stood, saying its label
   ])
   expect(shut.groups).toEqual([])
   expect(collapsedOf(graph, new Set())).toBe(graph)
+})
+
+test('collapsed in a graph whose nodes name their layers, a group\'s box stands in its first node\'s layer, so every other node keeps its own', () => {
+  const graph = readGraph({
+    nodes: [{ id: 'top', label: 'top', layer: 0 }, { id: 'a', label: 'a', layer: 2, group: 'g' }, { id: 'b', label: 'b', layer: 3, group: 'g' }, { id: 'low', label: 'low', layer: 5 }],
+    links: [{ from: 'top', to: 'a' }, { from: 'b', to: 'low' }],
+  })
+  const shut = collapsedOf(graph, new Set(['g']))
+  expect(shut.nodes.map(node => `${node.id} ${node.layer}`)).toEqual(['top 0', 'g 2', 'low 5'])
+  expect([...ranksOf(shut)]).toEqual([['top', 0], ['g', 1], ['low', 2]])
 })

@@ -210,9 +210,10 @@ export type Still = { rows: Span[][]; foot: string }
 
 /**
  * A graph drawn as a still picture in a room: laid out once in it, as tall as
- * it needs, from its top left corner, with nothing selected. Nothing in it
- * answers a click, so its foot keeps only the counts of what is out of view.
- * The columns blank down the whole of its left side are cut away.
+ * it needs, from its top left corner, with nothing selected. Its foot keeps
+ * the counts of what is out of view and of what was left out, and not the
+ * corner a pane's has. The columns blank down the whole of its left side are
+ * cut away.
  */
 export function stillOf(view: View, graph: Graph, room: Room): Still {
   const drawing = view.draw(graph, null, room, { x: 0, y: 0 })
