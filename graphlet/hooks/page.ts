@@ -111,6 +111,7 @@ text { text-anchor: middle; fill: var(--ink); }
 .dim text, .badge { fill: var(--soft); }
 .badge { font-size: ${BADGE_SIZE}px; }
 .link { color: var(--line); }
+.link.toned { color: var(--tone); }
 .link path { fill: none; stroke: currentColor; stroke-width: 1.25; }
 .link polygon { fill: currentColor; }
 .link text { font-size: ${BADGE_SIZE}px; fill: currentColor; paint-order: stroke; stroke: var(--page); stroke-width: 4px; }
@@ -358,7 +359,8 @@ function boxOf(node: Node, spot: Spot): string {
 
 /**
  * The drawing: every link, each naming its two ends by their places in the
- * graph, with an arrowhead where it runs one way and its label, cut as the
+ * graph, in its tone where it has one, with an arrowhead where it runs one
+ * way and its label, cut as the
  * terminal cuts it, written on its first stretch, and moved down past any
  * label written there before it; and over them every node, in the graph's
  * order. A link between the same two boxes as one before it, running the
@@ -396,7 +398,8 @@ function drawingOf(graph: Graph): string {
     const head = link.isDirected ? `<polygon points="${headOf(arrow.tip, arrow.way)}"/>` : ''
     const at = writtenAt.get(link)
     const label = at === undefined ? '' : `<text x="${at.x}" y="${at.y + BASELINE}">${escaped(labelOf(link))}</text>`
-    return `<g class="link" ${ends}><path${dashes} d="${arrow.path}"/>${head}${label}</g>`
+    const tone = TONES.find(one => one === link.tone)
+    return `<g class="link${tone === undefined ? '' : ` toned ${tone}`}" ${ends}><path${dashes} d="${arrow.path}"/>${head}${label}</g>`
   })
   const nodes = graph.nodes.flatMap(node => {
     const place = places.get(node.id)

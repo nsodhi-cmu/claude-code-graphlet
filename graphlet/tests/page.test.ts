@@ -284,6 +284,17 @@ describe('links between the same two nodes on a page', () => {
 })
 
 describe('the page as a document', () => {
+  test('a link in a tone is drawn in its tone\'s color, and a link in none in the color of lines', () => {
+    const graph = readGraph({
+      nodes: ['a', 'b', 'c'].map(id => ({ id, label: id })),
+      links: [{ from: 'a', to: 'b', tone: 'bad' }, { from: 'a', to: 'c' }],
+    })
+    const page = pageOf(graph, '')
+    expect(count(page, '<g class="link toned bad" data-from="0" data-to="1">')).toBe(1)
+    expect(links(page).map(link => [link.from, link.to])).toEqual([[0, 2]])
+    expect(page).toContain('.link.toned { color: var(--tone); }')
+  })
+
   test('what a graph and a title say is escaped, a tone the page does not know is drawn plain, and an id is never written', () => {
     const id = '"><img src=x>'
     const graph = readGraph({

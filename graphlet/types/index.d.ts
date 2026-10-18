@@ -36,6 +36,13 @@ export type GraphletLink = {
   /** A few words written on the link, where it leaves the node it is drawn from. */
   label?: string
   /**
+   * How the link's line, its arrowhead, and its label are painted where it
+   * is not lit, as a node's tone paints the node: a link that fails `bad`, a
+   * path a mod would have followed `note`. Left out, or `plain`, the line is
+   * dim. A link of one tone never shares a line with a link of another.
+   */
+  tone?: GraphletTone
+  /**
    * Whether the link runs from one node to the other, drawn with an arrowhead.
    * `false`, it only joins its two nodes, whichever it names first. Left out,
    * it is as its graph says.

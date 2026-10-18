@@ -43,7 +43,7 @@ describe('reading a graph', () => {
     ])
   })
 
-  test('text is made safe to draw, a node with no label is called by its id, and a tone that is none of the tones is dropped', () => {
+  test('text is made safe to draw, a node with no label is called by its id, and a tone that is none of the tones, or a link\'s of plain, is dropped', () => {
     const graph = readGraph({
       nodes: [
         { id: 'a', label: 'two\nlines\tand a tab', mark: ' ◆ ', badge: '', tone: 'warn' },
@@ -51,8 +51,17 @@ describe('reading a graph', () => {
         { id: 'c\nd', label: '' },
         { id: '  ', label: '' },
       ],
-      links: [],
+      links: [
+        { from: 'a', to: 'b', tone: 'bad' },
+        { from: 'b', to: 'a', tone: 'plain' },
+        { from: 'a', to: '  ', tone: 'loud' as never },
+      ],
     })
+    expect(graph.links).toEqual([
+      { from: 'a', to: 'b', isDirected: true, tone: 'bad' },
+      { from: 'b', to: 'a', isDirected: true },
+      { from: 'a', to: '  ', isDirected: true },
+    ])
     expect(graph.nodes).toEqual([
       { id: 'a', label: 'two lines and a tab', mark: '◆', tone: 'warn', isForemost: false },
       { id: 'b', label: 'b', isForemost: false },

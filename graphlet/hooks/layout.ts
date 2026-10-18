@@ -125,6 +125,9 @@ export function linesOf(label: string): string[] {
 /** What is written on a link, cut to the cells a link's label may take; nothing where it has no label. */
 export const labelOf = (link: GraphletLink): string => (link.label === undefined ? '' : clipMiddle(link.label, LINK_LABEL_CELLS))
 
+/** Whether a link keeps to lines of links that say what it says: one with a label or a tone, which is then true of every link of the line. */
+export const isApart = (link: GraphletLink): boolean => labelOf(link) !== '' || link.tone !== undefined
+
 /** What a box says: its node's mark, the lines of its label, and what follows the last of them, dim. */
 export type Words = { mark: string; lines: string[]; badge: string }
 
@@ -271,13 +274,14 @@ function wiresOf(pieces: Piece[], flats: Link[], shelf: Shelf, placeOf: Map<Slot
  * that run together they say nothing false. Links of the two kinds are never
  * of one bundle. A link with no direction, whose line has no arrowhead to
  * tell its two ends apart, between two nodes of the shelf is a bundle alone,
- * and merged too where it has a label. Merged, a bundle is every wire of one
- * kind with no label
- * that runs the one way, with the flow or against it. Wires with a label are
- * bundled as they are kept apart whichever the setting, and wires with
- * different labels are never of one bundle, so that a label is true of every
- * wire of the line it is written beside; merged, the bundles with a label keep
- * tracks of their own, apart from the one the rest share. Kept apart, a wire that leaves a box for a
+ * and merged too where it has a label or a tone. Merged, a bundle is every
+ * wire of one kind with neither that runs the one way, with the flow or
+ * against it. Wires with a label or a tone are bundled as they are kept apart
+ * whichever the setting, and wires with different labels or tones are never
+ * of one bundle, so that a label is true of every wire of the line it is
+ * written beside, and a tone of every wire of the line it paints; merged, the
+ * bundles with either keep tracks of their own, apart from the one the rest
+ * share. Kept apart, a wire that leaves a box for a
  * lane that wires from elsewhere reach too is a fan of its own, so that it meets the lane's
  * others there without joining them to the box's other links.
  */
@@ -287,15 +291,15 @@ function bundlesOf(wires: Wire[], links: Links): Wire[][] {
     if (!ids.has(end.place)) ids.set(end.place, ids.size)
     return `${ids.get(end.place)}${end.isAbove ? 'v' : '^'}`
   }
-  const isAlone = (wire: Wire): boolean => !wire.link.isDirected && wire.from.isAbove === wire.to.isAbove && (links === 'separate' || labelOf(wire.link) !== '')
+  const isAlone = (wire: Wire): boolean => !wire.link.isDirected && wire.from.isAbove === wire.to.isAbove && (links === 'separate' || isApart(wire.link))
   const reaching = new Map<Place, Set<Place>>()
   for (const wire of wires) if ('lane' in wire.to.place.slot) reaching.set(wire.to.place, new Set([...(reaching.get(wire.to.place) ?? []), wire.from.place]))
   /** Whether a wire leaves a box for a lane that wires from elsewhere reach too, which it must reach on a line of its own. */
   const isJoining = (wire: Wire): boolean => 'node' in wire.from.place.slot && (reaching.get(wire.to.place)?.size ?? 0) > 1
   const fans = new Map<string, { way: string; isMerged: boolean; wires: Wire[] }>()
   for (const wire of wires.filter(wire => !isAlone(wire))) {
-    const way = JSON.stringify([wire.isUp, wire.link.isDirected, wire.link.label ?? ''])
-    const isMerged = links === 'merged' && labelOf(wire.link) === ''
+    const way = JSON.stringify([wire.isUp, wire.link.isDirected, wire.link.label ?? '', wire.link.tone ?? ''])
+    const isMerged = links === 'merged' && !isApart(wire.link)
     const key = isMerged ? way : `${way} ${faceOf(wire.from)}${isJoining(wire) ? ` into ${faceOf(wire.to)}` : ''}`
     fans.set(key, { way, isMerged, wires: [...(fans.get(key)?.wires ?? []), wire] })
   }
@@ -939,9 +943,9 @@ function laidOut(graph: Graph, columns: number, look: Look, into?: number): Layo
     const [shelf, next] = [shelves[index], shelves[index + 1]]
     channel.isLoose = shelf !== undefined && next !== undefined && next.across !== shelf.across
     if (look.links === 'merged') {
-      const written = channel.bundles.filter(bundle => bundle[0] !== undefined && labelOf(bundle[0].link) !== '')
-      const unwritten = [true, false].map(isDirected => channel.wires.filter(wire => labelOf(wire.link) === '' && wire.link.isDirected === isDirected))
-      channel.bundles = [...unwritten.filter(bundle => bundle.length > 0), ...written]
+      const apart = channel.bundles.filter(bundle => bundle[0] !== undefined && isApart(bundle[0].link))
+      const shared = [true, false].map(isDirected => channel.wires.filter(wire => !isApart(wire.link) && wire.link.isDirected === isDirected))
+      channel.bundles = [...shared.filter(bundle => bundle.length > 0), ...apart]
     }
     channel.bundles.forEach((bundle, at) => {
       for (const wire of bundle) wire.bundle = at

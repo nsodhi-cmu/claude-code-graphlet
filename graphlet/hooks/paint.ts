@@ -46,6 +46,9 @@ function insetOf(place: Place): number {
 }
 
 
+/** The paint of a link's line where it is not lit: its tone, or dim. */
+const lineOf = (link: Link | undefined): Paint => link?.tone ?? 'dim'
+
 /** What is being looked for in a graph, and the nodes whose labels hold it, in the graph's order. */
 export type Finding = { query: string; found: string[] }
 
@@ -78,7 +81,7 @@ function paintShelf(canvas: Canvas, graph: Graph, shelf: Shelf, selected: string
       const pulses = isLit && motion !== null && !flows
       for (let row = 0; row < shelf.rows; row += 1) {
         const y = top + row
-        canvas.put(left, y, isUp ? '┊' : '│', { paint: isLit ? 'accent' : 'dim', ...(flows ? { beat: beatOf(isUp ? -y : y) } : {}), ...(pulses ? { isPulsing: true as const } : {}) })
+        canvas.put(left, y, isUp ? '┊' : '│', { paint: isLit ? 'accent' : lineOf(lane[0]), ...(flows ? { beat: beatOf(isUp ? -y : y) } : {}), ...(pulses ? { isPulsing: true as const } : {}) })
       }
       continue
     }
@@ -140,8 +143,8 @@ const JUNCTIONS: Record<number, string> = {
 /** How a straight run of wire is drawn where every wire in the cell runs against the flow. */
 const DASHED: Record<string, string> = { '│': '┊', '─': '┈' }
 
-/** What the wires of one bundle make of one cell: the ways they leave it, whether any is lit, whether any runs with the flow, the beat of the first lit one that flows, and whether a lit one pulses. */
-type Mark = { ways: number; isLit: boolean; isSolid: boolean; beat?: number; isPulsing?: true }
+/** What the wires of one bundle make of one cell: the ways they leave it, whether any is lit, whether any runs with the flow, the paint of their line where it is not lit, the beat of the first lit one that flows, and whether a lit one pulses. */
+type Mark = { ways: number; isLit: boolean; isSolid: boolean; line: Paint; beat?: number; isPulsing?: true }
 
 /**
  * Paints the wires of one channel. A wire goes from the border it leaves to
@@ -149,7 +152,8 @@ type Mark = { ways: number; isLit: boolean; isSolid: boolean; beat?: number; isP
  * where it leaves and arrives in one column. A border shows a tick where a
  * wire leaves it, and where one with no arrowhead reaches it. A wire against
  * the flow is dashed, what touches the selected node is lit over what does
- * not, and a wire to a place out of the window runs off the window's edge.
+ * not, what does not is in its link's tone or dim, and a wire to a place out
+ * of the window runs off the window's edge.
  * Wires of one bundle that meet are joined, in a tee or a cross; a wire that
  * only crosses another bundle's passes over it unbroken, and breaks the line
  * it crosses. A wire's label is written just past its box, beside the port it
@@ -159,7 +163,7 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
   const first = seen.yOf(channel.top)
   const below = first + channel.rows
   const cells = new Map<string, Map<number, Mark>>()
-  const heads = new Map<string, { char: string; isLit: boolean }>()
+  const heads = new Map<string, { char: string; isLit: boolean; line: Paint }>()
   const exits = new Map<string, { char: string; isLit: boolean; paint: Paint }>()
   /** The row of the border an end meets: the bottom of its own box, which may be shorter than its shelf, or the top of the shelf below. */
   const borderOfEnd = (end: End): number =>
@@ -177,12 +181,12 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
     const draw = (x: number, y: number, ways: number, along: number): void => {
       if (x < 0 || x >= seen.columns) return
       const marks = cells.get(`${x},${y}`) ?? new Map<number, Mark>()
-      const mark = marks.get(wire.bundle) ?? { ways: 0, isLit: false, isSolid: false }
+      const mark = marks.get(wire.bundle) ?? { ways: 0, isLit: false, isSolid: false, line: lineOf(wire.link) }
       const beat = mark.beat ?? (flows ? beatOf(along) : undefined)
       const isPulsing = mark.isPulsing === true || pulses
       cells.set(
         `${x},${y}`,
-        marks.set(wire.bundle, { ways: mark.ways | ways, isLit: mark.isLit || isLit, isSolid: mark.isSolid || !wire.isUp, ...(beat === undefined ? {} : { beat }), ...(isPulsing ? { isPulsing } : {}) }),
+        marks.set(wire.bundle, { ways: mark.ways | ways, isLit: mark.isLit || isLit, isSolid: mark.isSolid || !wire.isUp, line: mark.line, ...(beat === undefined ? {} : { beat }), ...(isPulsing ? { isPulsing } : {}) }),
       )
     }
     /** Marks a column of the wire, as it runs from row `from` to row `to`, leaving out row `skip`: a border's own row is the box's. */
@@ -222,7 +226,7 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
     tick(wire.from, out, start)
     if (wire.hasHead) {
       const key = `${into},${wire.to.isAbove ? end + 1 : end - 1}`
-      heads.set(key, { char: wire.to.isAbove ? '▲' : '▼', isLit: isLit || (heads.get(key)?.isLit ?? false) })
+      heads.set(key, { char: wire.to.isAbove ? '▲' : '▼', isLit: isLit || (heads.get(key)?.isLit ?? false), line: lineOf(wire.link) })
     } else {
       tick(wire.to, into, end)
     }
@@ -241,27 +245,27 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
     const beat = shown.find(mark => mark.beat !== undefined)?.beat
     const isPulsing = beat === undefined && shown.some(mark => mark.isPulsing === true)
     canvas.put(x, y, isSolid ? line : (DASHED[line] ?? line), {
-      paint: shown.some(mark => mark.isLit) ? 'accent' : 'dim',
+      paint: shown.some(mark => mark.isLit) ? 'accent' : (shown.find(mark => mark.line !== 'dim')?.line ?? 'dim'),
       ...(beat === undefined ? {} : { beat }),
       ...(isPulsing ? { isPulsing } : {}),
     })
   }
   for (const [key, head] of heads) {
     const [x = 0, y = 0] = key.split(',').map(Number)
-    canvas.put(x, y, head.char, { paint: head.isLit ? 'accent' : 'dim' })
+    canvas.put(x, y, head.char, { paint: head.isLit ? 'accent' : head.line })
   }
-  const labels = new Map<string, { text: string; isLit: boolean }>()
+  const labels = new Map<string, { text: string; isLit: boolean; tone: Paint }>()
   for (const wire of channel.wires) {
     const text = labelOf(wire.link)
     if (text === '' || 'lane' in wire.from.place.slot) continue
     const border = borderOfEnd(wire.from)
     const key = `${seen.xOf(wire.from.place) + wire.from.at + 1},${wire.from.isAbove ? border + 1 : border - 1}`
     const isLit = selected !== null && (wire.link.from === selected || wire.link.to === selected)
-    labels.set(key, { text, isLit: isLit || (labels.get(key)?.isLit ?? false) })
+    labels.set(key, { text, isLit: isLit || (labels.get(key)?.isLit ?? false), tone: wire.link.tone ?? 'plain' })
   }
   for (const [key, label] of labels) {
     const [x = 0, y = 0] = key.split(',').map(Number)
-    canvas.put(x, y, label.text, { paint: label.isLit ? 'accent' : 'plain' })
+    canvas.put(x, y, label.text, { paint: label.isLit ? 'accent' : label.tone })
   }
 }
 

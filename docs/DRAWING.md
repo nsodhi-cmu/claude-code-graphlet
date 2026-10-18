@@ -74,7 +74,7 @@ A link's label is written beside its line, just past the box it leaves, in the p
 
 ## What Is Selected
 
-The selected node's box has a double frame, in place of the heavy one of a node put foremost, and its label is bold and inverse in the node's own tone. Every link that touches the selected node is lit along its whole way, in the theme's accent color, and so are its label and the borders of the boxes at the other ends. Everything else keeps its own paint: a box's border takes its node's tone, and a link is dim.
+The selected node's box has a double frame, in place of the heavy one of a node put foremost, and its label is bold and inverse in the node's own tone. Every link that touches the selected node is lit along its whole way, in the theme's accent color, and so are its label and the borders of the boxes at the other ends. Everything else keeps its own paint: a box's border takes its node's tone, and a link takes its own tone, in its line, its arrowhead, and its label, or is dim where it has none.
 
 Lit is painted over unlit. Where links share a stretch of line, selecting a node shows which of them are its own.
 

@@ -565,6 +565,48 @@ describe('the drawing', () => {
     ])
   })
 
+  test('a link\'s tone paints its line, its arrowhead, and its label where it is not lit, and it never shares a line with links of another tone, merged or not', () => {
+    const graph = readGraph({
+      nodes: ['Build', 'Test', 'Lint', 'Deploy'].map(id => ({ id, label: id })),
+      links: [
+        { from: 'Build', to: 'Test', tone: 'bad', label: 'fails' },
+        { from: 'Build', to: 'Lint' },
+        { from: 'Build', to: 'Deploy' },
+        { from: 'Lint', to: 'Deploy', tone: 'good' },
+      ],
+    })
+    const pictured = [
+      '               ┌────────┐',
+      '               │ Build  │',
+      '               └┬──────┬┘',
+      '                │fails │',
+      '             ┌──┘      ├─────┐',
+      '             ▼         ▼     │',
+      '         ┌──────┐  ┌──────┐  │',
+      '         │ Test │  │ Lint │  │',
+      '         └──────┘  └───┬──┘  │',
+      '                       │ ┌───┘',
+      '                       ▼ ▼',
+      '                   ┌────────┐',
+      '                   │ Deploy │',
+      '                   └────────┘',
+    ]
+    const paints = (drawing: Drawing, row: number): Array<[string, string]> =>
+      (drawing.rows[row] ?? []).filter(span => span.text.trim() !== '').map(span => [span.text.trim(), span.paint])
+    for (const links of ['separate', 'merged'] as const) {
+      const drawing = drawn(graph, null, SMALL, { ...LOOK, links })
+      expect(graphRows(drawing)).toEqual(pictured)
+      expect([3, 4, 5, 9, 10].map(row => paints(drawing, row))).toEqual([
+        [['│fails', 'bad'], ['│', 'dim']],
+        [['┌──┘', 'bad'], ['├─────┐', 'dim']],
+        [['▼', 'bad'], ['▼     │', 'dim']],
+        [['│', 'good'], ['┌───┘', 'dim']],
+        [['▼', 'good'], ['▼', 'dim']],
+      ])
+    }
+    expect(spansWith(drawn(graph, 'Build'), 'fails').map(span => span.paint)).toEqual(['accent'])
+  })
+
   test('an empty graph draws nothing', () => {
     expect(drawn(readGraph({ nodes: [], links: [] }))).toEqual({ rows: [], hits: [] })
   })

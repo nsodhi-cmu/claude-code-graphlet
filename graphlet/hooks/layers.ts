@@ -34,7 +34,8 @@ const tidy = (text: unknown): string =>
 
 /**
  * Reads a graph leniently: a node needs an id no node before it has, text is
- * made safe to draw, a tone that is none of the tones is dropped, a priority
+ * made safe to draw, a tone that is none of the tones is dropped, and so is a
+ * link's of `plain`, which is a link's when it has none, a priority
  * that is not a whole number is dropped, and so is one of 0, which is a node's
  * when it has none. The nodes put foremost are those of the highest
  * priority, where it is above 0 and above another node's. A link
@@ -80,7 +81,8 @@ export function readGraph(graph: GraphletGraph): Graph {
       unreadLinks += 1
       continue
     }
-    links.push({ from: link.from, to: link.to, isDirected, ...(label === '' ? {} : { label }) })
+    const tone = TONES.includes(link.tone as GraphletTone) && link.tone !== 'plain' ? link.tone : undefined
+    links.push({ from: link.from, to: link.to, isDirected, ...(label === '' ? {} : { label }), ...(tone === undefined ? {} : { tone }) })
   }
   return {
     nodes: nodes.map(node => ({ ...node, isForemost: priorityOf(node) === top && top > 0 && top > lowest })),
@@ -375,7 +377,7 @@ function folded(graph: Graph, ranks: Map<string, number>, fold: Fold): Map<strin
   const lanesIn = (ranks: Map<string, number>, rank: number): number => {
     const passing = links.filter(link => Math.min(ranks.get(link.from) ?? 0, ranks.get(link.to) ?? 0) < rank && rank < Math.max(ranks.get(link.from) ?? 0, ranks.get(link.to) ?? 0))
     const keyOf = (link: Link, end: 0 | 1): string =>
-      JSON.stringify([link.isDirected && (ranks.get(link.from) ?? 0) > (ranks.get(link.to) ?? 0), link.isDirected, link.label, end, endsOf(link, ranks)[end]])
+      JSON.stringify([link.isDirected && (ranks.get(link.from) ?? 0) > (ranks.get(link.to) ?? 0), link.isDirected, link.label, link.tone, end, endsOf(link, ranks)[end]])
     const bound = new Map<string, number>()
     for (const link of passing) bound.set(keyOf(link, 1), (bound.get(keyOf(link, 1)) ?? 0) + 1)
     const shared = [...bound.values()].filter(count => count > 1).length
@@ -426,7 +428,7 @@ const endsOf = (link: Link, ranks: Map<string, number>): [string, string] =>
  * The lane each link passes each layer between its ends in, as a key the
  * links that share the lane have in common, from the layer under its higher
  * end down. In a layer, the links of one kind that pass it the one way, with
- * one label, bound for the same node share a lane, which carries what
+ * one label and one tone, bound for the same node share a lane, which carries what
  * reaches that node from many; of the links that share no such lane
  * anywhere, those from the same node share one, which carries what leaves it
  * for many; and a link that shares with none has one of its own. Neither
@@ -444,8 +446,8 @@ function laneKeys(graph: Graph, ranks: Map<string, number>): Map<Link, string[]>
     for (const key of keys) counts.set(key, (counts.get(key) ?? 0) + 1)
   }
   const [toward, from] = [new Map<string, number>(), new Map<string, number>()]
-  const towardKey = (span: (typeof spans)[number], layer: number): string => JSON.stringify([layer, span.isUp, span.link.isDirected, span.link.label, 'to', span.ends[1]])
-  const fromKey = (span: (typeof spans)[number], layer: number): string => JSON.stringify([layer, span.isUp, span.link.isDirected, span.link.label, 'from', span.ends[0]])
+  const towardKey = (span: (typeof spans)[number], layer: number): string => JSON.stringify([layer, span.isUp, span.link.isDirected, span.link.label, span.link.tone, 'to', span.ends[1]])
+  const fromKey = (span: (typeof spans)[number], layer: number): string => JSON.stringify([layer, span.isUp, span.link.isDirected, span.link.label, span.link.tone, 'from', span.ends[0]])
   for (const span of spans) count(span.layers.map(layer => towardKey(span, layer)), toward)
   const isBound = (span: (typeof spans)[number]): boolean => span.layers.some(layer => (toward.get(towardKey(span, layer)) ?? 0) > 1)
   for (const span of spans) if (!isBound(span)) count(span.layers.map(layer => fromKey(span, layer)), from)
