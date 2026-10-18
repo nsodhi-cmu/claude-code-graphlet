@@ -2,6 +2,7 @@ import { expect, test } from 'claude-code/testing'
 
 import { LOOK, graphOf as graphNamed, picture } from './fixture'
 import { GUIDE, fencedOf, graphOf, partsOf, pictureOf } from '../hooks/reply'
+import { sizeOf } from '../hooks/draw'
 import { readGraph } from '../hooks/layers'
 import { viewOf } from '../hooks/view'
 
@@ -171,6 +172,14 @@ test('the groups of a block are drawn in frames in its picture, every group open
   expect(drawing).toContain('╭─ Backend ─')
   expect(drawing).toContain('╭─ Data ─')
   expect(drawing).not.toContain('▸')
+})
+
+test('a group folded into a narrow reply keeps its frame within the reply, its layers drawn together under one another', () => {
+  const block = ['Gateway -> Auth service', 'Gateway -> Orders service', 'Gateway -> Billing service', 'Gateway -> Search service', 'Backend:', '  Gateway', '  Auth service', '  Orders service', '  Billing service', '  Search service']
+  const rows = picture(pictureOf(still, readGraph({ ...graphOf(block), direction: 'down' }), { columns: 60, rows: 1000 }))
+  expect(Math.max(...rows.map(sizeOf))).toBeLessThanOrEqual(60)
+  expect(rows[0]).toMatch(/^╭─ Backend ─+╮$/)
+  expect(rows.at(-1)).toMatch(/^╰─+╯$/)
 })
 
 test('dashes within a label, and a dash in prose, stay part of the label', () => {

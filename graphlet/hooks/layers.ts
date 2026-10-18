@@ -355,8 +355,8 @@ function orderOf(nodes: GraphletNode[], links: Link[]): string[] {
   return order
 }
 
-/** The room a graph is folded into: the columns a layer may take, how wide a node's box is, and the room between two neighbors in a layer. A lane takes a column. */
-export type Fold = { columns: number; widthOf: (node: GraphletNode) => number; gap: number }
+/** The room a graph is folded into: the columns a layer may take, how wide a node's box is, the room between two neighbors in a layer, and what each group's frame adds to a layer it stands in. A lane takes a column. */
+export type Fold = { columns: number; widthOf: (node: GraphletNode) => number; gap: number; frame: number }
 
 /**
  * The layers folded into a room: each layer too wide for it gives up a node
@@ -417,7 +417,8 @@ function folded(graph: Graph, ranks: Map<string, number>, fold: Fold): Map<strin
   const nodesIn = (ranks: Map<string, number>, rank: number): Node[] => graph.nodes.filter(node => ranks.get(node.id) === rank)
   const widthIn = (ranks: Map<string, number>, rank: number): number => {
     const [nodes, lanes] = [nodesIn(ranks, rank), lanesIn(ranks, rank)]
-    return nodes.reduce((sum, node) => sum + fold.widthOf(node), 0) + lanes + (nodes.length + lanes - 1) * fold.gap
+    const frames = new Set(nodes.flatMap(node => node.group ?? [])).size * fold.frame
+    return nodes.reduce((sum, node) => sum + fold.widthOf(node), 0) + lanes + (nodes.length + lanes - 1) * fold.gap + frames
   }
   const order = new Map(graph.nodes.map((node, index) => [node.id, index]))
   for (let rank = 0; rank <= Math.max(...folds.values()); rank += 1) {

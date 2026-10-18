@@ -182,7 +182,8 @@ export type Place = { slot: Slot; shelf: number; x: number; width: number; rows:
 
 /**
  * One layer as it is laid out: its places, the columns they take side by
- * side, the columns they are laid out across, which the window slides over
+ * side with the frames that span the layer, the columns they are laid out
+ * across, which the window slides over
  * when they are more than the room's, and the rows its tallest box takes. A
  * lane runs down all of them.
  */
@@ -951,7 +952,7 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
   }
   const layers = layersOf(
     graph,
-    into === undefined ? undefined : { columns: into, widthOf: node => Math.max(widthOf(wordsOf(graph, node, look.labels)), writtenOf(node)), gap },
+    into === undefined ? undefined : { columns: into, widthOf: node => Math.max(widthOf(wordsOf(graph, node, look.labels)), writtenOf(node)), gap, frame: 2 * FRAME_MARGIN },
   )
   const placeOf = new Map<Slot, Place>()
   const shelves: Shelf[] = layers.slots.map((slots, shelf) => {
@@ -1011,7 +1012,11 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
   const priority = new Map(graph.nodes.map(node => [node.id, priorityOf(node)]))
   reseat(shelves, channels, columns, wire => Math.max(priority.get(wire.link.from) ?? 0, priority.get(wire.link.to) ?? 0), gap)
 
-  const frames = framesOf(graph, shelves, channels, gap, direction)
+  const frames = framesOf(graph, shelves, channels, columns, gap, direction)
+  shelves.forEach((shelf, index) => {
+    const spans = [...shelf.places, ...frames.filter(frame => frame.first <= index && index <= frame.last)]
+    if (spans.length > 0) shelf.width = Math.max(shelf.width, Math.max(...spans.map(one => one.x + one.width)) - Math.min(...spans.map(one => one.x)))
+  })
   if (frames.length > 0) {
     const end = Math.max(...shelves.flatMap(shelf => shelf.places.map(place => place.x + place.width)), ...frames.map(frame => frame.x + frame.width))
     if (direction === 'right') columns = Math.min(room, Math.max(columns, end))
@@ -1051,7 +1056,9 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
 
 /**
  * Each group's frame, around every place of it, standing `FRAME_MARGIN` out
- * from them across their shelves, and where the graph runs down, wide enough
+ * from them across their shelves, where that would be wider than `columns`
+ * the places of each shelf first moved together to stand in the middle of
+ * all of them, and where the graph runs down, wide enough
  * for the group's label in its top border, between the lines that cross it
  * into the group's first shelf and out of it, or else widened back past the
  * first of them until it is. On each shelf it spans, what is
@@ -1062,14 +1069,24 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
  * is moved. A shelf a frame passes with nothing of its group on it takes the
  * frame where it stands among the shelf's places.
  */
-function framesOf(graph: Graph, shelves: Shelf[], channels: Channel[], gap: number, direction: Direction): Frame[] {
+function framesOf(graph: Graph, shelves: Shelf[], channels: Channel[], columns: number, gap: number, direction: Direction): Frame[] {
   if (graph.groups.length === 0) return []
   const groupOf = slotGroups(graph)
   const framed = graph.groups.flatMap(group => {
     const held = shelves.flatMap((shelf, index) => shelf.places.filter(place => groupOf(place.slot) === group.id).map(place => ({ place, index })))
     if (held.length === 0) return []
-    const left = Math.min(...held.map(({ place }) => place.x))
-    const right = Math.max(...held.map(({ place }) => place.x + place.width))
+    const spanOf = (places: Place[]): [number, number] => [Math.min(...places.map(place => place.x)), Math.max(...places.map(place => place.x + place.width))]
+    const [wide, high] = spanOf(held.map(({ place }) => place))
+    if (high - wide + 2 * FRAME_MARGIN > columns) {
+      const middle = (wide + high) / 2
+      for (const index of new Set(held.map(one => one.index))) {
+        const block = held.filter(one => one.index === index).map(({ place }) => place)
+        const [start, end] = spanOf(block)
+        const by = Math.round(middle - (start + end) / 2)
+        for (const place of block) place.x += by
+      }
+    }
+    const [left, right] = spanOf(held.map(({ place }) => place))
     const title = direction === 'down' ? sizeOf(group.label) + 6 : 0
     const [first, last] = [Math.min(...held.map(({ index }) => index)), Math.max(...held.map(({ index }) => index))]
     const frame: Frame = { group, first, last, x: left - FRAME_MARGIN, width: Math.max(right - left + 2 * FRAME_MARGIN, title), top: 0, bottom: 0 }
