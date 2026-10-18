@@ -707,12 +707,24 @@ const say = ($: Engine, surface: RenderSurface, text: string, rest: Partial<Rend
 const textOf = (node: unknown): string =>
   typeof node === 'string' ? node : ((node as { children?: unknown[] }).children ?? []).map(textOf).join('')
 
-/** A drawn tree as the lines a terminal shows: each Text its lines, a Markdown its text, and a Box's margins as blank rows above and columns to the left. */
+/**
+ * A drawn tree as the lines a terminal shows: each Text its lines, a Markdown
+ * its text, a Button its label, a Box's margins as blank rows above and
+ * columns to the left, and a row Box its children on one line, the first and
+ * last as far apart as its width holds where it spaces them between.
+ */
 const screenOf = (node: unknown): string[] => {
   if (typeof node === 'string') return node.split('\n')
   const { type, props = {}, children = [] } = node as { type?: string; props?: Record<string, unknown>; children?: unknown[] }
   if (type === 'Text') return textOf(node).split('\n')
   if (type === 'Markdown') return String(props.text).split('\n')
+  if (type === 'Button') return [String(props.label)]
+  if (props.flexDirection === 'row') {
+    const [first = '', ...after] = children.map(child => screenOf(child)[0] ?? '')
+    const rest = after.join('')
+    const gap = props.justifyContent === 'space-between' ? Math.max(0, Number(props.width) - first.length - rest.length) : 0
+    return [`${first}${' '.repeat(gap)}${rest}`]
+  }
   const left = ' '.repeat(Number(props.marginLeft ?? 0))
   const above = Array<string>(Number(props.marginTop ?? 0)).fill('')
   return [...above, ...children.flatMap(screenOf).map(line => (line === '' ? '' : `${left}${line}`))]
@@ -725,11 +737,28 @@ test('a graph block in a reply is drawn in its place, in color, under the engine
     '● Here is how a request flows:',
     '',
     ...FLOW.map(line => `  ${line}`),
+    `  ${'copy · html ↗'.padStart(37)}`,
     '',
     '  The dashed line is the retry.',
   ])
   expect((await reply.findAll({ type: 'Text', text: /Ask for a correction/ })).map(text => text.props.color)).toContain('warning')
   expect(await reply.find({ type: 'Markdown' })).toMatchObject({ props: { text: 'The dashed line is the retry.' } })
+  await reply.unmount()
+})
+
+test('a click on copy, in the corner under a reply\'s picture, copies the picture as text, and one on html ↗ opens the graph as a web page', async ($, on) => {
+  const seen = world(on)
+  replies(on)
+  const reply = await say($, 'terminal', `${REPLY}\n\n\`\`\`graphlet\nOne -> Two\n\`\`\``)
+  expect(await reply.findAll({ type: 'Button' })).toHaveLength(4)
+  await reply.press({ plugin: 'graphlet', key: 'copy:0' })
+  expect(seen.copied).toEqual([FLOW.join('\n')])
+  expect(seen.toasts).toEqual(['graphlet: copied the graph as text.'])
+  await reply.press({ plugin: 'graphlet', key: 'page:1' })
+  expect(seen.written.map(file => file.path)).toEqual(['/var/tmp/graphlet-reply.html'])
+  expect(seen.written[0]?.text).toContain('>One</tspan>')
+  expect(seen.written[0]?.text).not.toContain('Valid?')
+  expect(seen.ran).toEqual([['xdg-open', '/var/tmp/graphlet-reply.html']])
   await reply.unmount()
 })
 

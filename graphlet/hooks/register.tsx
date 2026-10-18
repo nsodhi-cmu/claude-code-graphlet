@@ -1,12 +1,12 @@
 import type { EngineInterface, Register, RenderSurface } from 'claude-code'
 
 import type { Graphlet } from '../types'
-import { MOST_TREE_CHARS, bounded, charactersOf, rowText, styleOf } from './draw'
+import { MOST_TREE_CHARS, bounded, charactersOf, rowText, sizeOf, styleOf } from './draw'
 import type { Drawing, Pan, Room } from './draw'
 import { readGraph } from './layers'
 import type { Graph } from './layers'
 import { pageOf } from './page'
-import { GUIDE, fencedOf, partsOf, pictureOf } from './reply'
+import { GUIDE, fencedOf, partsOf, pictureOf, stillOf } from './reply'
 import { MOVES, focusOf, leadOf, viewOf } from './view'
 
 /** What a pane holds, as it was last drawn: the graph it was given, the graph as drawn, the room, the selected node, and where its window stood. */
@@ -19,6 +19,10 @@ const held = new Map<string, Held>()
 const picked = new Map<string, string>()
 /** Where the person scrolled each pane's window to. A pane is missing while its window follows the selection. */
 const scrolled = new Map<string, Pan>()
+/** The graphs of each reply block drawn lately, in order, by the block's request, and the room they were drawn in: what a click on the corner of one of their pictures copies or opens. */
+const replied = new Map<string, { graphs: Graph[]; room: Room }>()
+/** How many reply blocks' graphs are kept for their corners, those drawn last: a block is drawn again as it comes back into view. */
+const KEPT_REPLIES = 64
 /** The panes whose graph is drawn in focus on the selected node. */
 const focused = new Set<string>()
 /** What the person is typing to find, in each pane where they are finding a node. */
@@ -47,14 +51,15 @@ const OPENERS: ReadonlyArray<(path: string) => string[]> = [
 const OPEN_TIMEOUT_MS = 10_000
 
 /**
- * Writes a pane's graph out as a web page in the system's temporary folder,
- * and opens it in the browser. Where nothing opens it, says where it is.
+ * Writes a graph out as a web page in the system's temporary folder, named
+ * for the pane it is drawn in, or `reply`, and opens it in the browser. Where
+ * nothing opens it, says where it is.
  */
-const openPage = async ($: EngineInterface, pane: string, graph: Graph): Promise<void> => {
+const openPage = async ($: EngineInterface, name: string, graph: Graph): Promise<void> => {
   const folder = (await $.env.get('TMPDIR')) ?? (await $.env.get('TEMP')) ?? '/tmp'
-  const path = `${folder.replace(/[\\/]+$/, '')}/graphlet-${pane.replace(/[^A-Za-z0-9_-]/g, '-')}.html`
+  const path = `${folder.replace(/[\\/]+$/, '')}/graphlet-${name.replace(/[^A-Za-z0-9_-]/g, '-')}.html`
   try {
-    await $.fs.write(path, pageOf(graph, pane))
+    await $.fs.write(path, pageOf(graph, name))
   } catch (error) {
     $.ui.toast(`graphlet: could not write the graph's page (${error instanceof Error ? error.message : String(error)}).`)
     return
@@ -77,12 +82,10 @@ const cellsOf = (asked: unknown): number =>
   typeof asked === 'number' && Number.isFinite(asked) ? Math.min(Math.max(Math.floor(asked), 1), MOST_CELLS) : 1
 
 /**
- * Puts a graph on the clipboard as plain text, and says whether it went: the
- * whole graph drawn still, as a reply draws it, in a room as wide as its
- * longest layer is laid out across in a room `columns` wide.
+ * Puts a graph on the clipboard as plain text, drawn still as a reply draws
+ * it, in `room`, and says whether it went.
  */
-const copyGraph = async ($: EngineInterface, graph: Graph, columns: number, surface?: RenderSurface): Promise<void> => {
-  const room = { columns: cellsOf(view.measure(graph, columns).columns), rows: MOST_CELLS }
+const copyGraph = async ($: EngineInterface, graph: Graph, room: Room, surface?: RenderSurface): Promise<void> => {
   const text = pictureOf(still, graph, room).rows.map(row => rowText(row).trimEnd()).join('\n')
   const copied = await $.ui.copy({ text, ...(surface === undefined ? {} : { surface }) })
   $.ui.toast(copied.isCopied ? 'graphlet: copied the graph as text.' : `graphlet: could not copy the graph (${copied.reason}).`)
@@ -92,6 +95,8 @@ const copyGraph = async ($: EngineInterface, graph: Graph, columns: number, surf
 const BULLET_COLUMNS = 2
 /** How wide a reply is taken to be on a surface that has not said. */
 const REPLY_COLUMNS = 80
+/** What the corner of a picture in a reply says: a click on the first word copies the graph as text, and on the second opens it as a web page. */
+const REPLY_CORNER = { copy: 'copy', between: ' · ', page: 'html ↗' } as const
 
 const isPan = (value: unknown): value is Pan =>
   typeof value === 'object' &&
@@ -167,35 +172,63 @@ export const register: Register = (on, options) => {
     const room = { columns: cellsOf((e.viewport?.columns ?? REPLY_COLUMNS) - BULLET_COLUMNS), rows: MOST_CELLS }
     const words = parts.reduce((sum, part) => sum + ('text' in part ? part.text.length : 0), 0)
     const share = Math.max(0, MOST_TREE_CHARS - words) / parts.filter(part => 'graph' in part).length
-    const shown = parts.map(part => ('graph' in part ? bounded(pictureOf(still, readGraph(part.graph), room), share) : part))
+    const graphs = parts.flatMap(part => ('graph' in part ? [readGraph(part.graph)] : []))
+    const shown = parts.map((part, at) => ('text' in part ? part : { graph: graphs[parts.slice(0, at).filter(one => 'graph' in one).length] as Graph }))
     if (e.surface !== 'terminal') {
-      const text = shown.map(part => ('text' in part ? part.text : fencedOf(part))).join('\n\n')
+      const text = shown.map(part => ('text' in part ? part.text : fencedOf(bounded(pictureOf(still, part.graph, room), share)))).join('\n\n')
       return next({ ...e, props: { ...e.props, text } })
     }
-    const { Box, Text, Markdown } = $.ui.resolve(e)
+    replied.delete(e.requestId)
+    replied.set(e.requestId, { graphs, room })
+    for (const old of [...replied.keys()].slice(0, Math.max(0, replied.size - KEPT_REPLIES))) replied.delete(old)
+    const { Box, Text, Markdown, Button } = $.ui.resolve(e)
     const [first, ...rest] = shown
     const lead = first !== undefined && 'text' in first ? [await next({ ...e, props: { ...e.props, text: first.text } })] : []
     const following = lead.length > 0 ? rest : shown
+    /** A graph's still picture, and under it its foot: the counts of what is out of view, and at the picture's right edge, the corner. */
+    const pictured = (graph: Graph) => {
+      const index = graphs.indexOf(graph)
+      const picture = stillOf(still, graph, room)
+      const rows = bounded({ rows: picture.rows, hits: [] }, share).rows
+      const corner = sizeOf(`${REPLY_CORNER.copy}${REPLY_CORNER.between}${REPLY_CORNER.page}`)
+      const width = Math.min(room.columns, Math.max(sizeOf(picture.foot) + (picture.foot === '' ? 0 : 2) + corner, ...rows.map(row => sizeOf(rowText(row)))))
+      return [
+        ...rows.map(row => (
+          <Text wrap="truncate-end">{row.length === 0 ? ' ' : row.map(span => <Text {...styleOf(span)}>{span.text}</Text>)}</Text>
+        )),
+        <Box flexDirection="row" justifyContent="space-between" width={width}>
+          <Text dimColor>{picture.foot}</Text>
+          <Box flexDirection="row">
+            <Button key={`copy:${index}`} label={REPLY_CORNER.copy} plain dimColor onPress={() => undefined} />
+            <Text dimColor>{REPLY_CORNER.between}</Text>
+            <Button key={`page:${index}`} label={REPLY_CORNER.page} plain dimColor onPress={() => undefined} />
+          </Box>
+        </Box>,
+      ]
+    }
     return (
       <Box flexDirection="column">
         {[
           ...lead,
           ...following.map(part => (
             <Box flexDirection="column" marginLeft={BULLET_COLUMNS} marginTop={1}>
-              {'text' in part ? (
-                <Markdown text={part.text} />
-              ) : (
-                part.rows.map(row => (
-                  <Text wrap="truncate-end">
-                    {row.length === 0 ? ' ' : row.map(span => <Text {...styleOf(span)}>{span.text}</Text>)}
-                  </Text>
-                ))
-              )}
+              {'text' in part ? <Markdown text={part.text} /> : pictured(part.graph)}
             </Box>
           )),
         ]}
       </Box>
     )
+  })
+
+  on('ui.press', { plugin: 'graphlet' }, async ($, e, next) => {
+    const [action, at] = e.element.split(':')
+    const reply = e.component === 'AssistantMessage' ? replied.get(e.requestId) : undefined
+    const graph = reply?.graphs[Number(at)]
+    if (reply === undefined || graph === undefined) return next(e)
+    if (action === 'copy') await copyGraph($, graph, reply.room, e.surface)
+    else if (action === 'page') await openPage($, 'reply', graph)
+    else return next(e)
+    return { element: e.element }
   })
 
   on('ui.message', async ($, e, next) => {
@@ -251,7 +284,7 @@ export const register: Register = (on, options) => {
       finding.set(pane, '')
       $.ui.invalidate('ui.render')
     } else if (key === 'c') {
-      await copyGraph($, at.whole, at.room.columns)
+      await copyGraph($, at.whole, { columns: cellsOf(view.measure(at.whole, at.room.columns).columns), rows: MOST_CELLS })
     } else if (key === 'f') {
       if (focused.has(pane)) focused.delete(pane)
       else focused.add(pane)

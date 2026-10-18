@@ -68,7 +68,7 @@ Ask for a correction -> Read the request
 
 With the **Graphs in replies** setting off, graphlet adds nothing to the system prompt and draws no block, for a person who wants it only as a library for the mods that use it.
 
-The block is drawn in its place in the reply, with the person's settings, its links always kept separate. A tone in brackets colors its node, a label in bold, `**Valid?**`, is drawn in a heavy frame where not every label is, and words in pipes after an arrow, `->|yes|`, are written on its link. Where links have no direction, Claude writes them as `--`, drawn with no arrowheads, alone or among arrows. The picture fits the reply: a layer too wide for it is folded onto more rows. The picture is still: it does not scroll or take a selection, and a graph that cannot be folded narrow enough counts the nodes past its edge. Where graphlet draws no picture, the block becomes the same picture as plain text. The conversation keeps the block as Claude wrote it.
+The block is drawn in its place in the reply, with the person's settings, its links always kept separate. A tone in brackets colors its node, a label in bold, `**Valid?**`, is drawn in a heavy frame where not every label is, and words in pipes after an arrow, `->|yes|`, are written on its link. Where links have no direction, Claude writes them as `--`, drawn with no arrowheads, alone or among arrows. The picture fits the reply: a layer too wide for it is folded onto more rows. The picture is still: it does not scroll or take a selection, and a graph that cannot be folded narrow enough counts the nodes past its edge. Under it, `copy` puts the picture on the clipboard as text, and `html ↗` opens the graph as a web page, where all of it can be seen. Where graphlet draws no picture, the block becomes the same picture as plain text. The conversation keeps the block as Claude wrote it.
 
 [docs/REPLIES.md](docs/REPLIES.md) has the block's syntax, what the model is told, and why it is a block and not a tool.
 
@@ -194,16 +194,16 @@ What graphlet does with that access:
 
 - **Tells Claude** that it can draw graphs, in one section of the system prompt of every session that draws, unless **Graphs in replies** is off. The section rides on every request.
 - **Draws** in Claude's replies where they hold a graph block, in the panes of the mods that ask it to, and nowhere else.
-- **Keeps** each such pane's graph, selection, and scroll position in memory, for the session.
+- **Keeps** each such pane's graph, selection, and scroll position in memory, for the session, and the graphs of the replies it drew last, for the clicks under their pictures.
 - **Writes one file and opens it**, only when you click `html ↗`: the graph as a web page, in your temporary folder, opened with your system's own opener (`xdg-open`, `open`, or `start`).
-- **Copies a graph to your clipboard**, only when you ask it to, by `c`: the graph as plain text.
+- **Copies a graph to your clipboard**, only when you ask it to, by `c` or a click on `copy`: the graph as plain text.
 
 It reads no file, stores nothing between sessions, calls no model, and makes no network requests.
 
 ## Limits
 
 - It draws pictures in the terminal only. Elsewhere a reply's graph is plain text, and a pane's is not drawn.
-- A graph in a reply is still. It does not scroll, and has no web page.
+- A graph in a reply is still. It does not scroll or take a selection; its web page shows all of it.
 - Where an organization manages Claude Code, the engine adds graphlet's section to the system prompt only if the organization lists graphlet in managed settings. Otherwise Claude is not told of graph blocks there, though graphlet still draws one Claude writes.
 - Layers run top to bottom only.
 - A graph has at most 1000 nodes and 2000 links, and a pane holds one. What is past those is left out, and the row under the graph says how much.

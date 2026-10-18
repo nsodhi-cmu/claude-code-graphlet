@@ -174,24 +174,30 @@ const after = (row: Span[], count: number): Span[] => {
   })
 }
 
+/** A still picture: the rows of its graph, and its foot, the counts of what is out of view past its edge and of what was left out of the graph; '' where it has none. */
+export type Still = { rows: Span[][]; foot: string }
+
 /**
  * A graph drawn as a still picture in a room: laid out once in it, as tall as
- * it needs, from its top left corner, with nothing selected.
- * Nothing in it answers a click, so its foot keeps only the counts of what is
- * out of view, and is left off where nothing is. The columns blank down the
- * whole of its left side are cut away.
+ * it needs, from its top left corner, with nothing selected. Nothing in it
+ * answers a click, so its foot keeps only the counts of what is out of view.
+ * The columns blank down the whole of its left side are cut away.
  */
-export function pictureOf(view: View, graph: Graph, room: Room): Drawing {
+export function stillOf(view: View, graph: Graph, room: Room): Still {
   const drawing = view.draw(graph, null, room, { x: 0, y: 0 })
-  const foot = drawing.rows.at(-1)
-  if (foot === undefined) return { rows: [], hits: [] }
+  const last = drawing.rows.at(-1)
+  if (last === undefined) return { rows: [], foot: '' }
   const corner = drawing.hits.find(hit => 'page' in hit)
-  const counts = rowText(foot).slice(0, corner?.x).trimEnd()
-  const kept = [...drawing.rows.slice(0, -1), ...(counts === '' ? [] : [[{ text: counts, paint: 'dim' as const }]])]
-  const blank = Math.min(
-    ...kept.map(rowText).filter(text => text !== '').map(text => text.length - text.trimStart().length),
-  )
-  return { rows: kept.map(row => after(row, blank)), hits: [] }
+  const foot = rowText(last).slice(0, corner?.x).trimEnd()
+  const rows = drawing.rows.slice(0, -1)
+  const blank = Math.min(...[...rows.map(rowText), foot].filter(text => text !== '').map(text => text.length - text.trimStart().length))
+  return { rows: rows.map(row => after(row, blank)), foot: foot.slice(blank) }
+}
+
+/** A still picture as one drawing: its rows, and its foot under them where it says anything. */
+export function pictureOf(view: View, graph: Graph, room: Room): Drawing {
+  const { rows, foot } = stillOf(view, graph, room)
+  return { rows: foot === '' ? rows : [...rows, [{ text: foot, paint: 'dim' }]], hits: [] }
 }
 
 /** A picture as plain text, fenced as code marked `text`, by more backticks than any run of them inside it. */

@@ -111,7 +111,7 @@ The last row of a drawing is its foot. A graph with no nodes has no drawing, and
 - Where nodes or links were left out of a graph past the most that are read, it says how many: `12 nodes and 340 links left out`, or in a narrow room `+12 nodes +340 links`.
 - In its right corner is `html ↗`. A click there opens the graph as a [web page](PAGE.md). Where the row is too narrow for all of it, the corner says only `↗`, and what was left out keeps its place over the corner's words.
 
-A still picture in a reply keeps the counts and what was left out, and drops the corner; it has no foot when all of it is in view and nothing was left out.
+A still picture in a reply keeps the counts and what was left out, and its corner says `copy · html ↗`: `copy` puts the picture on the clipboard as text, and `html ↗` opens the web page. As plain text, on a surface graphlet draws no picture on, it has no corner, and no foot when all of it is in view and nothing was left out.
 
 ## Moving The Selection
 
