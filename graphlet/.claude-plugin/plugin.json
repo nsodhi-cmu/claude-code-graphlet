@@ -57,6 +57,16 @@
         "flowing"
       ],
       "default": "still"
+    },
+    "replies": {
+      "type": "string",
+      "title": "Graphs in replies",
+      "description": "Whether Claude draws graphs in its replies: on tells Claude it can, in a few lines of the system prompt, and draws each graph it writes; off adds nothing to the system prompt and leaves replies as Claude writes them, for graphlet as a library for other mods alone.",
+      "options": [
+        "on",
+        "off"
+      ],
+      "default": "on"
     }
   }
 }

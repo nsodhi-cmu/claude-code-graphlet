@@ -6,7 +6,7 @@ Claude, the model in a session where graphlet is installed, draws a graph in a r
 
 A `prompt.compose` hook adds one section to the end of the system prompt, `graphlet:graphs`, on the session's side of the cache boundary. Its text is `GUIDE` in `reply.ts`: what a block looks like, an example, the tones, labels, links with no direction, how large a graph to draw, and when to write one and when not to. The example is itself a block that graphlet draws.
 
-The section is added wherever the session draws, that is, wherever `e.surfaces` names a surface. A run that draws nowhere, such as `claude -p`, gets no section, since a block there would reach the person as written, unless the environment variable `EVAL_GRAPHLET_GUIDE` is `1`, as the evals set it, so that what the model writes with the guide can be measured.
+The section is added wherever the session draws, that is, wherever `e.surfaces` names a surface, unless the person's `replies` setting is `off`: then no section is added anywhere, and the hook that draws a reply passes every block on as it is, so graphlet is only a library for the mods that use it. A run that draws nowhere, such as `claude -p`, gets no section, since a block there would reach the person as written, unless the environment variable `EVAL_GRAPHLET_GUIDE` is `1`, as the evals set it, so that what the model writes with the guide can be measured.
 
 Where an organization manages Claude Code, the engine runs `prompt.compose` hooks only for the plugins the organization lists in managed settings. Unless graphlet is listed, the model there is not told, and graphlet still draws any block the model writes.
 

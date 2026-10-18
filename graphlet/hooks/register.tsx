@@ -108,6 +108,7 @@ export const register: Register = (on, options) => {
   }
   view = viewOf(look)
   still = viewOf({ ...look, links: 'separate' }, true)
+  const isDrawingReplies = options.replies !== 'off'
 
   on('engine.create', async ($, e, next) => {
     const built = await next(e)
@@ -156,12 +157,12 @@ export const register: Register = (on, options) => {
 
   on('prompt.compose', async ($, e, next) => {
     const composed = await next(e)
-    if (e.surfaces.length === 0 && (await $.env.get('EVAL_GRAPHLET_GUIDE')) !== '1') return composed
+    if (!isDrawingReplies || (e.surfaces.length === 0 && (await $.env.get('EVAL_GRAPHLET_GUIDE')) !== '1')) return composed
     return { sections: [...composed.sections, { id: 'graphlet:graphs', text: GUIDE, scope: 'session' as const }] }
   })
 
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
-    const parts = e.props.isSummary ? [] : partsOf(e.props.text)
+    const parts = e.props.isSummary || !isDrawingReplies ? [] : partsOf(e.props.text)
     if (!parts.some(part => 'graph' in part)) return next(e)
     const room = { columns: cellsOf((e.viewport?.columns ?? REPLY_COLUMNS) - BULLET_COLUMNS), rows: MOST_CELLS }
     const words = parts.reduce((sum, part) => sum + ('text' in part ? part.text.length : 0), 0)

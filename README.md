@@ -66,6 +66,8 @@ Ask for a correction -> Read the request
 ```
 ````
 
+With the **Graphs in replies** setting off, graphlet adds nothing to the system prompt and draws no block, for a person who wants it only as a library for the mods that use it.
+
 The block is drawn in its place in the reply, with the person's settings, its links always kept separate. A tone in brackets colors its node, a label in bold, `**Valid?**`, is drawn in a heavy frame where not every label is, and words in pipes after an arrow, `->|yes|`, are written on its link. Where links have no direction, Claude writes them as `--`, drawn with no arrowheads, alone or among arrows. The picture fits the reply: a layer too wide for it is folded onto more rows. The picture is still: it does not scroll or take a selection, and a graph that cannot be folded narrow enough counts the nodes past its edge. Where graphlet draws no picture, the block becomes the same picture as plain text. The conversation keeps the block as Claude wrote it.
 
 [docs/REPLIES.md](docs/REPLIES.md) has the block's syntax, what the model is told, and why it is a block and not a tool.
@@ -165,6 +167,7 @@ These are a person's, and hold for every graph graphlet draws, in a reply or in 
 | **Long labels** | What becomes of a label too long for one line of its box. `wrap` breaks it onto more lines. `clip` keeps it to one, cut in the middle. |
 | **Links** | How the links between two layers share the rows there. `separate` gives each box's links rows of their own wherever they would run into another's, and each box an arrowhead, or in an undirected graph a tick, for each set of boxes whose links reach it. `merged` runs all those of one kind along one row, into one arrowhead or tick where they reach a box, which is shorter; selecting a node shows which links are its own. Links with a label or a tone keep rows and arrowheads of their own either way. A graph in a reply, which nothing selects, keeps its links separate. |
 | **Motion** | Whether the selected node's links move. `still` lights them as lines. `flowing` runs beads along each link that runs one way, a bright cell every few, moving on from the node it leaves to the node it reaches, down the links that run down and back up the ones that close a loop; a link with no direction, and two links that run both ways between two nodes, pulse instead, brightening and fading together. A graph in a reply, which nothing selects, never moves. |
+| **Graphs in replies** | Whether Claude draws graphs in its replies. `on` tells Claude it can, in a few lines of the system prompt, and draws each graph block it writes. `off` adds nothing to the system prompt and leaves every reply as Claude wrote it, for graphlet as a library for other mods alone. |
 
 ## How It Works
 
@@ -189,7 +192,7 @@ A mod is code that runs inside Claude Code, unsandboxed, with your permissions. 
 
 What graphlet does with that access:
 
-- **Tells Claude** that it can draw graphs, in one section of the system prompt of every session that draws. The section rides on every request.
+- **Tells Claude** that it can draw graphs, in one section of the system prompt of every session that draws, unless **Graphs in replies** is off. The section rides on every request.
 - **Draws** in Claude's replies where they hold a graph block, in the panes of the mods that ask it to, and nowhere else.
 - **Keeps** each such pane's graph, selection, and scroll position in memory, for the session.
 - **Writes one file and opens it**, only when you click `html ↗`: the graph as a web page, in your temporary folder, opened with your system's own opener (`xdg-open`, `open`, or `start`).

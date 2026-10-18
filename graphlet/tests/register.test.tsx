@@ -791,3 +791,17 @@ test('a run that draws nowhere is told of graph blocks where EVAL_GRAPHLET_GUIDE
   const composed = await $.prompt.compose({ model: 'claude', promptModel: 'claude', surfaces: [], tools: [], outputStyle: null, traits: [] })
   expect(composed.sections).toEqual([intro, { id: 'graphlet:graphs', text: GUIDE, scope: 'session' }])
 })
+
+test('with graphs in replies off, the model is told nothing of graph blocks, and a reply with one is left to the engine as written', { options: { replies: 'off' } }, async ($, on) => {
+  const intro = { id: 'intro', text: 'You are Claude Code.', scope: 'shared' as const }
+  on('prompt.compose', () => ({ sections: [intro] }))
+  on('env.get', ($, e) => ({ value: e.name === 'EVAL_GRAPHLET_GUIDE' ? '1' : undefined }))
+  replies(on)
+  const composed = await $.prompt.compose({ model: 'claude', promptModel: 'claude', surfaces: ['terminal'], tools: [], outputStyle: null, traits: [] })
+  expect(composed.sections).toEqual([intro])
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const reply = await say($, surface, REPLY)
+    expect(screenOf(await reply.drawn())).toEqual(`● ${REPLY}`.split('\n'))
+    await reply.unmount()
+  }
+})
