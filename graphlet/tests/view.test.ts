@@ -5,7 +5,7 @@ import type { GraphletMove } from '../types'
 import { rowText, sizeOf } from '../hooks/draw'
 import { readGraph } from '../hooks/layers'
 import type { Look } from '../hooks/layout'
-import { FOCUS_NODES, MOVES, focusOf, viewOf } from '../hooks/view'
+import { FOCUS_NODES, MOVES, collapsedOf, focusOf, viewOf } from '../hooks/view'
 
 const LABELS = ['a', 'node', 'src/some/long/path/to/file.component.ts', 'Validate the incoming request', 'x-y_z.w', '', '数据库连接池', '✅ 完成']
 const LOOKS: Look[] = (['pinned', 'sheet'] as const).flatMap(scroll =>
@@ -101,4 +101,24 @@ test('a graph that says not which way it runs runs right where that fits its roo
   expect(view.direction({ ...chain, direction: 'down' }, { columns: 80, rows: 40 })).toBe('down')
   expect(view.direction({ ...fan, direction: 'right' }, { columns: 20, rows: 40 })).toBe('right')
   expect(view.measure(chain, 80)).toEqual({ columns: 41, rows: 4 })
+})
+
+test('collapsed, a group is one box where its first node stood, saying its label and how many nodes it holds, its links those of all of them once each, and none between two of them', () => {
+  const graph = readGraph({
+    nodes: [{ id: 'in', label: 'in' }, { id: 'a', label: 'a', group: 'g' }, { id: 'out', label: 'out' }, { id: 'b', label: 'b', group: 'g', priority: 2 }],
+    links: [{ from: 'in', to: 'a' }, { from: 'in', to: 'b' }, { from: 'a', to: 'b' }, { from: 'b', to: 'out', tone: 'bad' }, { from: 'a', to: 'a' }],
+    groups: [{ id: 'g', label: 'Group', tone: 'note' }],
+  })
+  const shut = collapsedOf(graph, new Set(['g']))
+  expect(shut.nodes).toEqual([
+    { id: 'in', label: 'in', isForemost: false },
+    { id: 'g', label: 'Group', mark: '▸', badge: '2', holds: 2, isForemost: true, tone: 'note', priority: 2 },
+    { id: 'out', label: 'out', isForemost: false },
+  ])
+  expect(shut.links).toEqual([
+    { from: 'in', to: 'g', isDirected: true },
+    { from: 'g', to: 'out', isDirected: true, tone: 'bad' },
+  ])
+  expect(shut.groups).toEqual([])
+  expect(collapsedOf(graph, new Set())).toBe(graph)
 })

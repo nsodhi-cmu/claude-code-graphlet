@@ -8,10 +8,14 @@ import type { Graph } from './layers'
 import type { Direction } from './layout'
 import { pageOf } from './page'
 import { GUIDE, fencedOf, partsOf, pictureOf, stillOf } from './reply'
-import { MOVES, focusOf, leadOf, viewOf } from './view'
+import { MOVES, collapsedOf, focusOf, leadOf, viewOf } from './view'
 
-/** What a pane holds, as it was last drawn: the graph it was given, the graph as drawn, the room, the selected node, and where its window stood. */
-type Held = { whole: Graph; graph: Graph; room: Room; selected: string | null; pan: Pan; drawing: Drawing }
+/**
+ * What a pane holds, as it was last drawn: the graph it was given, that
+ * graph with its groups collapsed as they are there, the graph as drawn, in
+ * focus or not, the room, the selected node, and where its window stood.
+ */
+type Held = { given: Graph; whole: Graph; graph: Graph; room: Room; selected: string | null; pan: Pan; drawing: Drawing }
 
 const ORIGIN: Pan = { x: 0, y: 0 }
 
@@ -24,6 +28,8 @@ const scrolled = new Map<string, Pan>()
 const replied = new Map<string, { graphs: Graph[]; room: Room }>()
 /** How many reply blocks' graphs are kept for their corners, those drawn last: a block is drawn again as it comes back into view. */
 const KEPT_REPLIES = 64
+/** Whether each group of each pane's graph is collapsed, as `collapse` was last called for it there. */
+const shutIn = new Map<string, Map<string, boolean>>()
 /** The panes whose graph is drawn in focus on the selected node. */
 const focused = new Set<string>()
 /** What the person is typing to find, in each pane where they are finding a node. */
@@ -118,17 +124,22 @@ export const register: Register = (on, options) => {
     const graphlet: Graphlet = {
       measure: async input => view.measure(readGraph(input.graph), cellsOf(input.columns)),
       show: async input => {
-        const graph = readGraph(input.graph)
+        const given = readGraph(input.graph)
         const room = { columns: cellsOf(input.columns), rows: cellsOf(input.rows) }
+        const shut = new Set(given.groups.filter(group => shutIn.get(input.pane)?.get(group.id) ?? group.isCollapsed === true).map(group => group.id))
+        const graph = collapsedOf(given, shut)
         const wanted = input.selected ?? picked.get(input.pane)
-        const selected = graph.nodes.find(node => node.id === wanted)?.id ?? leadOf(graph)
+        const group = given.nodes.find(node => node.id === wanted)?.group
+        const standing = group !== undefined && shut.has(group) ? group : wanted
+        const selected = graph.nodes.find(node => node.id === standing)?.id ?? leadOf(graph)
         const before = held.get(input.pane)
         if (before?.selected !== selected) scrolled.delete(input.pane)
         const drawn = focused.has(input.pane) ? focusOf(graph, selected) : graph
         const query = finding.get(input.pane)
+        const found = query === undefined ? undefined : { query, found: foundIn(given, query).map(id => graph.nodes.find(node => node.id === id)?.id ?? given.nodes.find(node => node.id === id)?.group ?? id) }
         const pan = scrolled.get(input.pane) ?? view.show(drawn, selected, room, before?.pan ?? ORIGIN)
-        const drawing = view.draw(drawn, selected, room, pan, query === undefined ? undefined : { query, found: foundIn(graph, query) })
-        held.set(input.pane, { whole: graph, graph: drawn, room, selected, pan, drawing })
+        const drawing = view.draw(drawn, selected, room, pan, found)
+        held.set(input.pane, { given, whole: graph, graph: drawn, room, selected, pan, drawing })
         return { rows: drawing.rows.length, selected }
       },
       step: async input => {
@@ -146,6 +157,13 @@ export const register: Register = (on, options) => {
         built.ui.invalidate('ui.render')
       },
       open: async () => undefined,
+      collapse: async input => {
+        shutIn.set(input.pane, new Map(shutIn.get(input.pane)).set(input.group, input.isCollapsed === true))
+        const first = held.get(input.pane)?.given.nodes.find(node => node.group === input.group)
+        if (input.isCollapsed !== true && picked.get(input.pane) === input.group && first !== undefined) picked.set(input.pane, first.id)
+        scrolled.delete(input.pane)
+        built.ui.invalidate('ui.render')
+      },
       key: async () => undefined,
     }
     return { ...built, graphlet }
@@ -233,9 +251,10 @@ export const register: Register = (on, options) => {
     const at = held.get(e.requestId)
     if (at === undefined || typeof e.data !== 'object' || e.data === null) return next(e)
     const pane = e.requestId
-    const { node, isOpened, by, drag, grab, isDropped, key, page, isChord } = e.data as {
+    const { node, isOpened, group, by, drag, grab, isDropped, key, page, isChord } = e.data as {
       node?: unknown
       isOpened?: unknown
+      group?: unknown
       by?: unknown
       drag?: unknown
       grab?: unknown
@@ -246,8 +265,15 @@ export const register: Register = (on, options) => {
     }
     const query = finding.get(pane)
     const typed = key === 'space' ? ' ' : typeof key === 'string' && isChord !== true && charactersOf(key).length === 1 ? key : undefined
-    /** Selects a node, where it is one and not the selected one already, and draws the pane again either way. */
+    /** Whether a node of the graph as drawn is the box of a collapsed group. */
+    const isShut = (id: string): boolean => at.whole.nodes.some(one => one.id === id && one.holds !== undefined)
+    /** Opens a node: a collapsed group's box by opening the group, and any other by `open`. */
+    const open = async (id: string): Promise<void> =>
+      isShut(id) ? $.graphlet.collapse({ pane, group: id, isCollapsed: false }) : $.graphlet.open({ pane, node: id })
+    /** Selects a node, opening the collapsed group it is in, where it is one and not the selected one already, and draws the pane again either way. */
     const pick = async (to: string | undefined): Promise<void> => {
+      const shut = at.given.nodes.find(one => one.id === to)?.group
+      if (shut !== undefined && isShut(shut)) await $.graphlet.collapse({ pane, group: shut, isCollapsed: false })
       if (to !== undefined && to !== at.selected) await $.graphlet.select({ pane, node: to })
       else $.ui.invalidate('ui.render')
     }
@@ -255,7 +281,9 @@ export const register: Register = (on, options) => {
       finding.delete(pane)
       if (node !== at.selected) await $.graphlet.select({ pane, node })
       else $.ui.invalidate('ui.render')
-      if (isOpened === true) await $.graphlet.open({ pane, node })
+      if (isOpened === true) await open(node)
+    } else if (typeof group === 'string') {
+      await $.graphlet.collapse({ pane, group, isCollapsed: true })
     } else if (isPan(by)) {
       await $.graphlet.scroll({ pane, by })
     } else if (isPan(drag)) {
@@ -272,12 +300,15 @@ export const register: Register = (on, options) => {
     } else if (query !== undefined && (typed !== undefined || key === 'backspace')) {
       const asked = typed === undefined ? charactersOf(query).slice(0, -1).join('') : `${query}${typed}`
       finding.set(pane, asked)
-      await pick(foundIn(at.whole, asked)[0])
+      await pick(foundIn(at.given, asked)[0])
     } else if (query !== undefined && key === 'return') {
-      const found = foundIn(at.whole, query)
+      const found = foundIn(at.given, query)
       await pick(found[(found.indexOf(at.selected ?? '') + 1) % Math.max(found.length, 1)])
     } else if (key === 'return' && at.selected !== null) {
-      await $.graphlet.open({ pane, node: at.selected })
+      await open(at.selected)
+    } else if (key === 'space' && at.selected !== null && (isShut(at.selected) || at.given.nodes.some(one => one.id === at.selected && one.group !== undefined))) {
+      const shut = isShut(at.selected)
+      await $.graphlet.collapse({ pane, group: shut ? at.selected : (at.given.nodes.find(one => one.id === at.selected)?.group ?? ''), isCollapsed: !shut })
     } else if (key === '/') {
       finding.set(pane, '')
       $.ui.invalidate('ui.render')

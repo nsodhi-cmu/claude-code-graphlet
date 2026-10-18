@@ -55,6 +55,44 @@ export function focusOf(graph: Graph, selected: string | null): Graph {
   return { ...graph, nodes, links, unread }
 }
 
+/** The sign before the label of a box that stands for a collapsed group. */
+const COLLAPSED = '▸'
+
+/**
+ * A graph with each of its groups that is `shut` collapsed into one box that
+ * stands for all the group holds: where its first node stood among the
+ * graph's nodes, saying the group's label after `COLLAPSED`, in its tone,
+ * and how many nodes it holds as its badge; put foremost where any of them
+ * is, and of the highest priority any of them has. A link to or from any of
+ * them is to or from the box, given once however many of them it joins it
+ * to; a link between two of them is not drawn. A graph with nothing shut is
+ * as it is.
+ */
+export function collapsedOf(graph: Graph, shut: Set<string>): Graph {
+  const groups = graph.groups.filter(group => shut.has(group.id))
+  if (groups.length === 0) return graph
+  const into = new Map(graph.nodes.flatMap(node => (node.group !== undefined && shut.has(node.group) ? [[node.id, node.group] as const] : [])))
+  const nodes = graph.nodes.flatMap((node): Node[] => {
+    const id = into.get(node.id)
+    const group = groups.find(one => one.id === id)
+    if (group === undefined) return [node]
+    const held = graph.nodes.filter(one => into.get(one.id) === id)
+    if (held[0] !== node) return []
+    const priority = Math.max(...held.map(priorityOf))
+    return [{ id: group.id, label: group.label, mark: COLLAPSED, badge: String(held.length), holds: held.length, isForemost: held.some(one => one.isForemost), ...(group.tone === undefined ? {} : { tone: group.tone }), ...(priority === 0 ? {} : { priority }) }]
+  })
+  const kept = new Set<string>()
+  const links = graph.links.flatMap((link): Link[] => {
+    const [from, to] = [into.get(link.from) ?? link.from, into.get(link.to) ?? link.to]
+    if (from === to && (into.has(link.from) || into.has(link.to))) return []
+    const key = JSON.stringify([...(link.isDirected ? [from, to] : [from, to].sort().concat('--')), link.label ?? ''])
+    if (kept.has(key)) return []
+    kept.add(key)
+    return [{ ...link, from, to }]
+  })
+  return { ...graph, nodes, links, groups: graph.groups.filter(group => !shut.has(group.id)) }
+}
+
 /** The node a graph is drawn with selected when nothing else is: the first it names of those of the highest priority; null in a graph with no nodes. */
 export function leadOf(graph: Graph): string | null {
   return graph.nodes.reduce<Node | undefined>((lead, node) => (lead === undefined || priorityOf(node) > priorityOf(lead) ? node : lead), undefined)?.id ?? null

@@ -70,9 +70,10 @@ export type Pan = { x: number; y: number }
 
 /**
  * A rectangle of the drawing, in cells, and what a click inside it does:
- * selects `node`, scrolls the graph `by`, or opens the graph as a web page.
+ * selects `node`, collapses `group`, scrolls the graph `by`, or opens the
+ * graph as a web page.
  */
-export type Hit = { x: number; y: number; width: number; height: number } & ({ node: string } | { by: Pan } | { page: true })
+export type Hit = { x: number; y: number; width: number; height: number } & ({ node: string } | { group: string } | { by: Pan } | { page: true })
 
 /** A picture: its rows, top to bottom, and where a click does what. */
 export type Drawing = { rows: Span[][]; hits: Hit[] }

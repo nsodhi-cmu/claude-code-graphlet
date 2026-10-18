@@ -9,7 +9,7 @@ import type { Graph } from '../hooks/layers'
 import { labelOf, layoutOf } from '../hooks/layout'
 import type { Layout, Look, Place } from '../hooks/layout'
 import { paint } from '../hooks/paint'
-import { viewOf } from '../hooks/view'
+import { collapsedOf, viewOf } from '../hooks/view'
 import { sightOf, slideOf } from '../hooks/window'
 
 const ORIGIN = { x: 0, y: 0 }
@@ -833,6 +833,26 @@ describe('groups', () => {
       '           │ ┌──────────┐  ┌───────┐ │',
       '           │ │ Postgres │  │ Redis │ │',
       '           │ └──────────┘  └───────┘ │',
+      '           ╰─────────────────────────╯',
+    ])
+  })
+
+  test('collapsed, a group is one box with round corners, saying its label after ▸ and how many nodes it holds, and its links are those of all of them', () => {
+    expect(graphRows(drawn(collapsedOf(tiers('down'), new Set(['back'])), null, ROOM))).toEqual([
+      '                          ┌─────────┐',
+      '                          │ Browser │',
+      '                          └────┬────┘',
+      '                               │',
+      '                               ▼',
+      '                       ╭──────────────╮',
+      '                       │ ▸ Backend  3 │',
+      '                       ╰───────┬──────╯',
+      '                   ┌───────────┼────────────┐',
+      '           ╭───────│ Data ─────│─────╮      │',
+      '           │       ▼           ▼     │      ▼',
+      '           │ ┌──────────┐  ┌───────┐ │  ┌──────┐',
+      '           │ │ Postgres │  │ Redis │ │  │ Logs │',
+      '           │ └──────────┘  └───────┘ │  └──────┘',
       '           ╰─────────────────────────╯',
     ])
   })

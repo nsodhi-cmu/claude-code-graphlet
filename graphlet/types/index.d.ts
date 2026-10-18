@@ -43,6 +43,12 @@ export type GraphletGroup = {
   label?: string
   /** How its frame is painted; dim when left out. */
   tone?: GraphletTone
+  /**
+   * Whether the group is drawn collapsed, as one box that stands for all it
+   * holds, until the person or the mod opens it in a pane with `collapse`.
+   * Left out, it is drawn open, in its frame.
+   */
+  isCollapsed?: boolean
 }
 
 /** A link between two nodes, by their ids: from one to the other, where it runs one way. */
@@ -105,7 +111,11 @@ export type GraphletShow = {
   /** The room the drawing may take, in cells. */
   columns: number
   rows: number
-  /** The node drawn as selected. Left out, the one the person last picked, or the first the graph names of those of the highest priority. */
+  /**
+   * The node drawn as selected. Left out, the one the person last picked, or
+   * the first the graph names of those of the highest priority. A node in a
+   * collapsed group is drawn as its group's box selected.
+   */
   selected?: string
 }
 
@@ -113,7 +123,7 @@ export type GraphletShow = {
 export type GraphletShown = {
   /** The rows the drawing takes, never more than it was given. */
   rows: number
-  /** The node drawn as selected; null in a graph with no nodes. */
+  /** The node drawn as selected, or the collapsed group whose box is; null in a graph with no nodes. */
   selected: string | null
 }
 
@@ -123,7 +133,8 @@ export type GraphletScroll = { pane: string; by: number | { x: number; y: number
 /**
  * What graphlet adds to `$`. A mod that lists graphlet under `dependencies`
  * calls these from its own hooks, and hooks `graphlet.select`,
- * `graphlet.open`, and `graphlet.key` to hear what the person did.
+ * `graphlet.open`, `graphlet.collapse`, and `graphlet.key` to hear what the
+ * person did.
  */
 export type Graphlet = {
   /**
@@ -156,6 +167,13 @@ export type Graphlet = {
    * going to the file a node stands for.
    */
   open(input: { pane: string; node: string }): Promise<void>
+  /**
+   * Collapses a group of the graph a pane holds into one box, or opens it
+   * again. Graphlet calls this itself when the person does either, so a hook
+   * on `graphlet.collapse` hears it. A pane draws a group as this was last
+   * called for it there, and else as the group's `isCollapsed` says.
+   */
+  collapse(input: { pane: string; group: string; isCollapsed: boolean }): Promise<void>
   /**
    * Does nothing. Graphlet calls it with each key pressed over a graph that
    * it has no use for itself, and the node selected as it was pressed, for a

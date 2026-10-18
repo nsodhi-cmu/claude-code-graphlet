@@ -1011,7 +1011,7 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
   const priority = new Map(graph.nodes.map(node => [node.id, priorityOf(node)]))
   reseat(shelves, channels, columns, wire => Math.max(priority.get(wire.link.from) ?? 0, priority.get(wire.link.to) ?? 0), gap)
 
-  const frames = framesOf(graph, shelves, gap, direction)
+  const frames = framesOf(graph, shelves, channels, gap, direction)
   if (frames.length > 0) {
     const end = Math.max(...shelves.flatMap(shelf => shelf.places.map(place => place.x + place.width)), ...frames.map(frame => frame.x + frame.width))
     if (direction === 'right') columns = Math.min(room, Math.max(columns, end))
@@ -1051,8 +1051,10 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
 
 /**
  * Each group's frame, around every place of it, standing `FRAME_MARGIN` out
- * from them across their shelves, and wide enough for the group's label in
- * its top border where the graph runs down. On each shelf it spans, what is
+ * from them across their shelves, and where the graph runs down, wide enough
+ * for the group's label in its top border, between the lines that cross it
+ * into the group's first shelf and out of it, or else widened back past the
+ * first of them until it is. On each shelf it spans, what is
  * not the group's is moved clear of it, a gap from its border: what stands
  * before it in the shelf's order moved back where it can be, and else the
  * frame, with all it holds, moved on; and what stands after it moved on.
@@ -1060,7 +1062,7 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
  * is moved. A shelf a frame passes with nothing of its group on it takes the
  * frame where it stands among the shelf's places.
  */
-function framesOf(graph: Graph, shelves: Shelf[], gap: number, direction: Direction): Frame[] {
+function framesOf(graph: Graph, shelves: Shelf[], channels: Channel[], gap: number, direction: Direction): Frame[] {
   if (graph.groups.length === 0) return []
   const groupOf = slotGroups(graph)
   const framed = graph.groups.flatMap(group => {
@@ -1071,7 +1073,21 @@ function framesOf(graph: Graph, shelves: Shelf[], gap: number, direction: Direct
     const title = direction === 'down' ? sizeOf(group.label) + 6 : 0
     const [first, last] = [Math.min(...held.map(({ index }) => index)), Math.max(...held.map(({ index }) => index))]
     const frame: Frame = { group, first, last, x: left - FRAME_MARGIN, width: Math.max(right - left + 2 * FRAME_MARGIN, title), top: 0, bottom: 0 }
-    return [{ frame, held: new Set(held.map(({ place }) => place)) }]
+    const places = new Set(held.map(({ place }) => place))
+    if (direction === 'down') {
+      const crossed = (channels[first - 1]?.wires ?? []).flatMap(wire => {
+        const { out, into } = routeOf(wire, place => place.x)
+        return places.has(wire.to.place) && !wire.to.isAbove ? [into] : places.has(wire.from.place) && !wire.from.isAbove ? [out] : []
+      })
+      const stops = [frame.x + 1, ...new Set(crossed.toSorted((a, b) => a - b)), frame.x + frame.width - 1]
+      const room = Math.max(...stops.slice(1).map((stop, index) => stop - (stops[index] ?? 0) - 2))
+      const wanted = sizeOf(group.label) + 3
+      if (room < wanted) {
+        frame.x -= wanted - Math.max(0, (stops[1] ?? 0) - frame.x - 2)
+        frame.width = right + FRAME_MARGIN - frame.x
+      }
+    }
+    return [{ frame, held: places }]
   })
   const shift = (one: (typeof framed)[number], by: number): void => {
     one.frame.x += by

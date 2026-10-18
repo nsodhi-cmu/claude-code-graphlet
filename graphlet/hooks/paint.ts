@@ -24,11 +24,12 @@ const FRAMES = {
   plain: { corners: '┌┐└┘', across: '─', down: '│', exits: { top: '┴', bottom: '┬', left: '┤', right: '├' } },
   foremost: { corners: '┏┓┗┛', across: '━', down: '┃', exits: { top: '┷', bottom: '┯', left: '┨', right: '┠' } },
   selected: { corners: '╔╗╚╝', across: '═', down: '║', exits: { top: '╧', bottom: '╤', left: '╢', right: '╟' } },
+  collapsed: { corners: '╭╮╰╯', across: '─', down: '│', exits: { top: '┴', bottom: '┬', left: '┤', right: '├' } },
 } as const satisfies Record<string, Frame>
 
-/** A node's frame: doubled where it is selected, heavy where the graph puts it foremost, else plain. */
+/** A node's frame: doubled where it is selected, heavy where the graph puts it foremost, round where it stands for a collapsed group, else plain. */
 const frameOf = (node: Node, selected: string | null): Frame =>
-  node.id === selected ? FRAMES.selected : node.isForemost ? FRAMES.foremost : FRAMES.plain
+  node.id === selected ? FRAMES.selected : node.isForemost ? FRAMES.foremost : node.holds !== undefined ? FRAMES.collapsed : FRAMES.plain
 
 /**
  * Where a window puts things: how far across it each place starts and how
@@ -175,9 +176,10 @@ function paintFrame(canvas: Canvas, box: FrameBox): void {
  * as near its left corner as it can stand where no line crosses the border
  * there or in the cell after it, or else in any such stretch it fits, and
  * cut in its middle where the border has none long enough: then in the
- * longest it has. It is in the group's tone, or plain.
+ * longest it has. It is in the group's tone, or plain. Answers where a click
+ * collapses the group: on the label, where the window shows it.
  */
-function writeTitle(canvas: Canvas, box: FrameBox): void {
+function writeTitle(canvas: Canvas, box: FrameBox): Hit[] {
   const row = canvas.cells[box.top] ?? []
   const runs: Array<{ start: number; length: number }> = []
   for (let x = box.left + 2; x < box.right - 1; x += 1) {
@@ -189,8 +191,11 @@ function writeTitle(canvas: Canvas, box: FrameBox): void {
   }
   const label = box.frame.group.label
   const run = runs.find(one => one.length >= sizeOf(label) + 3) ?? runs.find(one => one.length >= sizeOf(label) + 2) ?? runs.toSorted((a, b) => b.length - a.length)[0]
-  if (run === undefined || run.length < 5) return
-  canvas.put(run.start, box.top, ` ${clipMiddle(label, Math.min(sizeOf(label), run.length - 2))} `, { paint: box.frame.group.tone ?? 'plain' })
+  if (run === undefined || run.length < 5) return []
+  const title = ` ${clipMiddle(label, Math.min(sizeOf(label), run.length - 2))} `
+  canvas.put(run.start, box.top, title, { paint: box.frame.group.tone ?? 'plain' })
+  const [start, end] = [Math.max(run.start, 0), Math.min(run.start + sizeOf(title), canvas.cells[0]?.length ?? 0)]
+  return box.top >= 0 && box.top < canvas.cells.length && end > start ? [{ group: box.frame.group.id, x: start, y: box.top, width: end - start, height: 1 }] : []
 }
 
 /** Which ways a wire leaves a cell; a cell several wires share shows all of theirs. */
@@ -478,7 +483,7 @@ export function paint(layout: Layout, graph: Graph, selected: string | null, roo
     if (channel.isLoose) layTracks(channel, seen.xOf, channel.rows - channel.topRows - channel.bottomRows - channel.frameBottom - channel.frameTop)
     paintChannel(canvas, graph, layout, channel, selected, seen, motion)
   })
-  for (const frame of frames) writeTitle(canvas, frame)
+  const titles = frames.flatMap(frame => writeTitle(canvas, frame))
 
   const boxes: Box[] = layout.shelves.flatMap(shelf => shelf.places.filter(place => 'node' in place.slot).map(place => boxOf(seen, place, seen.yOf(shelf.top))))
   const signs = paintSigns(canvas, graph, boxes, selected, seen)
@@ -496,5 +501,5 @@ export function paint(layout: Layout, graph: Graph, selected: string | null, roo
       ? leftOut(graph.unread)
       : [`/${finding.query} · ${finding.found.length === 0 ? 'no match' : `${Math.max(which, 0) + 1} of ${finding.found.length}`}`, `/${finding.query}`]
   const foot = footRow(sight.isWhole ? undefined : beyond, width, page, rows.length, notes)
-  return bounded({ rows: [...rows, foot.row], hits: [...signs, ...hits, ...foot.hits] })
+  return bounded({ rows: [...rows, foot.row], hits: [...signs, ...titles, ...hits, ...foot.hits] })
 }

@@ -6,7 +6,7 @@ graphlet adds one noun to `$`, `$.graphlet`, in the `engine.create` hook of `gra
 
 ```ts
 type GraphletGraph = { nodes: GraphletNode[]; links: GraphletLink[]; groups?: GraphletGroup[]; isDirected?: boolean; direction?: 'down' | 'right' }
-type GraphletGroup = { id: string; label?: string; tone?: GraphletTone }
+type GraphletGroup = { id: string; label?: string; tone?: GraphletTone; isCollapsed?: boolean }
 type GraphletLink = { from: string; to: string; label?: string; tone?: GraphletTone; isDirected?: boolean }
 ```
 
@@ -28,6 +28,8 @@ A graph runs the way its `direction` says: `down`, its layers one under another,
 A node's `priority` matters as it compares with the priorities of the graph's other nodes, and with 0: a graph whose nodes all have one priority, or none, is drawn as one with none. The nodes of the highest priority, where it is above 0 and above another node's, are drawn with heavy frames and bold labels, in the terminal and on the web page. Where graphlet must choose between nodes, the one of higher priority goes first: it is the one a pane selects when nothing else says which, and among nodes that otherwise tie, the one kept in focus and the one named first at a window's edge. And the layout is seated again by the links of the nodes of higher priority first, and that seating is kept only where those links bend less and the drawing's rows and bent links, weighed together, weigh no more, as [LAYOUT.md](LAYOUT.md#shelves) tells. Such a seating may bend other links, or take another row for links it straightens, as any seating may that weighs no more.
 
 A group is a set of nodes drawn together in a frame: a tier of services, a package of files, a phase of states. A node is in the group its `group` names, and the graph's `groups` say what each frame says, its `label`, and how it is painted, its `tone`, dim when left out. A node may name a group the graph does not list; that group is labelled by its id. A group's id is unique among its graph's groups and nodes: a group whose id another group before it or a node has is dropped, and so is a node's group of a node's id, the node then in none. A group holds nodes, not groups. Its nodes stand together in each layer, its frame around all of them across the layers they stand in, and nothing else stands inside it, as [LAYOUT.md](LAYOUT.md#frames) tells.
+
+A group may be collapsed: drawn as one box with round corners that stands for all it holds, where its first node stood, saying its label after `▸` and how many nodes it holds, `▸ Backend  3`, in its tone. A link to or from any of its nodes is a link to or from the box, given once however many of them it joins, and a link between two of them is not drawn. A group is drawn collapsed where its `isCollapsed` says, until the person or the mod opens or collapses it in a pane, as [Groups](#groups) tells; a graph in a reply is drawn with every group open.
 
 ## Showing A Graph
 
@@ -56,6 +58,7 @@ A mod runs before the mods it depends on, so its hook is the outer one and graph
 | `scroll({ pane, by })` | Scrolls the graph: by cells, `{ x, y }`, or by turns of the wheel, a number. |
 | `select({ pane, node })` | Selects a node. |
 | `open({ pane, node })` | Does nothing. |
+| `collapse({ pane, group, isCollapsed })` | Collapses a group into one box, or opens it again. |
 | `key({ pane, key, selected })` | Does nothing. |
 
 A room has at least one cell each way and at most a thousand, whatever is asked: a count that is no number is taken as one. A room narrower than the narrowest a graph is laid out for, `LEAST_COLUMNS` in `graphlet/hooks/layout.ts`, is drawn as that wide. A scroll by what is no number is ignored.
@@ -88,6 +91,17 @@ on('graphlet.open', async ($, e, next) => {
 })
 ```
 
+## Groups
+
+A pane draws each group collapsed or open as `$.graphlet.collapse` was last called for it there, and else as the group's `isCollapsed` says. Graphlet calls it itself when the person collapses or opens a group, so a mod hears that in a hook on `graphlet.collapse`, as it hears a pick:
+
+- space, with the box of a collapsed group selected, opens the group; with a node of an open group selected, collapses it, and the group's box is then selected;
+- return, or a double click, on the box of a collapsed group opens the group, in place of opening a node;
+- a click on a frame's label collapses its group;
+- finding a node in a collapsed group, with `/`, opens the group.
+
+A node in a collapsed group is drawn as the group's box selected, and `show` answers the group's id as `selected`. Opening a group the person had picked the box of picks its first node. The web page and `c` take the graph as the pane has it, its groups collapsed or open.
+
 ## Keys And The Wheel
 
 The graph is drawn by a surface module, the only kind of element that receives arrow keys, and it receives keys only after a click on it. While it has the keyboard, graphlet answers these keys itself:
@@ -95,7 +109,8 @@ The graph is drawn by a surface module, the only kind of element that receives a
 | Key | What it does |
 | :- | :- |
 | arrows, `h` `j` `k` `l` | Moves the selection: along a layer, or along a link to the next, as the graph runs. |
-| return | Opens the selected node. |
+| return | Opens the selected node, or the collapsed group whose box is selected. |
+| space | Collapses the selected node's group, or opens the collapsed group whose box is selected. |
 | `c` | Copies the whole graph as plain text: drawn still, with nothing selected, as a reply draws it, in a room as wide as its longest layer. A toast says whether it was copied. |
 | `f` | Draws the graph in focus on the selected node, or draws it all again. |
 | `/` | Starts finding a node by its label. While finding, what is typed is what is looked for, the selection goes to the first node found, return goes to the next in place of opening one, and backspace takes back what was typed, or with nothing typed, stops finding. A click on a box stops it too. |

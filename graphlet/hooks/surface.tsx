@@ -50,7 +50,7 @@ const Surface: ClientModule<Drawing, number> = (drawing, surface) => {
     const last = clicks.get(surface)
     clicks.delete(surface)
     if (hit === undefined) grips.set(surface, { x: event.x, y: event.y, grab: Math.random() })
-    else if (!('node' in hit)) surface.post('by' in hit ? { by: hit.by } : { page: true })
+    else if (!('node' in hit)) surface.post('by' in hit ? { by: hit.by } : 'group' in hit ? { group: hit.group } : { page: true })
     else if (last?.node === hit.node && Date.now() - last.at <= DOUBLE_CLICK_MS) surface.post({ node: hit.node, isOpened: true })
     else {
       clicks.set(surface, { node: hit.node, at: Date.now() })

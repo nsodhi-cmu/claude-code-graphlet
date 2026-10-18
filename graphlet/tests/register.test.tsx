@@ -61,6 +61,10 @@ const HOST: Plugin = {
       heard.push(`key ${e.pane} ${e.key} ${e.selected}`)
       return next(e)
     })
+    on('graphlet.collapse', async ($, e, next) => {
+      heard.push(`collapse ${e.pane} ${e.group} ${e.isCollapsed}`)
+      return next(e)
+    })
     on('ui.press', { plugin: 'host' }, async ($, e) => {
       if (e.element === 'wheel') await $.graphlet.scroll({ pane: e.requestId, by: 1 })
       if (e.element === 'drift') await $.graphlet.scroll({ pane: e.requestId, by: Number.NaN })
@@ -100,6 +104,32 @@ const HOST: Plugin = {
       return (
         <Box flexDirection="column">
           <Text>{`host ${JSON.stringify({ shown })}`}</Text>
+          {drawing}
+        </Box>
+      )
+    })
+    const GROUPED = {
+      nodes: [
+        { id: 'web', label: 'web' },
+        { id: 'api', label: 'api', group: 'back' },
+        { id: 'auth', label: 'auth', group: 'back' },
+        { id: 'db', label: 'db', group: 'data' },
+      ],
+      links: [
+        { from: 'web', to: 'api' },
+        { from: 'api', to: 'auth' },
+        { from: 'auth', to: 'db' },
+      ],
+      groups: [{ id: 'back', label: 'Backend' }, { id: 'data', label: 'Data', isCollapsed: true }],
+      direction: 'down' as const,
+    }
+    on('ui.render', { component: 'Pane', requestId: 'grouped' }, async ($, e, next) => {
+      const { Box, Text } = $.ui.resolve(e)
+      const shown = await $.graphlet.show({ pane: 'grouped', graph: GROUPED, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
+      const drawing = await next(e)
+      return (
+        <Box flexDirection="column">
+          <Text>{`host ${JSON.stringify({ shown, heard })}`}</Text>
           {drawing}
         </Box>
       )
@@ -280,6 +310,62 @@ test('return, or a double click on a box, opens its node: the owner hears which,
     shown: { selected: 'src/cart.ts' },
     heard: ['select free src/email.ts', 'open free src/email.ts', 'select free src/cart.ts', 'open free src/cart.ts', 'key free x src/cart.ts'],
   })
+  await pane.unmount()
+})
+
+test('a group its owner says is collapsed is drawn as one box; space opens it and collapses it again, a double click on its box or return opens it, and a click on a frame\'s label collapses its group, each heard by the owner', WITH_HOST, async ($, on) => {
+  world(on)
+  const pane = await mount($, 'grouped', NARROW)
+  const screen = async (): Promise<string> => (await rowsOf(pane)).join('\n')
+  expect(await screen()).toContain('│ ▸ Data  1 │')
+  expect(await screen()).toContain('╭─ Backend ─')
+  const at = async (text: string): Promise<{ x: number; y: number }> => {
+    const rows = await rowsOf(pane)
+    const y = rows.findIndex(row => row.includes(text))
+    return { x: (rows[y] ?? '').indexOf(text), y }
+  }
+  await click(pane, await at('▸ Data'))
+  await pane.key({ key: 'space', in: 'graph' })
+  await pane.redraw()
+  expect(await screen()).toContain('╭─ Data ─')
+  expect((await said(pane)).shown.selected).toBe('db')
+  await pane.key({ key: 'space', in: 'graph' })
+  await pane.redraw()
+  expect(await screen()).toContain('▸ Data  1')
+  expect((await said(pane)).shown.selected).toBe('data')
+  await pane.key({ key: 'return', in: 'graph' })
+  await pane.redraw()
+  expect(await screen()).toContain('╭─ Data ─')
+  const title = await at(' Backend ')
+  await pane.pointer({ type: 'down', x: title.x + 2, y: title.y, button: 'left', in: 'graph' })
+  await pane.redraw()
+  expect(await screen()).toContain('▸ Backend  2')
+  const box = await at('▸ Backend')
+  await click(pane, box)
+  await click(pane, box)
+  await pane.redraw()
+  expect(await screen()).toContain('╭─ Backend ─')
+  expect((await said(pane)).heard).toEqual([
+    'select grouped data',
+    'collapse grouped data false',
+    'collapse grouped data true',
+    'collapse grouped data false',
+    'collapse grouped back true',
+    'select grouped back',
+    'collapse grouped back false',
+  ])
+  await pane.unmount()
+})
+
+test('finding a node in a collapsed group opens the group and selects the node', WITH_HOST, async ($, on) => {
+  world(on)
+  const pane = await mount($, 'grouped', NARROW)
+  await pane.pointer({ type: 'down', x: 0, y: 0, button: 'left', in: 'graph' })
+  for (const key of ['/', 'd', 'b']) await pane.key({ key, in: 'graph' })
+  await pane.redraw()
+  expect((await said(pane)).shown.selected).toBe('db')
+  expect((await rowsOf(pane)).join('\n')).toContain('╭─ Data ─')
+  expect((await said(pane)).heard).toEqual(['collapse grouped data false', 'select grouped db'])
   await pane.unmount()
 })
 

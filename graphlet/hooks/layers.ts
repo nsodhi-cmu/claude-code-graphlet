@@ -6,14 +6,18 @@ import type { GraphletDirection, GraphletGraph, GraphletGroup, GraphletLink, Gra
 // stretches between it and its neighbors cross as little as an ordering can
 // make them.
 
-/** A node as it is drawn, and whether it is one the graph puts foremost, drawn with a heavy border. */
-export type Node = GraphletNode & { isForemost: boolean }
+/**
+ * A node as it is drawn, whether it is one the graph puts foremost, drawn
+ * with a heavy border, and for a box that stands for a collapsed group, how
+ * many nodes it holds.
+ */
+export type Node = GraphletNode & { isForemost: boolean; holds?: number }
 
 /** A link as it is drawn: between two nodes, and whether it runs one way, from `from` to `to`, or only joins them. */
 export type Link = GraphletLink & { isDirected: boolean }
 
-/** A group as it is drawn: its id, what its frame says, and its tone where it has one. */
-export type Group = { id: string; label: string; tone?: GraphletTone }
+/** A group as it is drawn: its id, what its frame says, its tone where it has one, and whether it is collapsed at first. */
+export type Group = { id: string; label: string; tone?: GraphletTone; isCollapsed?: true }
 
 /**
  * A graph as it is drawn: every node once, every link once, between two of
@@ -88,7 +92,7 @@ export function readGraph(graph: GraphletGraph): Graph {
   const held = new Set(nodes.map(node => node.group))
   const groups: Group[] = [...listed.values()].filter(group => held.has(group.id)).map(group => {
     const label = tidy(group.label) || tidy(group.id) || NAMELESS
-    return { id: group.id, label, ...(TONES.includes(group.tone as GraphletTone) ? { tone: group.tone } : {}) }
+    return { id: group.id, label, ...(TONES.includes(group.tone as GraphletTone) ? { tone: group.tone } : {}), ...(group.isCollapsed === true ? { isCollapsed: true as const } : {}) }
   })
   const priorities = nodes.map(priorityOf)
   const [top, lowest] = [Math.max(...priorities), Math.min(...priorities)]
