@@ -23,9 +23,9 @@ graders:
     flags: 'm'
     match: 'contains'
   - type: regex
-    name: no-group-for-what-has-no-parts
-    pattern: '```graphlet(?:(?!```)[\s\S])*?^[ \t]*[^\s:][^:\n]*:[ \t]*$'
-    flags: 'm'
+    name: no-frame-around-the-whole-graph
+    pattern: '```graphlet[ \t]*\n[ \t]*[^\s:][^:\n]*:[ \t]*\n(?:[ \t]+\S[^\n]*\n)+[ \t]*```'
+    flags: ''
     match: 'not_contains'
   - type: regex
     name: no-mermaid-in-the-block

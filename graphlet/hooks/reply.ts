@@ -26,7 +26,7 @@ Ask for a correction -> Read the request
 
 - A node is its label: one label is one node. \`->\` links one way; \`--\` joins two nodes with no direction, as friends.
 - \`->|yes|\` writes a word or two on a link. A tone after a label colors its node: [good], [warn], [bad], [note], [dim]. There are no shapes or styles.
-- A line \`Name:\` frames the nodes on the indented lines under it, for parts that belong together: a tier, a package, a phase.
+- When a graph falls into parts (tiers, packages, phases), a line \`Name:\` frames the nodes on the lines indented under it; never one frame around a whole graph.
 - Keep labels short and a graph to a couple dozen nodes: split a larger one. Introduce it with a sentence.
 - Only in replies, never in files. When asked for Mermaid, Graphviz, or a text diagram, write that instead.`
 
