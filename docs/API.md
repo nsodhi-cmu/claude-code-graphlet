@@ -50,7 +50,16 @@ A group may be collapsed: drawn as one box with round corners, doubled where it 
 
 ## Showing A Graph
 
-graphlet calls the place a graph is drawn its site, and knows it by the id its owner's `ui.render` hook sees as `e.requestId`: for a pane, the id the pane was opened with. A pane belongs to the mod that opened it, and so does its `ui.render` hook. That hook says what the pane holds, and then calls `next(e)`, which resolves to graphlet's drawing, for the mod to place among its own elements:
+graphlet calls the place a graph is drawn its site, and knows it by the id its owner's `ui.render` hook sees as `e.requestId`. A mod may draw a graph in four kinds of site:
+
+| Site | Its `ui.render` component and id | How the graph is drawn |
+| :- | :- | :- |
+| A pane the mod opened | `Pane`, the id it was opened with | Whole, through a window: it scrolls, takes a selection, the keys, and the mouse. |
+| The band above the prompt | `AbovePrompt`, the band's one id | As in a pane, over what the band holds beneath it. |
+| The row of a tool's result | `ToolResult`, the call's `tool_use_id` | Still, as a reply's graph is, folded into its room, with `copy · html ↗` under it. |
+| The row of a command's output | `CommandOutput`, the row's id | Still, as in a tool's row. |
+
+A site's `ui.render` hook is its owner's: a pane's, the mod that opened it; the band's, every mod that draws there; a tool's row, the mod whose tool it is, which matches on `e.props.tool`; a command's row, the mod whose command it is, on `e.props.command`. That hook says what the site holds, and then calls `next(e)`, which resolves to graphlet's drawing, for the mod to place among its own elements:
 
 ```tsx
 on('ui.render', { component: 'Pane', requestId: 'mine' }, async ($, e, next) => {
@@ -77,9 +86,17 @@ on('ui.render', { component: 'Pane', requestId: 'mine' }, async ($, e, next) => 
 })
 ```
 
-The drawing is given a row less than the pane's body, for the mod's own title over it.
+The drawing is given a row less than the pane's body, for the mod's own title over it. A tool's row is drawn the same way, as tall as the graph needs:
 
-A mod runs before the mods it depends on, so its hook is the outer one and graphlet's is the one `next(e)` reaches. Graphlet's hook draws only the panes `show` has named, on the terminal, and passes every other on.
+```tsx
+on('ui.render', { component: 'ToolResult' }, async ($, e, next) => {
+  if (e.props.tool !== 'my_tool') return next(e)
+  await $.graphlet.show({ site: e.requestId, graph: graphOf(e.props.output), columns: (e.viewport?.columns ?? 80) - 2, rows: 1000 })
+  return next(e)
+})
+```
+
+A mod runs before the mods it depends on, so its hook is the outer one and graphlet's is the one `next(e)` reaches. Graphlet's hook draws a site only on a render where `show` named it, on the terminal, and passes every other on: so a site whose owner stops calling `show` is left as the engine, or another mod, draws it. On every other surface, every site is left as its owner draws it.
 
 | Method | What it does |
 | :- | :- |
@@ -94,7 +111,9 @@ A mod runs before the mods it depends on, so its hook is the outer one and graph
 
 A room has at least one cell each way and at most `MOST_CELLS`, in `graphlet/hooks/draw.ts`, whatever is asked: a count that is no number is taken as one. A room narrower than the narrowest a graph is laid out for, `LEAST_COLUMNS` in `graphlet/hooks/layout.ts`, is drawn as that wide. A scroll by what is no number is ignored.
 
-`show` is called on every render. A drawing is only ever of what `show` was last given, so a mod that keeps its graph and its selection in its own state hands them over each time, and a change of either redraws the pane as any change of its state does.
+`show` is called on every render of the site, before `next(e)`. A drawing is only ever of what `show` was last given, so a mod that keeps its graph and its selection in its own state hands them over each time, and a change of either redraws the site as any change of its state does. A site holds one graph.
+
+A still site, a tool's row or a command's row, takes no selection, keys, or wheel. A click on `copy` puts the picture on the clipboard as text, and one on `html ↗` opens the graph as a web page, `graphlet-<site>.html`, as under a reply's graph.
 
 ## The Selection
 
@@ -166,4 +185,4 @@ A click on one of the counts under a graph larger than its room scrolls it a pag
 
 ## What Graphlet Keeps
 
-For each pane `show` has named, graphlet keeps what it was last given, the node last picked there, where the person scrolled the window to, the groups collapsed or opened there, whether it is drawn in focus, and what is being found. A window the person scrolled stays where they left it until another node is selected, and then follows the selection again. It also keeps the layouts it last made, `KEPT_LAYOUTS` of them, each by what its graph holds, which way it runs, and how wide its room is, and how tall too running right, so that a key press, a click, or a render of the same graph in the same room does not lay the graph out again; and the graphs of the reply blocks it drew last, for the corners under their pictures. None of it outlives the session, or a reload of the mod.
+For each site `show` has named, graphlet keeps what it was last given, the node last picked there, where the person scrolled the window to, the groups collapsed or opened there, whether it is drawn in focus, and what is being found. A window the person scrolled stays where they left it until another node is selected, and then follows the selection again. It also keeps the layouts it last made, `KEPT_LAYOUTS` of them, each by what its graph holds, which way it runs, and how wide its room is, and how tall too running right, so that a key press, a click, or a render of the same graph in the same room does not lay the graph out again; and the graphs of the reply blocks it drew last, for the corners under their pictures. None of it outlives the session, or a reload of the mod.

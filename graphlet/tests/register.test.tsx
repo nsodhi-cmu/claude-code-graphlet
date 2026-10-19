@@ -65,7 +65,9 @@ const HOST: Plugin = {
       heard.push(`collapse ${e.site} ${e.group} ${e.isCollapsed}`)
       return next(e)
     })
+    let isBandShown = true
     on('ui.press', { plugin: 'host' }, async ($, e) => {
+      if (e.element === 'hide') isBandShown = false
       if (e.element === 'wheel') await $.graphlet.scroll({ site: e.requestId, by: 1 })
       if (e.element === 'drift') await $.graphlet.scroll({ site: e.requestId, by: Number.NaN })
       if (e.element === 'right') heard.push(`step ${await $.graphlet.step({ site: e.requestId, move: 'right' })}`)
@@ -134,6 +136,29 @@ const HOST: Plugin = {
         </Box>
       )
     })
+    on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+      if (!isBandShown) return next(e)
+      const { Box, Text, Button } = $.ui.resolve(e)
+      await $.graphlet.show({ site: e.requestId, graph: GRAPH, columns: e.props.bodyColumns, rows: e.props.maxRows })
+      const drawing = await next(e)
+      return (
+        <Box flexDirection="column">
+          <Text>{`host ${JSON.stringify({ heard })}`}</Text>
+          {drawing}
+          <Button key="hide" label="hide" onPress={() => undefined} />
+        </Box>
+      )
+    })
+    on('ui.render', { component: 'ToolResult' }, async ($, e, next) => {
+      if (e.props.tool !== 'deps') return next(e)
+      await $.graphlet.show({ site: e.requestId, graph: GRAPH, columns: (e.viewport?.columns ?? 80) - 2, rows: 1000 })
+      return next(e)
+    })
+    on('ui.render', { component: 'CommandOutput' }, async ($, e, next) => {
+      if (e.props.command !== 'deps') return next(e)
+      await $.graphlet.show({ site: e.requestId, graph: GRAPH, columns: (e.viewport?.columns ?? 80) - 2, rows: 1000 })
+      return next(e)
+    })
     on('ui.render', { component: 'Pane', requestId: 'big' }, async ($, e, next) => {
       await $.graphlet.show({ site: 'big', graph: HUB, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
       return next(e)
@@ -194,6 +219,18 @@ const world = (on: On) => {
     const { Text } = $.ui.resolve(e)
     return h(Text, {}, 'the engine drew this') as never
   })
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return h(Text, {}, 'the engine drew this') as never
+  })
+  on('ui.render', { component: 'ToolResult' }, ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return h(Text, {}, 'the engine drew this') as never
+  })
+  on('ui.render', { component: 'CommandOutput' }, ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return h(Text, {}, 'the engine drew this') as never
+  })
   on('ui.press', ($, e) => ({ element: e.element }))
   on('ui.toast', ($, e) => {
     seen.toasts.push(e.text)
@@ -222,7 +259,7 @@ const mount = ($: Engine, requestId: string, props = PANE) =>
 type Pane = Awaited<ReturnType<typeof mount>>
 
 /** The rows graphlet's surface module drew. */
-const rowsOf = async (pane: Pane): Promise<string[]> => {
+const rowsOf = async (pane: Pick<Pane, 'drawn'>): Promise<string[]> => {
   const drawn = (await pane.drawn({ in: 'graph' })) as { children?: Array<{ children?: unknown[] }> }
   return (drawn.children ?? []).map(row =>
     (row.children ?? [])
@@ -245,7 +282,7 @@ const boxOf = (id: string): { x: number; y: number } => {
   if (hit === undefined) throw new Error(`${id} is not drawn`)
   return hit
 }
-const click = (pane: Pane, at: { x: number; y: number }) =>
+const click = (pane: Pick<Pane, 'pointer'>, at: { x: number; y: number }) =>
   pane.pointer({ type: 'down', x: at.x + 1, y: at.y + 1, button: 'left', in: 'graph' })
 
 test('a pane\'s owner says what the pane holds, and next hands it the drawing to place among its own elements', WITH_HOST, async ($, on) => {
@@ -582,6 +619,51 @@ test('each pane has its own graph, selection, and window', WITH_HOST, async ($, 
   expect((await rowsOf(free)).at(-1)?.trim()).toBe('html ↗')
   await free.unmount()
   await held.unmount()
+})
+
+const BAND: RenderPropsOf['AbovePrompt'] = { hasSurvey: false, isWorking: false, maxRows: 30, bodyColumns: 90, scroll: { offset: 0, bodyRows: 30 }, view: {} }
+
+test('a graph in the band above the prompt is drawn as a pane\'s is, among its owner\'s elements and over what the band held beneath, and a click on a box selects its node', WITH_HOST, async ($, on) => {
+  world(on)
+  const band = await $.ui.mount({ plugin: 'graphlet', surface: 'terminal', component: 'AbovePrompt', requestId: 'band', props: BAND })
+  expect(await rowsOf(band)).toEqual(picture(view.draw(SHOP, 'src/price.ts', { columns: 90, rows: 30 }, ORIGIN)))
+  expect(await band.find({ type: 'Text', text: 'the engine drew this' })).toBeDefined()
+  await click(band, boxOf('src/email.ts'))
+  expect(JSON.parse(((await band.find({ type: 'Text', text: /^host / }))?.text ?? 'host {}').slice('host '.length))).toEqual({ heard: ['select band src/email.ts'] })
+  await band.unmount()
+})
+
+test('a site is drawn only on a render where its owner says what it holds: once the band\'s owner stops, the band is as the engine draws it', WITH_HOST, async ($, on) => {
+  world(on)
+  const band = await $.ui.mount({ plugin: 'graphlet', surface: 'terminal', component: 'AbovePrompt', requestId: 'band', props: BAND })
+  const hasGraph = async (): Promise<boolean> => JSON.stringify(await band.drawn()).includes('surface.tsx')
+  expect(await hasGraph()).toBe(true)
+  await band.press({ plugin: 'host', key: 'hide' })
+  await band.redraw()
+  expect(await hasGraph()).toBe(false)
+  expect(await band.find({ type: 'Text', text: 'the engine drew this' })).toBeDefined()
+  await band.unmount()
+})
+
+test('a tool\'s row or a command\'s row holds the still picture of its graph, nothing selected, with copy and html ↗ under it; another row is the engine\'s', WITH_HOST, async ($, on) => {
+  const seen = world(on)
+  const still = picture(pictureOf(viewOf(LOOK, true), SHOP, { columns: 78, rows: 1000 }))
+  const width = Math.max(...still.map(line => line.length))
+  const row = (component: 'ToolResult' | 'CommandOutput', requestId: string, props: RenderPropsOf['ToolResult'] | RenderPropsOf['CommandOutput']) =>
+    $.ui.mount({ plugin: 'graphlet', surface: 'terminal', component, requestId, props, viewport: { columns: 80, rows: 40 } } as never)
+  const tool = await row('ToolResult', 'toolu_1', { tool_use_id: 'toolu_1', tool: 'deps', output: {}, isErrored: false })
+  expect(screenOf(await tool.drawn())).toEqual([...still, 'copy · html ↗'.padStart(width)])
+  await tool.press({ plugin: 'graphlet', key: 'copy:0' })
+  expect(seen.copied).toEqual([still.join('\n')])
+  await tool.press({ plugin: 'graphlet', key: 'page:0' })
+  expect(seen.written.map(file => file.path)).toEqual(['/var/tmp/graphlet-toolu_1.html'])
+  await tool.unmount()
+  const command = await row('CommandOutput', 'command_1', { command: 'deps', args: '', text: '', isErrored: false })
+  expect(screenOf(await command.drawn())).toEqual([...still, 'copy · html ↗'.padStart(width)])
+  await command.unmount()
+  const other = await row('ToolResult', 'toolu_2', { tool_use_id: 'toolu_2', tool: 'Bash', output: {}, isErrored: false })
+  expect(screenOf(await other.drawn())).toEqual(['the engine drew this'])
+  await other.unmount()
 })
 
 test('a pane graphlet was told nothing of is left as it is, and so is every surface but the terminal', WITH_HOST, async ($, on) => {

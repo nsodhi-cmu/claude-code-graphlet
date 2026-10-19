@@ -1,4 +1,4 @@
-import type { EngineInterface, Register, RenderSurface } from 'claude-code'
+import type { Elements, EngineInterface, Register, RenderSurface } from 'claude-code'
 
 import type { Graphlet } from '../types'
 import { MOST_CELLS, MOST_TREE_CHARS, bounded, charactersOf, rowText, sizeOf, styleOf } from './draw'
@@ -28,6 +28,8 @@ const scrolled = new Map<string, Pan>()
 const replied = new Map<string, { graphs: Graph[]; room: Room }>()
 /** How many reply blocks' graphs are kept for their corners, those drawn last: a block is drawn again as it comes back into view. */
 const KEPT_REPLIES = 64
+/** The sites `show` was called for since each was last drawn: a site is drawn only on a render where its owner said what it holds. */
+const asked = new Set<string>()
 /** Whether each group of each site's graph is collapsed, as `collapse` was last called for it there. */
 const shutIn = new Map<string, Map<string, boolean>>()
 /** The sites whose graph is drawn in focus on the selected node. */
@@ -101,8 +103,33 @@ const copyGraph = async ($: EngineInterface, graph: Graph, room: Room, surface?:
 const BULLET_COLUMNS = 2
 /** How wide a reply is taken to be on a surface that has not said. */
 const REPLY_COLUMNS = 80
-/** What the corner of a picture in a reply says: a click on the first word copies the graph as text, and on the second opens it as a web page. */
+/** What the corner of a still picture says: a click on the first word copies the graph as text, and on the second opens it as a web page. */
 const REPLY_CORNER = { copy: 'copy', between: ' · ', page: 'html ↗' } as const
+
+/**
+ * A graph's still picture in `room`, drawn plainer past `share` of what the
+ * engine draws, and under it its foot: the counts of what is out of view,
+ * and at the picture's right edge, the corner, its two Buttons keyed by
+ * `index`, the graph's place among those its site holds.
+ */
+const stillTreeOf = (elements: Pick<Elements['terminal'], 'Box' | 'Text' | 'Button'>, graph: Graph, room: Room, share: number, index: number) => {
+  const { Box, Text, Button } = elements
+  const picture = stillOf(still, graph, room)
+  const rows = bounded({ rows: picture.rows, hits: [] }, share).rows
+  const corner = sizeOf(`${REPLY_CORNER.copy}${REPLY_CORNER.between}${REPLY_CORNER.page}`)
+  const width = Math.min(room.columns, Math.max(sizeOf(picture.foot) + (picture.foot === '' ? 0 : 2) + corner, ...rows.map(row => sizeOf(rowText(row)))))
+  return [
+    ...rows.map(row => <Text wrap="truncate-end">{row.length === 0 ? ' ' : row.map(span => <Text {...styleOf(span)}>{span.text}</Text>)}</Text>),
+    <Box flexDirection="row" justifyContent="space-between" width={width}>
+      <Text dimColor>{picture.foot}</Text>
+      <Box flexDirection="row">
+        <Button key={`copy:${index}`} label={REPLY_CORNER.copy} plain dimColor onPress={() => undefined} />
+        <Text dimColor>{REPLY_CORNER.between}</Text>
+        <Button key={`page:${index}`} label={REPLY_CORNER.page} plain dimColor onPress={() => undefined} />
+      </Box>
+    </Box>,
+  ]
+}
 
 const isPan = (value: unknown): value is Pan =>
   typeof value === 'object' &&
@@ -142,6 +169,7 @@ export const register: Register = (on, options) => {
         const pan = scrolled.get(input.site) ?? view.show(drawn, selected, room, before?.pan ?? ORIGIN)
         const drawing = view.draw(drawn, selected, room, pan, found)
         held.set(input.site, { given, whole: graph, graph: drawn, room, selected, pan, drawing })
+        asked.add(input.site)
         return { rows: drawing.rows.length, selected }
       },
       step: async input => {
@@ -173,9 +201,35 @@ export const register: Register = (on, options) => {
 
   on('ui.render', { component: 'Pane' }, async ($, e, next) => {
     const at = held.get(e.requestId)
-    if (at === undefined || e.surface !== 'terminal') return next(e)
+    if (!asked.delete(e.requestId) || at === undefined || e.surface !== 'terminal') return next(e)
     const { Client } = $.ui.resolve(e)
     return <Client key="graph" module="./surface.tsx" props={at.drawing} />
+  })
+
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    const at = held.get(e.requestId)
+    if (!asked.delete(e.requestId) || at === undefined || e.surface !== 'terminal') return next(e)
+    const { Box, Client } = $.ui.resolve(e)
+    return (
+      <Box flexDirection="column">
+        <Client key="graph" module="./surface.tsx" props={at.drawing} />
+        {await next(e)}
+      </Box>
+    )
+  })
+
+  on('ui.render', { component: 'ToolResult' }, async ($, e, next) => {
+    const at = held.get(e.requestId)
+    if (!asked.delete(e.requestId) || at === undefined || e.surface !== 'terminal') return next(e)
+    const { Box, Text, Button } = $.ui.resolve(e)
+    return <Box flexDirection="column">{stillTreeOf({ Box, Text, Button }, at.whole, at.room, MOST_TREE_CHARS, 0)}</Box>
+  })
+
+  on('ui.render', { component: 'CommandOutput' }, async ($, e, next) => {
+    const at = held.get(e.requestId)
+    if (!asked.delete(e.requestId) || at === undefined || e.surface !== 'terminal') return next(e)
+    const { Box, Text, Button } = $.ui.resolve(e)
+    return <Box flexDirection="column">{stillTreeOf({ Box, Text, Button }, at.whole, at.room, MOST_TREE_CHARS, 0)}</Box>
   })
 
   on('prompt.compose', async ($, e, next) => {
@@ -203,34 +257,13 @@ export const register: Register = (on, options) => {
     const [first, ...rest] = shown
     const lead = first !== undefined && 'text' in first ? [await next({ ...e, props: { ...e.props, text: first.text } })] : []
     const following = lead.length > 0 ? rest : shown
-    /** A graph's still picture, and under it its foot: the counts of what is out of view, and at the picture's right edge, the corner. */
-    const pictured = (graph: Graph) => {
-      const index = graphs.indexOf(graph)
-      const picture = stillOf(still, graph, room)
-      const rows = bounded({ rows: picture.rows, hits: [] }, share).rows
-      const corner = sizeOf(`${REPLY_CORNER.copy}${REPLY_CORNER.between}${REPLY_CORNER.page}`)
-      const width = Math.min(room.columns, Math.max(sizeOf(picture.foot) + (picture.foot === '' ? 0 : 2) + corner, ...rows.map(row => sizeOf(rowText(row)))))
-      return [
-        ...rows.map(row => (
-          <Text wrap="truncate-end">{row.length === 0 ? ' ' : row.map(span => <Text {...styleOf(span)}>{span.text}</Text>)}</Text>
-        )),
-        <Box flexDirection="row" justifyContent="space-between" width={width}>
-          <Text dimColor>{picture.foot}</Text>
-          <Box flexDirection="row">
-            <Button key={`copy:${index}`} label={REPLY_CORNER.copy} plain dimColor onPress={() => undefined} />
-            <Text dimColor>{REPLY_CORNER.between}</Text>
-            <Button key={`page:${index}`} label={REPLY_CORNER.page} plain dimColor onPress={() => undefined} />
-          </Box>
-        </Box>,
-      ]
-    }
     return (
       <Box flexDirection="column">
         {[
           ...lead,
           ...following.map(part => (
             <Box flexDirection="column" marginLeft={BULLET_COLUMNS} marginTop={1}>
-              {'text' in part ? <Markdown text={part.text} /> : pictured(part.graph)}
+              {'text' in part ? <Markdown text={part.text} /> : stillTreeOf({ Box, Text, Button }, part.graph, room, share, graphs.indexOf(part.graph))}
             </Box>
           )),
         ]}
@@ -240,11 +273,14 @@ export const register: Register = (on, options) => {
 
   on('ui.press', { plugin: 'graphlet' }, async ($, e, next) => {
     const [action, at] = e.element.split(':')
-    const reply = e.component === 'AssistantMessage' ? replied.get(e.requestId) : undefined
-    const graph = reply?.graphs[Number(at)]
-    if (reply === undefined || graph === undefined) return next(e)
-    if (action === 'copy') await copyGraph($, graph, reply.room, e.surface)
-    else if (action === 'page') await openPage($, `reply-${e.requestId.replace(/[^A-Za-z0-9]/g, '').slice(-8)}-${at}`, 'reply', graph, still.direction(graph, reply.room))
+    const site = held.get(e.requestId)
+    const isReply = e.component === 'AssistantMessage'
+    const pictured = isReply ? replied.get(e.requestId) : site === undefined ? undefined : { graphs: [site.whole], room: site.room }
+    const graph = pictured?.graphs[Number(at)]
+    if (pictured === undefined || graph === undefined) return next(e)
+    const name = isReply ? `reply-${e.requestId.replace(/[^A-Za-z0-9]/g, '').slice(-8)}-${at}` : e.requestId
+    if (action === 'copy') await copyGraph($, graph, pictured.room, e.surface)
+    else if (action === 'page') await openPage($, name, isReply ? 'reply' : e.requestId, graph, still.direction(graph, pictured.room))
     else return next(e)
     return { element: e.element }
   })

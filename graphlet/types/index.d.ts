@@ -106,7 +106,12 @@ export type GraphletSize = { columns: number; rows: number }
 
 /** What a site is to hold. */
 export type GraphletShow = {
-  /** The site the graph is drawn in, by the id its owner's `ui.render` hook sees as `e.requestId`: a pane's id, the one it was opened with. */
+  /**
+   * The site the graph is drawn in, by the id its owner's `ui.render` hook
+   * sees as `e.requestId`: a pane's, the band's above the prompt, a tool
+   * result's row, or a command output's row. A pane and the band draw it
+   * whole, through a window; a tool's or a command's row, still.
+   */
   site: string
   graph: GraphletGraph
   /** The room the drawing may take, in cells. */
@@ -148,7 +153,7 @@ export type Graphlet = {
   /**
    * Says what a site holds. The site's own `ui.render` hook calls this and
    * then `next(e)`, which resolves to the drawing, for it to place among its
-   * own elements.
+   * own elements. A site is drawn only on a render where this was called.
    */
   show(input: GraphletShow): Promise<GraphletShown>
   /** The node a move from the selected one lands on in the graph a site holds; null when the site holds none. */

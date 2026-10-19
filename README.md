@@ -1,6 +1,6 @@
 # graphlet
 
-graphlet draws graphs in Claude Code: boxes for the things, and lines for how they connect. Claude draws them in its replies, and other mods draw them in their panes.
+graphlet draws graphs in Claude Code: boxes for the things, and lines for how they connect. Claude draws them in its replies, and other mods draw them in their panes, in the band above the prompt, and under their tools' results.
 
 ```
 ● Here is how the app fits together:
@@ -56,7 +56,7 @@ The conversation keeps the block as Claude wrote it, so an export or `/copy` has
 
 ## In Other Mods
 
-A mod can depend on graphlet to draw graphs in its own panes, where the person can click and move through them, and the mod hears what they picked. The mod lists graphlet in its `.claude-plugin/plugin.json`:
+A mod can depend on graphlet to draw graphs in its own panes and in the band above the prompt, where the person can click and move through them and the mod hears what they picked, and still, as in a reply, in the rows of its tools' results and its commands' output. The mod lists graphlet in its `.claude-plugin/plugin.json`:
 
 ```json
 { "name": "my-mod", "dependencies": ["graphlet"] }
@@ -125,8 +125,8 @@ A mod is code that runs inside Claude Code, unsandboxed, with your permissions. 
 What graphlet does with that access:
 
 - **Tells Claude** that it can draw graphs, in one section of the system prompt of every session that draws, unless **Graphs in replies** is off. The section rides on every request.
-- **Draws** in Claude's replies where they hold a graph block, in the panes of the mods that ask it to, and nowhere else.
-- **Keeps** each pane's graph, selection, and scroll position in memory for the session, and the graphs of the replies it drew last, for the buttons under them.
+- **Draws** in Claude's replies where they hold a graph block, where the mods that use it ask it to, and nowhere else.
+- **Keeps** each site's graph, selection, and scroll position in memory for the session, and the graphs of the replies it drew last, for the buttons under them.
 - **Writes one file and opens it**, only when you click `html ↗`: the graph as a web page, in your temporary folder, opened with your system's own opener (`xdg-open`, `open`, or `start`).
 - **Copies a graph to your clipboard**, only when you click `copy` or press `c`.
 
@@ -134,7 +134,7 @@ It reads no file, stores nothing between sessions, calls no model, and makes no 
 
 ## Limits
 
-- It draws pictures in the terminal only. On the desktop app, the VS Code extension, and the mobile app, a graph in a reply is shown as plain text, and a pane is left as its mod draws it.
+- It draws pictures in the terminal only. On the desktop app, the VS Code extension, and the mobile app, a graph in a reply is shown as plain text, and a mod's graph is left as the mod draws it.
 - A graph in a reply is still: nothing in it can be selected, and it does not scroll. Its web page shows all of it.
 - The mouse reaches a graph only in Claude Code's fullscreen layout, and a pane's graph takes keys only once it has been clicked.
 - Where an organization manages Claude Code, Claude is told of graph blocks only if the organization lists graphlet in managed settings. graphlet still draws a block Claude writes.
