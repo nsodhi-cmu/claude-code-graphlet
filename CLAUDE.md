@@ -35,7 +35,7 @@ graphlet/hooks/
   surface.tsx     the surface module that paints a drawing and posts clicks and keys
 graphlet/tests/   the tests, one file for each of those it tests
 graphlet/types/   the contract: a graph's types, and what the mod adds to `$`
-docs/             one file for each part: the API, the layers, the layout, the drawing, the page, the replies
+docs/             one file for each part: the API, the layers, the layout, the drawing, the page, the replies; and how to work on graphlet
 ```
 
 ## What The Engine Expects
