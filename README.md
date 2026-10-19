@@ -95,6 +95,7 @@ on('graphlet.select', async ($, e, next) => {
 - **Finding and focusing.** `/` finds a node by its label as you type, and in a large graph, `f` shows only the selected node and the nodes nearest it.
 - **Copy.** `copy`, under a graph, or `c`, puts the graph on your clipboard as text, to paste into a pull request or a chat.
 - **The web page.** `html ↗`, under a graph, opens it as a web page in your browser, where you can zoom and pan around all of it.
+- **Tips.** Now and then, after a reply, a tip about graphlet at the end of the line under the prompt. Claude Code's own **Show tips** setting turns them off with its own.
 
 ## Installing
 
@@ -125,7 +126,8 @@ A mod is code that runs inside Claude Code, unsandboxed, with your permissions. 
 What graphlet does with that access:
 
 - **Tells Claude** that it can draw graphs, in one section of the system prompt of every session that draws, unless **Graphs in replies** is off. The section rides on every request.
-- **Draws** in Claude's replies where they hold a graph block, where the mods that use it ask it to, and nowhere else.
+- **Draws** in Claude's replies where they hold a graph block, where the mods that use it ask it to, and a tip now and then at the end of the line under the prompt, and nowhere else.
+- **Reads** your `/config` settings, to leave tips out when **Show tips** is off.
 - **Keeps** each graph's selection and scroll position in memory for the session: those of the mods' graphs it drew last, and of the graphs in the replies it drew last.
 - **Writes one file and opens it**, only when you click `html ↗`: the graph as a web page, in your temporary folder, opened with your system's own opener (`xdg-open`, `open`, or `start`).
 - **Copies a graph to your clipboard**, only when you click `copy` or press `c`.
@@ -144,7 +146,7 @@ It reads no file, stores nothing between sessions, calls no model, and makes no 
 
 ## Documentation
 
-[docs/](docs/) is for anyone who wants to dig deeper: what a mod [calls](docs/API.md), how a graph is put in [layers](docs/LAYERS.md) and [laid out](docs/LAYOUT.md), how it is [drawn](docs/DRAWING.md), the [web page](docs/PAGE.md), the [graphs in replies](docs/REPLIES.md), and how to [contribute](docs/CONTRIBUTING.md).
+[docs/](docs/) is for anyone who wants to dig deeper: what a mod [calls](docs/API.md), how a graph is put in [layers](docs/LAYERS.md) and [laid out](docs/LAYOUT.md), how it is [drawn](docs/DRAWING.md), the [web page](docs/PAGE.md), the [graphs in replies](docs/REPLIES.md), the [tips](docs/TIPS.md), and how to [contribute](docs/CONTRIBUTING.md).
 
 ## License
 

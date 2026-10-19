@@ -32,10 +32,11 @@ graphlet/hooks/
   draw.ts         what a drawing is made of
   page.ts         the graph as a web page
   reply.ts        a reply's graph blocks: finding them, reading them, and drawing them at the reply's edge
+  tips.ts         the tips on the hint line under the prompt, and which one is shown
   surface.tsx     the surface module that paints a drawing and posts clicks and keys
 graphlet/tests/   the tests, one file for each of those it tests
 graphlet/types/   the contract: a graph's types, and what the mod adds to `$`
-docs/             one file for each part: the API, the layers, the layout, the drawing, the page, the replies; and how to work on graphlet
+docs/             one file for each part: the API, the layers, the layout, the drawing, the page, the replies, the tips; and how to work on graphlet
 ```
 
 ## What The Engine Expects
@@ -50,6 +51,7 @@ The engine reads a hooks module's source before it loads it, and refuses what it
 - An event matcher, an environment variable's name, and a `Client`'s `module` path are literals in the source. A call on a plugin's noun is refused from a module whose source does not spell it, which is why a test raises `graphlet.select` through a hook of an inline plugin and not from its own body.
 - In the test kit, an inline plugin's `register` closes over nothing of the test file, and its `tier` says where it loads: `prepend` puts a mod that uses graphlet outside it, as a dependent is.
 - A `ui.render` hook on `AssistantMessage` answers for one block of a reply, its bullet and the room above it included. `next(e)` with a rewritten `text` is the engine's own drawing of that text, so the text before a graph keeps the reply's bullet that way. The stored message is never changed.
+- A `ui.render` hook on `PromptHint` sets `tail` to add to the hint line under the prompt, which only the terminal draws, dim, cut where the row ends. `turn.complete` hears each turn end, the main loop's and every subagent's (`e.agentId`), and `$.config.list()` reads the `/config` rows, Claude Code's `tips` among them.
 - A `prompt.compose` hook adds to the system prompt, and its `e.surfaces` is empty in a run that draws nowhere. Where an organization manages Claude Code, the engine runs it only for a plugin the organization lists in managed settings.
 
 The API's types are the reference for everything else: `graphlet/.claude-plugin/types/claude-code/index.d.ts`, once the mod has been loaded.

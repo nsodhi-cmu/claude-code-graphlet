@@ -20,7 +20,7 @@ claude --plugin-dir ./graphlet --plugin-dir ../my-mod    # beside a mod that use
 | `.claude-plugin/marketplace.json` | The marketplace that lists the plugin. | |
 | `graphlet/.claude-plugin/plugin.json` | The manifest, and the person's settings under `userConfig`. | [README](../README.md#settings) |
 | `graphlet/hooks/hooks.json` | The hooks module the engine loads: `register.tsx`. | |
-| `graphlet/hooks/register.tsx` | Every hook, and everything that touches the engine. | [API](API.md), [REPLIES](REPLIES.md) |
+| `graphlet/hooks/register.tsx` | Every hook, and everything that touches the engine. | [API](API.md), [REPLIES](REPLIES.md), [TIPS](TIPS.md) |
 | `graphlet/hooks/layers.ts` | Reading a graph, and putting it in layers. | [LAYERS](LAYERS.md) |
 | `graphlet/hooks/layout.ts` | Boxes on shelves, and the wires in the channels between them. | [LAYOUT](LAYOUT.md) |
 | `graphlet/hooks/paint.ts` | Painting a layout through a window. | [DRAWING](DRAWING.md) |
@@ -29,6 +29,7 @@ claude --plugin-dir ./graphlet --plugin-dir ../my-mod    # beside a mod that use
 | `graphlet/hooks/draw.ts` | What a drawing is made of: runs of paint, the rectangles a click lands on, cells, widths, and the foot. | [DRAWING](DRAWING.md) |
 | `graphlet/hooks/page.ts` | The graph as a web page. | [PAGE](PAGE.md) |
 | `graphlet/hooks/reply.ts` | A reply's graph blocks, what the model is told of them, their drawings at the reply's edge, and their still pictures. | [REPLIES](REPLIES.md) |
+| `graphlet/hooks/tips.ts` | The tips on the hint line under the prompt, and which one is shown. | [TIPS](TIPS.md) |
 | `graphlet/hooks/surface.tsx` | The surface module: it paints a drawing and posts clicks, drags, and keys. | [DRAWING](DRAWING.md), [API](API.md#keys-and-the-wheel) |
 | `graphlet/types/index.d.ts` | The contract: a graph's types, and what the mod adds to `$`. | [API](API.md) |
 | `graphlet/tests/` | The tests. | [below](#the-tests) |

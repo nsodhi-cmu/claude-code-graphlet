@@ -1,13 +1,14 @@
 import type { Elements, EngineInterface, Register, RenderSurface, RenderViewport } from 'claude-code'
 
 import type { Graphlet } from '../types'
-import { MOST_CELLS, MOST_TREE_CHARS, bounded, charactersOf, cornerless, rowText, styleOf } from './draw'
+import { MOST_CELLS, MOST_TREE_CHARS, bounded, charactersOf, cornerless, rowText, sizeOf, styleOf } from './draw'
 import type { Drawing, Pan, Room } from './draw'
 import { readGraph } from './layers'
 import type { Graph } from './layers'
 import type { Direction } from './layout'
 import { pageOf } from './page'
 import { GUIDE, fencedOf, inReply, partsOf, pictureOf } from './reply'
+import { TIP_ODDS, tipOf } from './tips'
 import { MOVES, collapsedOf, focusOf, leadOf, viewOf } from './view'
 import type { View } from './view'
 
@@ -59,6 +60,13 @@ const KEPT_REPLIES = 64
 const faulted = new Set<string>()
 /** What `faulted` knows a Client by. */
 const faultOf = (requestId: string, element: string): string => `${requestId}\n${element}`
+
+/** Whether graphlet has drawn a graph this session, in a reply or in a mod's site: what most tips are true only after. */
+let hasDrawn = false
+/** The roll of the dice that picks the tip shown after the last reply, from its end to the start of the next turn: missing where no tip follows it. */
+let tipRoll: number | undefined
+/** What leads a tip at the end of the hint line. */
+const TIP_LEAD = ' · Tip: '
 
 /** A place as nothing has been done in it yet. */
 const placeOf = (): Place => ({ shut: new Map(), isFocused: false, asks: 0 })
@@ -242,6 +250,7 @@ export const register: Register = (on, options) => {
       measure: async input => view.measure(readGraph(input.graph), cellsOf(input.columns)),
       text: async input => textOf(readGraph(input.graph), { columns: cellsOf(input.columns), rows: MOST_CELLS }),
       show: async input => {
+        hasDrawn = true
         const place = siteOf(input.site)
         sites.delete(input.site)
         sites.set(input.site, place)
@@ -319,6 +328,7 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
     const parts = e.props.isSummary || !isDrawingReplies ? [] : partsOf(e.props.text)
     if (!parts.some(part => 'graph' in part)) return next(e)
+    hasDrawn = true
     const room = { columns: cellsOf((e.viewport?.columns ?? REPLY_COLUMNS) - BULLET_COLUMNS), rows: MOST_CELLS }
     const words = parts.reduce((sum, part) => sum + ('text' in part ? part.text.length : 0), 0)
     const share = Math.max(0, MOST_TREE_CHARS - words) / parts.filter(part => 'graph' in part).length
@@ -360,6 +370,28 @@ export const register: Register = (on, options) => {
         ]}
       </Box>
     )
+  })
+
+  on('turn.start', async ($, e, next) => {
+    if (e.agentId === undefined) tipRoll = undefined
+    return next(e)
+  })
+
+  on('turn.complete', async ($, e, next) => {
+    const done = await next(e)
+    if (e.agentId !== undefined || e.reason !== 'answer' || Math.random() * TIP_ODDS >= 1) return done
+    const tips = (await $.config.list().catch(() => [])).find(row => row.key === 'tips')
+    if (tips?.value === false) return done
+    tipRoll = Math.random()
+    $.ui.invalidate('ui.render')
+    return done
+  })
+
+  on('ui.render', { component: 'PromptHint' }, async ($, e, next) => {
+    if (tipRoll === undefined || e.surface !== 'terminal' || e.props.isDraft || e.props.isWorking) return next(e)
+    const columns = (e.viewport?.columns ?? REPLY_COLUMNS) - sizeOf(e.props.hint) - sizeOf(TIP_LEAD)
+    const tip = tipOf({ isDrawingReplies, hasGraph: hasDrawn, isClickable: isClickable(e.viewport), columns }, tipRoll)
+    return next(tip === undefined ? e : { ...e, props: { ...e.props, tail: `${TIP_LEAD}${tip}` } })
   })
 
   on('ui.fault', async ($, e, next) => {

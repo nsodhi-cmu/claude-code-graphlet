@@ -6,6 +6,7 @@ import { LOOK, SHOP, cellsOf, graphOf, graphRows, picture, undirected } from './
 import type { Drawing, Hit } from '../hooks/draw'
 import { readGraph } from '../hooks/layers'
 import { GUIDE, graphOf as graphLines, pictureOf } from '../hooks/reply'
+import { TIPS } from '../hooks/tips'
 import { viewOf } from '../hooks/view'
 
 // The mod through the engine, as another mod uses it: a host says what its
@@ -1170,6 +1171,66 @@ test('a graph in a reply draws its links as the setting says where it can be cli
   const desktop = await say($, 'desktop', text)
   expect(screenOf(await desktop.drawn())).toEqual(['● ```text', ...drawnAs('separate'), '```'])
   await desktop.unmount()
+})
+
+/** Stands in for the engine's own hint line under the prompt: its line, and the tail a hook adds after it. */
+const hints = (on: On): void => {
+  on('ui.render', { component: 'PromptHint' }, ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return h(Text, {}, `${e.props.hint}${e.props.tail ?? ''}`) as never
+  })
+}
+
+/** Stands in for the engine beneath a turn's start and end, and for the `/config` rows, with Claude Code's tips as `isTipping` says. */
+const turns = (on: On, isTipping: () => boolean): void => {
+  on('turn.start', ($, e) => ({ turnId: e.turnId }))
+  on('turn.complete', ($, e) => ({ text: e.answer }))
+  on('config.list', () => ({ value: [{ key: 'tips', label: 'Show tips', kind: 'boolean' as const, value: isTipping(), provider: { plugin: 'engine', tier: 'core' as const }, isLocked: false }] }))
+}
+
+test('about one reply in five is followed by a tip at the end of the hint line, until the next turn starts, and after a graph, the tips about graphs too; none while a turn runs or a prompt is typed, after a turn with no answer or an agent\'s, or with Claude Code\'s tips off', async ($, on) => {
+  let isTipping = true
+  hints(on)
+  turns(on, () => isTipping)
+  replies(on)
+  const props = { isDraft: false, isWorking: false, hint: '? for shortcuts' }
+  const hint = await $.ui.mount({ plugin: 'graphlet', surface: 'terminal', component: 'PromptHint', props, viewport: { columns: 120, rows: 40, isFullscreen: true } })
+  /** The tip the hint line ends with after a turn, ended as `end` says, or '' where it ends with none. */
+  const after = async (end: { reason?: 'answer' | 'aborted'; agentId?: string } = {}): Promise<string> => {
+    await $.turn.start({ text: 'hi', turnId: 'turn', ...(end.agentId === undefined ? {} : { agentId: end.agentId }) })
+    await hint.redraw({ ...props, isWorking: true })
+    expect(textOf(await hint.drawn())).toBe('? for shortcuts')
+    await $.turn.complete({ answer: 'ok', durationMs: 1, isAborted: end.reason === 'aborted', turnId: 'turn', reason: end.reason ?? 'answer', ...(end.agentId === undefined ? {} : { agentId: end.agentId }) })
+    await hint.redraw(props)
+    const said = textOf(await hint.drawn()).slice('? for shortcuts'.length)
+    if (said === '') return ''
+    await hint.redraw({ ...props, isDraft: true })
+    expect(textOf(await hint.drawn())).toBe('? for shortcuts')
+    await hint.redraw(props)
+    expect(said).toStartWith(' · Tip: ')
+    return said.slice(' · Tip: '.length)
+  }
+  const told = async (count: number, end?: { reason?: 'answer' | 'aborted'; agentId?: string }): Promise<string[]> => {
+    const tips: string[] = []
+    for (let turn = 0; turn < count; turn++) tips.push(await after(end))
+    return tips.filter(tip => tip !== '')
+  }
+  const before = await told(400)
+  expect(before.length).toBeGreaterThan(40)
+  expect(before.length).toBeLessThan(160)
+  expect([...new Set(before)].sort()).toEqual([TIPS[0]?.text, TIPS[1]?.text].sort())
+
+  const reply = await say($, 'terminal', REPLY)
+  await reply.unmount()
+  const later = await told(400)
+  expect(later.filter(tip => !TIPS.some(one => one.text === tip))).toEqual([])
+  expect(later.some(tip => tip.startsWith('Graphs can') || tip.startsWith('Click'))).toBe(true)
+
+  expect(await told(100, { reason: 'aborted' })).toEqual([])
+  expect(await told(100, { agentId: 'agent' })).toEqual([])
+  isTipping = false
+  expect(await told(100)).toEqual([])
+  await hint.unmount()
 })
 
 test('the model is told of graph blocks wherever the session draws, and not in a run that draws nowhere', async ($, on) => {
