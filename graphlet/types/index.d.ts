@@ -151,6 +151,12 @@ export type Graphlet = {
    */
   measure(input: { graph: GraphletGraph; columns: number }): Promise<GraphletSize>
   /**
+   * The graph as plain text: its still picture, as a reply draws it, folded
+   * into a room `columns` wide, a line a row with no blanks at its end. For
+   * what a tool hands back to the model, or a file.
+   */
+  text(input: { graph: GraphletGraph; columns: number }): Promise<string>
+  /**
    * Says what a site holds. The site's own `ui.render` hook calls this and
    * then `next(e)`, which resolves to the drawing, for it to place among its
    * own elements. A site is drawn only on a render where this was called.

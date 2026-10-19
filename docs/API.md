@@ -101,6 +101,7 @@ A mod runs before the mods it depends on, so its hook is the outer one and graph
 | Method | What it does |
 | :- | :- |
 | `measure({ graph, columns })` | Answers the size of the graph's drawing in a room `columns` wide and as tall as it needs: the rows it takes, and the columns it is laid out across, its longest layer's or the room's running down and all its layers' running right, which are more than `columns` when the graph scrolls sideways. |
+| `text({ graph, columns })` | Answers the graph as plain text: its still picture, as a reply draws it, folded into a room `columns` wide, a line a row with no blanks at its end. For what a tool hands back to the model, or a file. |
 | `show({ site, graph, columns, rows, selected? })` | Says what a site holds and the room the drawing may take. Answers the rows the drawing takes, and the node drawn as selected. A drawing of a graph with nodes takes at least two rows, a row of the graph and its foot, and no more than it was given where it was given two or more. |
 | `step({ site, move })` | Answers the node a move from the selected one lands on, for a mod that has keys of its own: `left`, `right`, `up`, or `down`. |
 | `scroll({ site, by })` | Scrolls the graph: by cells, `{ x, y }`, or by turns of the wheel, a number. |

@@ -71,6 +71,7 @@ const HOST: Plugin = {
       if (e.element === 'wheel') await $.graphlet.scroll({ site: e.requestId, by: 1 })
       if (e.element === 'drift') await $.graphlet.scroll({ site: e.requestId, by: Number.NaN })
       if (e.element === 'right') heard.push(`step ${await $.graphlet.step({ site: e.requestId, move: 'right' })}`)
+      if (e.element === 'text') heard.push(await $.graphlet.text({ graph: GRAPH, columns: 78 }))
       $.ui.invalidate('ui.render')
       return { element: e.element }
     })
@@ -183,6 +184,7 @@ const HOST: Plugin = {
           <Button key="wheel" label="wheel" onPress={() => undefined} />
           <Button key="drift" label="drift" onPress={() => undefined} />
           <Button key="right" label="right" onPress={() => undefined} />
+          <Button key="text" label="text" onPress={() => undefined} />
         </Box>
       )
     })
@@ -591,6 +593,14 @@ test('the owner passes on a turn of the wheel, and asks where a move of its own 
   await pane.press({ plugin: 'host', key: 'right' })
   expect((await said(pane)).heard).toEqual(['select free src/cart.ts', 'step src/invoice.ts'])
   expect((await said(pane)).shown.selected).toBe('src/cart.ts')
+  await pane.unmount()
+})
+
+test('a mod asks for its graph as plain text, drawn still as a reply draws it, for a tool to hand back or a file', WITH_HOST, async ($, on) => {
+  world(on)
+  const pane = await mount($, 'free')
+  await pane.press({ plugin: 'host', key: 'text' })
+  expect((await said(pane)).heard).toEqual([picture(pictureOf(viewOf(LOOK, true), SHOP, { columns: 78, rows: 1000 })).join('\n')])
   await pane.unmount()
 })
 

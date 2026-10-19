@@ -89,12 +89,12 @@ const openPage = async ($: EngineInterface, name: string, title: string, graph: 
 const cellsOf = (asked: unknown): number =>
   typeof asked === 'number' && Number.isFinite(asked) ? Math.min(Math.max(Math.floor(asked), 1), MOST_CELLS) : 1
 
-/**
- * Puts a graph on the clipboard as plain text, drawn still as a reply draws
- * it, in `room`, and says whether it went.
- */
+/** A graph as plain text: drawn still as a reply draws it, in `room`, a line a row with no blanks at its end. */
+const textOf = (graph: Graph, room: Room): string => pictureOf(still, graph, room).rows.map(row => rowText(row).trimEnd()).join('\n')
+
+/** Puts a graph on the clipboard as plain text, as `textOf` draws it, and says whether it went. */
 const copyGraph = async ($: EngineInterface, graph: Graph, room: Room, surface?: RenderSurface): Promise<void> => {
-  const text = pictureOf(still, graph, room).rows.map(row => rowText(row).trimEnd()).join('\n')
+  const text = textOf(graph, room)
   const copied = await $.ui.copy({ text, ...(surface === undefined ? {} : { surface }) })
   $.ui.toast(copied.isCopied ? 'graphlet: copied the graph as text.' : `graphlet: could not copy the graph (${copied.reason}).`)
 }
@@ -152,6 +152,7 @@ export const register: Register = (on, options) => {
     const built = await next(e)
     const graphlet: Graphlet = {
       measure: async input => view.measure(readGraph(input.graph), cellsOf(input.columns)),
+      text: async input => textOf(readGraph(input.graph), { columns: cellsOf(input.columns), rows: MOST_CELLS }),
       show: async input => {
         const given = readGraph(input.graph)
         const room = { columns: cellsOf(input.columns), rows: cellsOf(input.rows) }

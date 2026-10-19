@@ -56,7 +56,7 @@ The conversation keeps the block as Claude wrote it, so an export or `/copy` has
 
 ## In Other Mods
 
-A mod can depend on graphlet to draw graphs in its own panes and in the band above the prompt, where the person can click and move through them and the mod hears what they picked, and still, as in a reply, in the rows of its tools' results and its commands' output. The mod lists graphlet in its `.claude-plugin/plugin.json`:
+A mod can depend on graphlet to draw graphs in its own panes and in the band above the prompt, where the person can click and move through them and the mod hears what they picked, and still, as in a reply, in the rows of its tools' results and its commands' output. It can also ask for a graph as plain text, for a tool to hand back to Claude. The mod lists graphlet in its `.claude-plugin/plugin.json`:
 
 ```json
 { "name": "my-mod", "dependencies": ["graphlet"] }
