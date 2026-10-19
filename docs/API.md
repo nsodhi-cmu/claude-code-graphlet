@@ -2,6 +2,23 @@
 
 graphlet adds one noun to `$`, `$.graphlet`, in the `engine.create` hook of `graphlet/hooks/register.tsx`. Its types are the mod's contract, `graphlet/types/index.d.ts`. A mod that lists graphlet under `dependencies` in its `plugin.json` has the noun on its own `$`, typed, with nothing to copy.
 
+## Depending On It
+
+A mod lists graphlet under `dependencies` in its `.claude-plugin/plugin.json`, and lists graphlet in its own marketplace beside itself, so that installing the mod installs graphlet:
+
+```json
+{ "name": "my-mod", "dependencies": ["graphlet"] }
+```
+
+```json
+{
+  "name": "graphlet",
+  "source": { "source": "git-subdir", "url": "nsodhi-cmu/claude-code-graphlet", "path": "graphlet" }
+}
+```
+
+While developing, load both from disk, a `--plugin-dir` each: `claude --plugin-dir ./graphlet --plugin-dir ./my-mod`.
+
 ## A Graph
 
 ```ts
@@ -38,7 +55,19 @@ A pane belongs to the mod that opened it, and so does its `ui.render` hook. That
 ```tsx
 on('ui.render', { component: 'Pane', requestId: 'mine' }, async ($, e, next) => {
   const { Box, Text } = $.ui.resolve(e)
-  await $.graphlet.show({ pane: 'mine', graph, columns: e.props.bodyColumns, rows: 20 })
+  const graph = {
+    nodes: [
+      { id: 'a', label: 'Parse' },
+      { id: 'b', label: 'Check', tone: 'warn', mark: '▲' },
+      { id: 'c', label: 'Emit' },
+    ],
+    links: [
+      { from: 'a', to: 'b' },
+      { from: 'b', to: 'c' },
+      { from: 'c', to: 'a' },
+    ],
+  }
+  await $.graphlet.show({ pane: 'mine', graph, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows - 1 })
   return (
     <Box flexDirection="column">
       <Text bold>My graph</Text>
@@ -48,12 +77,14 @@ on('ui.render', { component: 'Pane', requestId: 'mine' }, async ($, e, next) => 
 })
 ```
 
+The drawing is given a row less than the pane's body, for the mod's own title over it.
+
 A mod runs before the mods it depends on, so its hook is the outer one and graphlet's is the one `next(e)` reaches. Graphlet's hook draws only the panes `show` has named, on the terminal, and passes every other on.
 
 | Method | What it does |
 | :- | :- |
 | `measure({ graph, columns })` | Answers the size of the graph's drawing in a room `columns` wide and as tall as it needs: the rows it takes, and the columns it is laid out across, its longest layer's or the room's running down and all its layers' running right, which are more than `columns` when the graph scrolls sideways. |
-| `show({ pane, graph, columns, rows, selected? })` | Says what a pane holds and the room the drawing may take. Answers the rows the drawing takes, and the node drawn as selected. A drawing takes no more rows than it was given, and never fewer than two: a row of the graph, and its foot. |
+| `show({ pane, graph, columns, rows, selected? })` | Says what a pane holds and the room the drawing may take. Answers the rows the drawing takes, and the node drawn as selected. A drawing of a graph with nodes takes at least two rows, a row of the graph and its foot, and no more than it was given where it was given two or more. |
 | `step({ pane, move })` | Answers the node a move from the selected one lands on, for a mod that has keys of its own: `left`, `right`, `up`, or `down`. |
 | `scroll({ pane, by })` | Scrolls the graph: by cells, `{ x, y }`, or by turns of the wheel, a number. |
 | `select({ pane, node })` | Selects a node. |
@@ -61,7 +92,7 @@ A mod runs before the mods it depends on, so its hook is the outer one and graph
 | `collapse({ pane, group, isCollapsed })` | Collapses a group into one box, or opens it again. |
 | `key({ pane, key, selected })` | Does nothing. |
 
-A room has at least one cell each way and at most a thousand, whatever is asked: a count that is no number is taken as one. A room narrower than the narrowest a graph is laid out for, `LEAST_COLUMNS` in `graphlet/hooks/layout.ts`, is drawn as that wide. A scroll by what is no number is ignored.
+A room has at least one cell each way and at most `MOST_CELLS`, in `graphlet/hooks/draw.ts`, whatever is asked: a count that is no number is taken as one. A room narrower than the narrowest a graph is laid out for, `LEAST_COLUMNS` in `graphlet/hooks/layout.ts`, is drawn as that wide. A scroll by what is no number is ignored.
 
 `show` is called on every render. A drawing is only ever of what `show` was last given, so a mod that keeps its graph and its selection in its own state hands them over each time, and a change of either redraws the pane as any change of its state does.
 
@@ -111,13 +142,13 @@ The graph is drawn by a surface module, the only kind of element that receives a
 | arrows, `h` `j` `k` `l` | Moves the selection: along a layer, or along a link to the next, as the graph runs. |
 | return | Opens the selected node, or the collapsed group whose box is selected. With nothing selected, it is handed on. |
 | space | Collapses the selected node's group, or opens the collapsed group whose box is selected. With a node in no group selected, it is handed on. |
-| `c` | Copies the whole graph as plain text: drawn still, with nothing selected, as a reply draws it, running the way it runs in the pane, in a room as wide as all of it, the columns `measure` answers. A toast says whether it was copied. |
+| `c` | Copies the whole graph as plain text: drawn still, with nothing selected, as a reply draws it, running the way it runs in the pane, its groups collapsed or open as they are there, in a room `MOST_CELLS` each way, so that a graph no wider than that is copied whole. A toast says whether it was copied. |
 | `f` | Draws the graph in focus on the selected node, or draws it all again. |
 | `/` | Starts finding a node by its label. While finding, what is typed is what is looked for, the selection goes to the first node found, return goes to the next in place of opening one, and backspace takes back what was typed, or with nothing typed, stops finding. A click on a box stops it too. |
 
 A key pressed with ctrl or meta held is neither answered nor handed on. It calls `$.graphlet.key` with every other key, and with no key typed while finding, along with the node selected as it was pressed, `selected`, or null where none is. That method does nothing: a mod with keys of its own hooks `graphlet.key` to answer them.
 
-A drag from where a click does nothing, on no box, name, count or corner, moves the graph with the pointer, as far as its window goes; graphlet answers it itself. The surface posts how far the pointer has gone since the button went down, so a move lost when two fall in one frame is made up by the next. Where the terminal did not report a release, the next press of a button, or a move with no button held, ends the drag where it is.
+A drag from where a click does nothing, on no box, name, count, frame's label, or corner, moves the graph with the pointer, as far as its window goes; graphlet answers it itself. The surface posts how far the pointer has gone since the button went down, so a move lost when two fall in one frame is made up by the next. Where the terminal did not report a release, the next press of a button, or a move with no button held, ends the drag where it is.
 
 The terminal reports the mouse only in Claude Code's fullscreen layout. On the main screen, as with `CLAUDE_CODE_NO_FLICKER=0` and in tmux by default, nothing is clicked or dragged.
 

@@ -1,9 +1,9 @@
 # graphlet
 
-graphlet is a Claude Code mod that draws graphs, nodes and the links between them, inside Claude Code. Claude draws them in its replies, and other mods build on it: a mod hands it a graph, and graphlet draws it in that mod's pane, scrolls it, and says which node the person picked.
+graphlet draws graphs in Claude Code. Ask Claude for a graph and it draws one in its reply, and other mods draw graphs in their panes with it.
 
 ```
 /plugin install graphlet --marketplace nsodhi-cmu/claude-code-graphlet
 ```
 
-The repository's [README](https://github.com/nsodhi-cmu/claude-code-graphlet#readme) says how Claude and other mods use it, and what it does with the access a mod has.
+The repository's [README](https://github.com/nsodhi-cmu/claude-code-graphlet#readme) says what it draws, its settings, and what it does with the access a mod has. Its [docs](https://github.com/nsodhi-cmu/claude-code-graphlet/tree/main/docs) say how it works.
