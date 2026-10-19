@@ -109,8 +109,8 @@ export type GraphletShow = {
   /**
    * The site the graph is drawn in, by the id its owner's `ui.render` hook
    * sees as `e.requestId`: a pane's, the band's above the prompt, a tool
-   * result's row, or a command output's row. A pane and the band draw it
-   * whole, through a window; a tool's or a command's row, still.
+   * result's row, or a command output's row. Each draws it whole, through
+   * a window.
    */
   site: string
   graph: GraphletGraph
@@ -159,7 +159,8 @@ export type Graphlet = {
   /**
    * Says what a site holds. The site's own `ui.render` hook calls this and
    * then `next(e)`, which resolves to the drawing, for it to place among its
-   * own elements. A site is drawn only on a render where this was called.
+   * own elements. The band above the prompt, which every mod shares, is
+   * drawn only on a render where this was called.
    */
   show(input: GraphletShow): Promise<GraphletShown>
   /** The node a move from the selected one lands on in the graph a site holds; null when the site holds none. */

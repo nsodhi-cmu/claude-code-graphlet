@@ -52,12 +52,14 @@ A group may be collapsed: drawn as one box with round corners, doubled where it 
 
 graphlet calls the place a graph is drawn its site, and knows it by the id its owner's `ui.render` hook sees as `e.requestId`. A mod may draw a graph in four kinds of site:
 
-| Site | Its `ui.render` component and id | How the graph is drawn |
-| :- | :- | :- |
-| A pane the mod opened | `Pane`, the id it was opened with | Whole, through a window: it scrolls, takes a selection, the keys, and the mouse. |
-| The band above the prompt | `AbovePrompt`, the band's one id | As in a pane, over what the band holds beneath it. |
-| The row of a tool's result | `ToolResult`, the call's `tool_use_id` | Still, as a reply's graph is, folded into its room, with `copy · html ↗` under it. |
-| The row of a command's output | `CommandOutput`, the row's id | Still, as in a tool's row. |
+| Site | Its `ui.render` component and id |
+| :- | :- |
+| A pane the mod opened | `Pane`, the id it was opened with |
+| The band above the prompt | `AbovePrompt`, the band's one id |
+| The row of a tool's result | `ToolResult`, the call's `tool_use_id` |
+| The row of a command's output | `CommandOutput`, the row's id |
+
+Every site draws its graph the same way: whole, through a window that scrolls, with a selection that the mouse and, once the graph has been clicked, the keys move, and `html ↗` in the corner of its foot.
 
 A site's `ui.render` hook is its owner's: a pane's, the mod that opened it; the band's, every mod that draws there; a tool's row, the mod whose tool it is, which matches on `e.props.tool`; a command's row, the mod whose command it is, on `e.props.command`. That hook says what the site holds, and then calls `next(e)`, which resolves to graphlet's drawing, for the mod to place among its own elements:
 
@@ -96,7 +98,7 @@ on('ui.render', { component: 'ToolResult' }, async ($, e, next) => {
 })
 ```
 
-A mod runs before the mods it depends on, so its hook is the outer one and graphlet's is the one `next(e)` reaches. Graphlet's hook draws a site only on a render where `show` named it, on the terminal, and passes every other on: so a site whose owner stops calling `show` is left as the engine, or another mod, draws it. On every other surface, every site is left as its owner draws it.
+A mod runs before the mods it depends on, so its hook is the outer one and graphlet's is the one `next(e)` reaches. Graphlet's hook draws a site `show` has named, on the terminal, and passes every other on. The band is shared by every mod that draws there, so it is drawn only on a render where `show` named it since it was last drawn, and so left as the engine or another mod draws it once its owner stops; and it yields to a survey, as the engine asks of a band. On every other surface, every site is left as its owner draws it.
 
 | Method | What it does |
 | :- | :- |
@@ -112,9 +114,7 @@ A mod runs before the mods it depends on, so its hook is the outer one and graph
 
 A room has at least one cell each way and at most `MOST_CELLS`, in `graphlet/hooks/draw.ts`, whatever is asked: a count that is no number is taken as one. A room narrower than the narrowest a graph is laid out for, `LEAST_COLUMNS` in `graphlet/hooks/layout.ts`, is drawn as that wide. A scroll by what is no number is ignored.
 
-`show` is called on every render of the site, before `next(e)`. A drawing is only ever of what `show` was last given, so a mod that keeps its graph and its selection in its own state hands them over each time, and a change of either redraws the site as any change of its state does. A site holds one graph.
-
-A still site, a tool's row or a command's row, takes no selection, keys, or wheel. A click on `copy` puts the picture on the clipboard as text, and one on `html ↗` opens the graph as a web page, `graphlet-<site>.html`, as under a reply's graph.
+`show` is called on every render of the site, before `next(e)`. A drawing is only ever of what `show` was last given, so a mod that keeps its graph and its selection in its own state hands them over each time, and a change of either redraws the site as any change of its state does. A site holds one graph. Graphlet keeps what it holds for the `KEPT_SITES` sites `show` named last, so a tool's row long scrolled away is let go, and drawn again whole when its owner next names it.
 
 ## The Selection
 
@@ -172,7 +172,7 @@ A drag from where a click does nothing, on no box, name, count, frame's label, o
 
 The terminal reports the mouse only in Claude Code's fullscreen layout. On the main screen, as with `CLAUDE_CODE_NO_FLICKER=0` and in tmux by default, nothing is clicked or dragged.
 
-A turn of the wheel is not a key or a click. It reaches the pane, as `ui.scroll`, and the pane's owner passes it on:
+A turn of the wheel is not a key or a click. It reaches a pane or the band, as `ui.scroll`, and the site's owner passes it on, as here for a pane; the engine raises no `ui.scroll` for a tool's or a command's row, whose graph a drag, a click on a count, or the selection scrolls:
 
 ```ts
 on('ui.scroll', { component: 'Pane', requestId: 'mine' }, async ($, e, next) => {

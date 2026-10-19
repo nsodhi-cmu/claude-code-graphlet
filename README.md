@@ -56,7 +56,7 @@ The conversation keeps the block as Claude wrote it, so an export or `/copy` has
 
 ## In Other Mods
 
-A mod can depend on graphlet to draw graphs in its own panes and in the band above the prompt, where the person can click and move through them and the mod hears what they picked, and still, as in a reply, in the rows of its tools' results and its commands' output. It can also ask for a graph as plain text, for a tool to hand back to Claude. The mod lists graphlet in its `.claude-plugin/plugin.json`:
+A mod can depend on graphlet to draw graphs in its own panes, in the band above the prompt, and in the rows of its tools' results and its commands' output, where the person can click and move through them, and the mod hears what they picked. It can also ask for a graph as plain text, for a tool to hand back to Claude. The mod lists graphlet in its `.claude-plugin/plugin.json`:
 
 ```json
 { "name": "my-mod", "dependencies": ["graphlet"] }
@@ -88,12 +88,12 @@ on('graphlet.select', async ($, e, next) => {
 - **Labels.** A link can say what it means, like `yes` or `retry`, in a few words beside its line.
 - **Tones.** A node can be colored by what it means, `good`, `warn`, `bad`, `note`, or `dim`, and a mod can color a link the same way.
 - **Emphasis.** The nodes a graph is most about can be drawn in heavy frames.
-- **Groups.** Nodes can be grouped, each group in a frame with its name, and in a mod's pane a group can be collapsed into one box and opened again.
+- **Groups.** Nodes can be grouped, each group in a frame with its name, and where a mod draws a graph, a group can be collapsed into one box and opened again.
 - **Down or right.** A graph runs down the screen, or left to right where that fits better, as a pipeline does.
 - **Fitting its room.** A graph too wide for a reply is folded onto more rows where it can be, and one too large for a pane scrolls, following the selection.
-- **Selecting.** In a mod's pane, a click selects a node and lights its links, the arrow keys move along them, and return or a double click opens the node for the mod to act on.
+- **Selecting.** Where a mod draws a graph, a click selects a node and lights its links, the arrow keys move along them, and return or a double click opens the node for the mod to act on.
 - **Finding and focusing.** In a pane, `/` finds a node by its label as you type, and in a large graph, `f` shows only the selected node and the nodes nearest it.
-- **Copy.** `copy`, under a graph in a reply, or `c` in a pane, puts the graph on your clipboard as text, to paste into a pull request or a chat.
+- **Copy.** `copy`, under a graph in a reply, or `c` where a mod draws one, puts the graph on your clipboard as text, to paste into a pull request or a chat.
 - **The web page.** `html ↗`, under a graph, opens it as a web page in your browser, where you can zoom and pan around all of it.
 
 ## Installing
@@ -108,7 +108,7 @@ A mod that depends on graphlet brings it along. graphlet is tested on Claude Cod
 
 ## Settings
 
-These hold for every graph graphlet draws, in a reply or in any mod's pane. They are in `/config`, or `/plugin configure graphlet@claude-code-graphlet` when graphlet was installed alone. The first choice of each is the default.
+These hold for every graph graphlet draws, in a reply or for any mod. They are in `/config`, or `/plugin configure graphlet@claude-code-graphlet` when graphlet was installed alone. The first choice of each is the default.
 
 | Setting | What it picks |
 | :- | :- |

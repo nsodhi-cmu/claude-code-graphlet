@@ -633,17 +633,18 @@ test('each pane has its own graph, selection, and window', WITH_HOST, async ($, 
 
 const BAND: RenderPropsOf['AbovePrompt'] = { hasSurvey: false, isWorking: false, maxRows: 30, bodyColumns: 90, scroll: { offset: 0, bodyRows: 30 }, view: {} }
 
-test('a graph in the band above the prompt is drawn as a pane\'s is, among its owner\'s elements and over what the band held beneath, and a click on a box selects its node', WITH_HOST, async ($, on) => {
+test('a graph in the band above the prompt is drawn as a pane\'s is, among its owner\'s elements, and a click on a box selects its node; the band yields to a survey', WITH_HOST, async ($, on) => {
   world(on)
   const band = await $.ui.mount({ plugin: 'graphlet', surface: 'terminal', component: 'AbovePrompt', requestId: 'band', props: BAND })
   expect(await rowsOf(band)).toEqual(picture(view.draw(SHOP, 'src/price.ts', { columns: 90, rows: 30 }, ORIGIN)))
-  expect(await band.find({ type: 'Text', text: 'the engine drew this' })).toBeDefined()
   await click(band, boxOf('src/email.ts'))
   expect(JSON.parse(((await band.find({ type: 'Text', text: /^host / }))?.text ?? 'host {}').slice('host '.length))).toEqual({ heard: ['select band src/email.ts'] })
+  await band.redraw({ ...BAND, hasSurvey: true })
+  expect(JSON.stringify(await band.drawn())).not.toContain('surface.tsx')
   await band.unmount()
 })
 
-test('a site is drawn only on a render where its owner says what it holds: once the band\'s owner stops, the band is as the engine draws it', WITH_HOST, async ($, on) => {
+test('the band is drawn only on a render where its owner says what it holds: once its owner stops, the band is as the engine draws it', WITH_HOST, async ($, on) => {
   world(on)
   const band = await $.ui.mount({ plugin: 'graphlet', surface: 'terminal', component: 'AbovePrompt', requestId: 'band', props: BAND })
   const hasGraph = async (): Promise<boolean> => JSON.stringify(await band.drawn()).includes('surface.tsx')
@@ -655,21 +656,31 @@ test('a site is drawn only on a render where its owner says what it holds: once 
   await band.unmount()
 })
 
-test('a tool\'s row or a command\'s row holds the still picture of its graph, nothing selected, with copy and html ↗ under it; another row is the engine\'s', WITH_HOST, async ($, on) => {
+test('the band drawn on two surfaces at once is drawn with the graph on the terminal, as each surface\'s render names it', WITH_HOST, async ($, on) => {
+  world(on)
+  const desk = await $.ui.mount({ plugin: 'graphlet', surface: 'desktop', component: 'AbovePrompt', requestId: 'band', props: BAND })
+  const term = await $.ui.mount({ plugin: 'graphlet', surface: 'terminal', component: 'AbovePrompt', requestId: 'band', props: BAND })
+  await Promise.all([desk.redraw(), term.redraw()])
+  expect(JSON.stringify(await term.drawn())).toContain('surface.tsx')
+  await Promise.all([desk.unmount(), term.unmount()])
+})
+
+test('a tool\'s row or a command\'s row holds its graph as a pane does, to click, move through, copy, and open as a web page; another row is the engine\'s', WITH_HOST, async ($, on) => {
   const seen = world(on)
-  const still = picture(pictureOf(viewOf(LOOK, true), SHOP, { columns: 78, rows: 1000 }))
-  const width = Math.max(...still.map(line => line.length))
+  const room = { columns: 78, rows: 1000 }
   const row = (component: 'ToolResult' | 'CommandOutput', requestId: string, props: RenderPropsOf['ToolResult'] | RenderPropsOf['CommandOutput']) =>
-    $.ui.mount({ plugin: 'graphlet', surface: 'terminal', component, requestId, props, viewport: { columns: 80, rows: 40 } } as never)
+    $.ui.mount({ plugin: 'graphlet', surface: 'terminal', component, requestId, props, viewport: { columns: 80, rows: 40 } } as never) as Promise<Pane>
   const tool = await row('ToolResult', 'toolu_1', { tool_use_id: 'toolu_1', tool: 'deps', output: {}, isErrored: false })
-  expect(screenOf(await tool.drawn())).toEqual([...still, 'copy · html ↗'.padStart(width)])
-  await tool.press({ plugin: 'graphlet', key: 'copy:0' })
-  expect(seen.copied).toEqual([still.join('\n')])
-  await tool.press({ plugin: 'graphlet', key: 'page:0' })
+  const drawn = view.draw(SHOP, 'src/price.ts', room, ORIGIN)
+  expect(await rowsOf(tool)).toEqual(picture(drawn))
+  await tool.key({ key: 'c', in: 'graph' })
+  expect(seen.toasts).toEqual(['graphlet: copied the graph as text.'])
+  const corner = drawn.hits.find(hit => 'page' in hit) ?? { x: 0, y: 0 }
+  await tool.pointer({ type: 'down', x: corner.x, y: corner.y, button: 'left', in: 'graph' })
   expect(seen.written.map(file => file.path)).toEqual(['/var/tmp/graphlet-toolu_1.html'])
   await tool.unmount()
   const command = await row('CommandOutput', 'command_1', { command: 'deps', args: '', text: '', isErrored: false })
-  expect(screenOf(await command.drawn())).toEqual([...still, 'copy · html ↗'.padStart(width)])
+  expect(await rowsOf(command)).toEqual(picture(drawn))
   await command.unmount()
   const other = await row('ToolResult', 'toolu_2', { tool_use_id: 'toolu_2', tool: 'Bash', output: {}, isErrored: false })
   expect(screenOf(await other.drawn())).toEqual(['the engine drew this'])

@@ -2,7 +2,7 @@
 
 # graphlet
 
-graphlet is a Claude Code mod: a plugin whose hooks are TypeScript that Claude Code loads and runs itself. It draws graphs, nodes and the links between them, in the terminal, for two kinds of user. Claude draws them in its replies: graphlet tells the model, in one section of the system prompt, that a fenced `graphlet` block in a reply is drawn, and draws each such block in the transcript. And other mods build on it: it adds `$.graphlet` to the engine's interface, a mod that depends on it hands it a graph, and graphlet draws the graph inside that mod's pane and says what the person did to it.
+graphlet is a Claude Code mod: a plugin whose hooks are TypeScript that Claude Code loads and runs itself. It draws graphs, nodes and the links between them, in the terminal, for two kinds of user. Claude draws them in its replies: graphlet tells the model, in one section of the system prompt, that a fenced `graphlet` block in a reply is drawn, and draws each such block in the transcript. And other mods build on it: it adds `$.graphlet` to the engine's interface, a mod that depends on it hands it a graph, and graphlet draws the graph inside that mod's site, a pane, the band above the prompt, or a row of its tool's result or its command's output, and says what the person did to it.
 
 ## Commands
 
@@ -43,7 +43,7 @@ docs/             one file for each part: the API, the layers, the layout, the d
 The engine reads a hooks module's source before it loads it, and refuses what it cannot follow.
 
 - A noun is added to `$` in an `engine.create` hook, and its types are the plugin's contract: one `.d.ts` that imports nothing, exports types whose names start with the noun's, and declares the noun on `EngineInterface`.
-- What a noun's method takes and answers crosses between mods as plain data. A tree of elements does not cross that way: `$.ui.resolve` takes a `ui.render` argument, and a `Client` is stamped with the plugin whose render hook drew it. So the drawing reaches another mod's pane through the `ui.render` chain, as what its `next(e)` resolves to.
+- What a noun's method takes and answers crosses between mods as plain data. A tree of elements does not cross that way: `$.ui.resolve` takes a `ui.render` argument, and a `Client` is stamped with the plugin whose render hook drew it. So the drawing reaches another mod's site through the `ui.render` chain, as what its `next(e)` resolves to.
 - A mod runs before the mods it lists under `dependencies`. Its hooks are the outer ones: its `ui.render` hook reaches graphlet's through `next(e)`, and its hook on `graphlet.select` hears a call graphlet's own hooks make.
 - A noun's method has no `$` of its own. It calls the engine through the `$` its `engine.create` hook was handed back, and those calls run in the hook that called the method.
 - A `Client` is the only element that receives pointer events and arrow keys, and it receives keys only after a click on it. Its posts reach the hooks of the plugin that drew it, and no other's.

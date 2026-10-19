@@ -13,9 +13,10 @@ import { MOVES, collapsedOf, focusOf, leadOf, viewOf } from './view'
 /**
  * What a site holds, as it was last drawn: the graph it was given, that
  * graph with its groups collapsed as they are there, the graph as drawn, in
- * focus or not, the room, the selected node, and where its window stood.
+ * focus or not, the room, the selected node, where its window stood, and
+ * how many times `show` named it since the band last drew it.
  */
-type Held = { given: Graph; whole: Graph; graph: Graph; room: Room; selected: string | null; pan: Pan; drawing: Drawing }
+type Held = { given: Graph; whole: Graph; graph: Graph; room: Room; selected: string | null; pan: Pan; drawing: Drawing; asks: number }
 
 const ORIGIN: Pan = { x: 0, y: 0 }
 
@@ -28,8 +29,8 @@ const scrolled = new Map<string, Pan>()
 const replied = new Map<string, { graphs: Graph[]; room: Room }>()
 /** How many reply blocks' graphs are kept for their corners, those drawn last: a block is drawn again as it comes back into view. */
 const KEPT_REPLIES = 64
-/** The sites `show` was called for since each was last drawn: a site is drawn only on a render where its owner said what it holds. */
-const asked = new Set<string>()
+/** How many sites graphlet keeps what it holds for, those `show` named last: a site named again is drawn again. */
+const KEPT_SITES = 128
 /** Whether each group of each site's graph is collapsed, as `collapse` was last called for it there. */
 const shutIn = new Map<string, Map<string, boolean>>()
 /** The sites whose graph is drawn in focus on the selected node. */
@@ -43,8 +44,8 @@ const dragged = new Map<string, { grab: unknown; at: Pan }>()
 const foundIn = (graph: Graph, query: string): string[] =>
   query.trim() === '' ? [] : graph.nodes.filter(node => node.label.toLowerCase().includes(query.trim().toLowerCase())).map(node => node.id)
 /**
- * How graphs are drawn: as the plugin's options say, in a pane, and still,
- * in a reply and as `c` copies them, folded into the room they have, with
+ * How graphs are drawn: as the plugin's options say, in a mod's site, and
+ * still, in a reply and as `c` copies them, folded into the room they have, with
  * their links kept separate, since nothing still can be selected to tell
  * merged links apart.
  */
@@ -103,14 +104,14 @@ const copyGraph = async ($: EngineInterface, graph: Graph, room: Room, surface?:
 const BULLET_COLUMNS = 2
 /** How wide a reply is taken to be on a surface that has not said. */
 const REPLY_COLUMNS = 80
-/** What the corner of a still picture says: a click on the first word copies the graph as text, and on the second opens it as a web page. */
+/** What the corner of a picture in a reply says: a click on the first word copies the graph as text, and on the second opens it as a web page. */
 const REPLY_CORNER = { copy: 'copy', between: ' · ', page: 'html ↗' } as const
 
 /**
- * A graph's still picture in `room`, drawn plainer past `share` of what the
- * engine draws, and under it its foot: the counts of what is out of view,
- * and at the picture's right edge, the corner, its two Buttons keyed by
- * `index`, the graph's place among those its site holds.
+ * A graph's still picture in a reply, in `room`, drawn plainer past `share`
+ * of what the engine draws, and under it its foot: the counts of what is out
+ * of view, and at the picture's right edge, the corner, its two Buttons
+ * keyed by `index`, the graph's place among the reply block's graphs.
  */
 const stillTreeOf = (elements: Pick<Elements['terminal'], 'Box' | 'Text' | 'Button'>, graph: Graph, room: Room, share: number, index: number) => {
   const { Box, Text, Button } = elements
@@ -169,8 +170,12 @@ export const register: Register = (on, options) => {
         const found = query === undefined ? undefined : { query, found: foundIn(given, query).map(id => graph.nodes.find(node => node.id === id)?.id ?? given.nodes.find(node => node.id === id)?.group ?? id) }
         const pan = scrolled.get(input.site) ?? view.show(drawn, selected, room, before?.pan ?? ORIGIN)
         const drawing = view.draw(drawn, selected, room, pan, found)
-        held.set(input.site, { given, whole: graph, graph: drawn, room, selected, pan, drawing })
-        asked.add(input.site)
+        held.delete(input.site)
+        held.set(input.site, { given, whole: graph, graph: drawn, room, selected, pan, drawing, asks: (before?.asks ?? 0) + 1 })
+        for (const old of [...held.keys()].slice(0, Math.max(0, held.size - KEPT_SITES))) {
+          for (const kept of [held, picked, scrolled, shutIn, finding, dragged]) kept.delete(old)
+          focused.delete(old)
+        }
         return { rows: drawing.rows.length, selected }
       },
       step: async input => {
@@ -202,35 +207,32 @@ export const register: Register = (on, options) => {
 
   on('ui.render', { component: 'Pane' }, async ($, e, next) => {
     const at = held.get(e.requestId)
-    if (!asked.delete(e.requestId) || at === undefined || e.surface !== 'terminal') return next(e)
+    if (at === undefined || e.surface !== 'terminal') return next(e)
     const { Client } = $.ui.resolve(e)
     return <Client key="graph" module="./surface.tsx" props={at.drawing} />
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const at = held.get(e.requestId)
-    if (!asked.delete(e.requestId) || at === undefined || e.surface !== 'terminal') return next(e)
-    const { Box, Client } = $.ui.resolve(e)
-    return (
-      <Box flexDirection="column">
-        <Client key="graph" module="./surface.tsx" props={at.drawing} />
-        {await next(e)}
-      </Box>
-    )
+    const isAsked = at !== undefined && at.asks > 0
+    if (at !== undefined) at.asks = Math.max(0, at.asks - 1)
+    if (!isAsked || at === undefined || e.surface !== 'terminal' || e.props.hasSurvey) return next(e)
+    const { Client } = $.ui.resolve(e)
+    return <Client key="graph" module="./surface.tsx" props={at.drawing} />
   })
 
   on('ui.render', { component: 'ToolResult' }, async ($, e, next) => {
     const at = held.get(e.requestId)
-    if (!asked.delete(e.requestId) || at === undefined || e.surface !== 'terminal') return next(e)
-    const { Box, Text, Button } = $.ui.resolve(e)
-    return <Box flexDirection="column">{stillTreeOf({ Box, Text, Button }, at.whole, at.room, MOST_TREE_CHARS, 0)}</Box>
+    if (at === undefined || e.surface !== 'terminal') return next(e)
+    const { Client } = $.ui.resolve(e)
+    return <Client key="graph" module="./surface.tsx" props={at.drawing} />
   })
 
   on('ui.render', { component: 'CommandOutput' }, async ($, e, next) => {
     const at = held.get(e.requestId)
-    if (!asked.delete(e.requestId) || at === undefined || e.surface !== 'terminal') return next(e)
-    const { Box, Text, Button } = $.ui.resolve(e)
-    return <Box flexDirection="column">{stillTreeOf({ Box, Text, Button }, at.whole, at.room, MOST_TREE_CHARS, 0)}</Box>
+    if (at === undefined || e.surface !== 'terminal') return next(e)
+    const { Client } = $.ui.resolve(e)
+    return <Client key="graph" module="./surface.tsx" props={at.drawing} />
   })
 
   on('prompt.compose', async ($, e, next) => {
@@ -274,14 +276,11 @@ export const register: Register = (on, options) => {
 
   on('ui.press', { plugin: 'graphlet' }, async ($, e, next) => {
     const [action, at] = e.element.split(':')
-    const site = held.get(e.requestId)
-    const isReply = e.component === 'AssistantMessage'
-    const pictured = isReply ? replied.get(e.requestId) : site === undefined ? undefined : { graphs: [site.whole], room: site.room }
-    const graph = pictured?.graphs[Number(at)]
-    if (pictured === undefined || graph === undefined) return next(e)
-    const name = isReply ? `reply-${e.requestId.replace(/[^A-Za-z0-9]/g, '').slice(-8)}-${at}` : e.requestId
-    if (action === 'copy') await copyGraph($, graph, pictured.room, e.surface)
-    else if (action === 'page') await openPage($, name, isReply ? 'reply' : e.requestId, graph, still.direction(graph, pictured.room))
+    const reply = e.component === 'AssistantMessage' ? replied.get(e.requestId) : undefined
+    const graph = reply?.graphs[Number(at)]
+    if (reply === undefined || graph === undefined) return next(e)
+    if (action === 'copy') await copyGraph($, graph, reply.room, e.surface)
+    else if (action === 'page') await openPage($, `reply-${e.requestId.replace(/[^A-Za-z0-9]/g, '').slice(-8)}-${at}`, 'reply', graph, still.direction(graph, reply.room))
     else return next(e)
     return { element: e.element }
   })

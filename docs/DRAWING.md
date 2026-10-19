@@ -1,6 +1,6 @@
 # The Drawing
 
-A drawing is rows of painted text, and the rectangles of them that answer a click. Painting one is `graphlet/hooks/paint.ts`, the window it is painted through is `graphlet/hooks/window.ts`, and what both are made of is `graphlet/hooks/draw.ts`. The surface module `graphlet/hooks/surface.tsx` puts a pane's rows on the terminal, moves the beads of lines that flow, and posts what a click lands on, whether two make a double click on a box, and how far a drag has gone. A graph in a reply is drawn as a [still picture](REPLIES.md#the-picture), its rows put on the terminal by the hook itself.
+A drawing is rows of painted text, and the rectangles of them that answer a click. Painting one is `graphlet/hooks/paint.ts`, the window it is painted through is `graphlet/hooks/window.ts`, and what both are made of is `graphlet/hooks/draw.ts`. The surface module `graphlet/hooks/surface.tsx` puts a site's rows on the terminal, in a pane, the band, or a tool's or command's row, moves the beads of lines that flow, and posts what a click lands on, whether two make a double click on a box, and how far a drag has gone. A graph in a reply is drawn as a [still picture](REPLIES.md#the-picture), its rows put on the terminal by the hook itself.
 
 ## Reading The Picture
 
