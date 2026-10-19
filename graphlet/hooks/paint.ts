@@ -450,11 +450,11 @@ function paintSigns(canvas: Canvas, graph: Graph, boxes: Box[], selected: string
  * carries does; each cell of any other lit line pulses. The last
  * row is the foot: it counts the nodes out of view of a graph larger than the
  * room, says what is being found and which of the found the selected node is,
- * or else what was left out of the graph, and holds the corner a click opens
- * the graph as a web page by. A drawing too large for the engine to draw is
- * drawn plainer.
+ * or else what was left out of the graph, and where the drawing `hasCorner`,
+ * holds the corner a click copies the graph or opens it as a web page by. A
+ * drawing too large for the engine to draw is drawn plainer.
  */
-export function paint(layout: Layout, graph: Graph, selected: string | null, room: Room, pan: Pan, finding?: Finding, isFlowing = false): Drawing {
+export function paint(layout: Layout, graph: Graph, selected: string | null, room: Room, pan: Pan, finding?: Finding, isFlowing = false, hasCorner = true): Drawing {
   if (layout.shelves.length === 0) return { rows: [], hits: [] }
   const sight = sightOf(layout, room)
   const at = within(pan, sight.most)
@@ -503,6 +503,6 @@ export function paint(layout: Layout, graph: Graph, selected: string | null, roo
     finding === undefined
       ? leftOut(graph.unread)
       : [`/${finding.query} · ${finding.found.length === 0 ? 'no match' : `${Math.max(which, 0) + 1} of ${finding.found.length}`}`, `/${finding.query}`]
-  const foot = footRow(sight.isWhole ? undefined : beyond, width, page, rows.length, notes)
+  const foot = footRow(sight.isWhole ? undefined : beyond, width, page, rows.length, notes, hasCorner)
   return bounded({ rows: [...rows, foot.row], hits: [...signs, ...titles, ...hits, ...foot.hits] })
 }

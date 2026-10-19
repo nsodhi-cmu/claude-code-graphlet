@@ -52,7 +52,7 @@ describe('a layer longer than the room', () => {
       '              ┌───────────────┐',
       '              │ → money.ts  2 │',
       '              └───────────────┘',
-      '                            2 more →  html ↗',
+      '                     2 more →  copy · html ↗',
     ])
   })
 
@@ -69,7 +69,7 @@ describe('a layer longer than the room', () => {
       '…c/invoice.ts │  │ ○ ui.ts │  ║ ▲ email.ts ║',
       '─────┬────────┘  └────┬────┘  ╚══════╤═════╝',
     ])
-    expect(end.at(-1)).toBe('← 2 more                              html ↗')
+    expect(end.at(-1)).toBe('← 2 more                       copy · html ↗')
     for (const row of [1, 12, 17]) expect(end[row]).toBe(start[row])
   })
 
@@ -130,7 +130,7 @@ describe('a layer longer than the room', () => {
 
   test('a click on a count scrolls most of a room that way, and no farther than the graph goes', () => {
     const count = pinned.draw(SHOP, 'src/ui.ts', NARROW, ORIGIN).hits.find((hit): hit is Hit & { by: Pan } => 'by' in hit)
-    expect(count).toEqual({ x: 28, y: 20, width: 8, height: 1, by: { x: 28, y: 0 } })
+    expect(count).toEqual({ x: 21, y: 20, width: 8, height: 1, by: { x: 28, y: 0 } })
     expect(pinned.scroll(SHOP, NARROW, ORIGIN, { x: 28, y: 0 })).toEqual({ x: 20, y: 0 })
     expect(pinned.scroll(SHOP, NARROW, { x: 20, y: 0 }, { x: -28, y: 0 })).toEqual(ORIGIN)
   })
@@ -197,7 +197,7 @@ describe('laid on one sheet', () => {
       '                         ┌───────────────┐',
       '                         │ → money.ts  2 │',
       '                         └───────────────┘',
-      '                            2 more →  html ↗',
+      '                     2 more →  copy · html ↗',
     ])
     const rightEdges = (x: number): Map<string, number> =>
       new Map(sheet.draw(SHOP, 'src/cart.ts', NARROW, { x, y: 0 }).hits.flatMap(hit => ('node' in hit ? [[hit.node, hit.x + hit.width] as [string, number]] : [])))
@@ -228,7 +228,7 @@ describe('a room too short for every layer', () => {
       '                                       ╔═══════════════╗',
       '                                       ║ → money.ts  2 ║',
       '                                       ╚═══════════════╝',
-      '                                     ↑ 6 more                                       html ↗',
+      '                                 ↑ 6 more                                    copy · html ↗',
     ])
     const top = picture(pinned.draw(SHOP, 'src/pages/checkout.ts', SHORT, ORIGIN))
     expect(top[1]).toContain('○ checkout.ts')

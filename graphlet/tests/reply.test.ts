@@ -1,13 +1,14 @@
 import { expect, test } from 'claude-code/testing'
 
-import { LOOK, graphOf as graphNamed, picture } from './fixture'
-import { GUIDE, fencedOf, graphOf, partsOf, pictureOf } from '../hooks/reply'
-import { sizeOf } from '../hooks/draw'
+import { LOOK, cellsOf, graphOf as graphNamed, picture } from './fixture'
+import { GUIDE, fencedOf, graphOf, inReply, partsOf, pictureOf } from '../hooks/reply'
+import { rowText, sizeOf } from '../hooks/draw'
+import type { Drawing, Hit } from '../hooks/draw'
 import { readGraph } from '../hooks/layers'
 import { viewOf } from '../hooks/view'
 
-const view = viewOf(LOOK)
-const still = viewOf(LOOK, true)
+const view = viewOf(LOOK, false, false)
+const still = viewOf(LOOK, true, false)
 
 test('a reply is cut at its closed graphlet blocks, and every other fence stays in the text whole, with what it holds', () => {
   const reply = [
@@ -313,8 +314,37 @@ test('a still picture wider than its room keeps the count of what is past the ed
   const ids = ['root', 'one', 'two', 'three', 'four', 'five', 'six', 'seven']
   const fan = graphNamed(ids, ids.slice(1).map(id => ['root', id] as [string, string]))
   const drawing = pictureOf(view, fan, { columns: 50, rows: 1000 })
-  expect(picture(drawing).at(-1)).toBe('                                  2 more →')
+  expect(picture(drawing).at(-1)).toBe('2 more →'.padStart(50))
   expect(drawing.hits).toEqual([])
+})
+
+/** What the cells a hit covers say, along its middle row: a box's label between its borders, or the words of the foot. */
+const said = (drawing: Drawing, hit: Hit): string =>
+  cellsOf(rowText(drawing.rows[hit.y + Math.floor(hit.height / 2)] ?? []))
+    .slice(hit.x, hit.x + hit.width)
+    .join('')
+
+test('in a reply, a drawing stands at the reply\'s left edge with its corner at its own right edge, and every click lands on what it says', () => {
+  const small = graphNamed(['A', 'B', 'C'], [['A', 'B'], ['A', 'C']])
+  const drawing = inReply(viewOf(LOOK, true)).draw(small, null, { columns: 60, rows: 1000 }, { x: 0, y: 0 })
+  expect(picture(drawing)).toEqual([
+    '     ┌─────┐',
+    '     │  A  │',
+    '     └──┬──┘',
+    '   ┌────┴───┐',
+    '   ▼        ▼',
+    '┌─────┐  ┌─────┐',
+    '│  B  │  │  C  │',
+    '└─────┘  └─────┘',
+    '   copy · html ↗',
+  ])
+  expect(drawing.hits.map(hit => said(drawing, hit))).toEqual(['│  A  │', '│  B  │', '│  C  │', 'copy', 'html ↗'])
+
+  const ids = ['root', 'one', 'two', 'three', 'four', 'five', 'six', 'seven']
+  const fan = graphNamed(ids, ids.slice(1).map(id => ['root', id] as [string, string]))
+  const wide = inReply(viewOf(LOOK)).draw(fan, null, { columns: 50, rows: 1000 }, { x: 0, y: 0 })
+  expect(picture(wide).at(-1)).toBe('                           2 more →  copy · html ↗')
+  expect(wide.hits.filter(hit => !('node' in hit)).map(hit => said(wide, hit))).toEqual(['2 more →', 'copy', 'html ↗'])
 })
 
 test('a picture as plain text is fenced by more backticks than any run of them in it', () => {

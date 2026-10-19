@@ -70,10 +70,10 @@ export type Pan = { x: number; y: number }
 
 /**
  * A rectangle of the drawing, in cells, and what a click inside it does:
- * selects `node`, collapses `group`, scrolls the graph `by`, or opens the
- * graph as a web page.
+ * selects `node`, collapses `group`, scrolls the graph `by`, copies the graph
+ * as text, or opens it as a web page.
  */
-export type Hit = { x: number; y: number; width: number; height: number } & ({ node: string } | { group: string } | { by: Pan } | { page: true })
+export type Hit = { x: number; y: number; width: number; height: number } & ({ node: string } | { group: string } | { by: Pan } | { copy: true } | { page: true })
 
 /** A picture: its rows, top to bottom, and where a click does what. */
 export type Drawing = { rows: Span[][]; hits: Hit[] }
@@ -136,10 +136,18 @@ export function beyondRow(beyond: Beyond, columns: number, page: Pan, y: number)
   return { row: [{ text: text.trimEnd(), paint: 'dim' }], hits }
 }
 
-/** What the corner of a drawing's last row says, as much of it as the row has room for: a click there opens the graph as a web page. */
-const PAGE_LABELS = ['html ↗', '↗']
+/**
+ * What the corner of a drawing's last row says, the longest the row has room
+ * for, word by word: a click on `copy` copies the graph as text, and one on
+ * the arrow opens it as a web page.
+ */
+const CORNERS: ReadonlyArray<ReadonlyArray<{ text: string; does?: 'copy' | 'page' }>> = [
+  [{ text: 'copy', does: 'copy' }, { text: ' · ' }, { text: 'html ↗', does: 'page' }],
+  [{ text: 'copy', does: 'copy' }, { text: ' · ' }, { text: '↗', does: 'page' }],
+  [{ text: '↗', does: 'page' }],
+]
 /** The room between the counts and the corner. */
-const CORNER_GAP = 2
+export const CORNER_GAP = 2
 
 /** How many of a graph's nodes and links were left out, said in full and said short: nothing where none were. */
 export function leftOut(unread: { nodes: number; links: number }): string[] {
@@ -151,27 +159,52 @@ export function leftOut(unread: { nodes: number; links: number }): string[] {
 /**
  * The last row of a drawing: the counts of what is out of view, when
  * anything is, then a note, when there is one, as of what was left out of the
- * graph, and in its right corner what a click opens the graph as a web page
- * by. The note is said as the longest of its `notes` the row has room for,
- * and keeps its place over the corner's words.
+ * graph, and where it `hasCorner`, in its right corner what a click copies
+ * the graph or opens it as a web page by. The note is said as the longest of
+ * its `notes` the row has room for, and keeps its place over the corner's
+ * words.
  */
-export function footRow(beyond: Beyond | undefined, columns: number, page: Pan, y: number, notes: string[] = []): { row: Span[]; hits: Hit[] } {
+export function footRow(beyond: Beyond | undefined, columns: number, page: Pan, y: number, notes: string[] = [], hasCorner = true): { row: Span[]; hits: Hit[] } {
   const none = { left: 0, right: 0, above: 0, below: 0 }
   for (const note of [...notes, '']) {
-    for (const label of PAGE_LABELS) {
-      const tail = note === '' ? label : `${note}${' '.repeat(CORNER_GAP)}${label}`
-      const room = columns - tail.length - CORNER_GAP
+    for (const corner of hasCorner ? CORNERS : [[]]) {
+      const label = corner.map(word => word.text).join('')
+      const tail = [note, label].filter(text => text !== '').join(' '.repeat(CORNER_GAP))
+      const room = columns - sizeOf(tail) - (tail === '' ? 0 : CORNER_GAP)
       const counts = beyondRow(beyond ?? none, room, page, y)
       const said = rowText(counts.row)
-      if (said.length > room) continue
-      const x = columns - label.length
+      if (sizeOf(said) > room) continue
+      const words = corner.map((word, index) => ({ ...word, x: columns - sizeOf(label) + sizeOf(corner.slice(0, index).map(one => one.text).join('')) }))
       return {
-        row: [{ text: `${said.padEnd(columns - tail.length)}${tail}`, paint: 'dim' }],
-        hits: [...counts.hits, { x, y, width: label.length, height: 1, page: true }],
+        row: [{ text: tail === '' ? said : `${said}${' '.repeat(columns - sizeOf(tail) - sizeOf(said))}${tail}`, paint: 'dim' }],
+        hits: [
+          ...counts.hits,
+          ...words.flatMap(word =>
+            word.does === undefined ? [] : [{ x: word.x, y, width: sizeOf(word.text), height: 1, ...(word.does === 'copy' ? { copy: true as const } : { page: true as const }) }],
+          ),
+        ],
       }
     }
   }
   return beyondRow(beyond ?? none, columns, page, y)
+}
+
+/** Whether a click on a hit copies the graph or opens it as a web page: whether it is in the corner of the drawing's last row. */
+export const isCorner = (hit: Hit): boolean => 'copy' in hit || 'page' in hit
+
+/** A drawing's last row cut where its corner starts: what it says before the corner, less the blanks it ends in, and the corner's words, '' where it has none. */
+export function footOf(drawing: Drawing): { foot: string; corner: string } {
+  const said = rowText(drawing.rows.at(-1) ?? [])
+  const at = Math.min(sizeOf(said), ...drawing.hits.filter(isCorner).map(hit => hit.x))
+  const corner = said.slice(said.length - (sizeOf(said) - at))
+  return { foot: said.slice(0, said.length - corner.length).trimEnd(), corner }
+}
+
+/** A drawing with no corner, for where nothing in it can be clicked: its last row says only what it said before the corner. */
+export function cornerless(drawing: Drawing): Drawing {
+  if (drawing.rows.length === 0) return drawing
+  const { foot } = footOf(drawing)
+  return { rows: [...drawing.rows.slice(0, -1), foot === '' ? [] : [{ text: foot, paint: 'dim' }]], hits: drawing.hits.filter(hit => !isCorner(hit)) }
 }
 
 export function rowText(row: Span[]): string {

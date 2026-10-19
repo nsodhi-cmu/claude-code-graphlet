@@ -1,13 +1,14 @@
 import type { GraphletGraph, GraphletGroup, GraphletLink, GraphletNode, GraphletTone } from '../types'
-import { rowText } from './draw'
+import { CORNER_GAP, footOf, isCorner, rowText, sizeOf } from './draw'
 import type { Drawing, Room, Span } from './draw'
 import { TONES } from './layers'
 import type { Graph } from './layers'
 import type { View } from './view'
 
 // Graphs in a reply: the fenced blocks marked `graphlet` that the model
-// writes, each read from its lines of arrows, and drawn as a still picture,
-// or as plain text where a surface draws no picture.
+// writes, each read from its lines of arrows, and drawn at the reply's left
+// edge, or as a still picture in plain text where a surface draws no picture
+// and where it is copied.
 
 /** The language a fenced block names to be drawn as a graph. */
 export const LANGUAGE = 'graphlet'
@@ -210,25 +211,49 @@ const after = (row: Span[], count: number): Span[] => {
   })
 }
 
+/**
+ * A drawing as a reply shows it: the columns blank down the whole of its left
+ * side cut away, so a small graph stands at the reply's left edge as the text
+ * does, and its foot's note and corner brought in to the right edge of what
+ * is left, past the counts before them.
+ */
+export function alignedLeft(drawing: Drawing): Drawing {
+  if (drawing.rows.length === 0) return drawing
+  const { foot, corner } = footOf(drawing)
+  const rows = drawing.rows.slice(0, -1)
+  const at = Math.min(...drawing.hits.filter(isCorner).map(hit => hit.x))
+  const said = Math.max(0, ...drawing.hits.filter(hit => 'by' in hit && hit.y === rows.length).map(hit => hit.x + hit.width))
+  const [counts, note] = [foot.slice(0, said).trimEnd(), foot.slice(said).trim()]
+  const blanks = [...rows.map(rowText), counts].filter(text => text.trim() !== '').map(text => text.length - text.trimStart().length)
+  const blank = blanks.length === 0 ? 0 : Math.min(...blanks)
+  const cut = rows.map(row => after(row, blank))
+  const [shown, tail] = [counts.slice(blank), [note, corner].filter(text => text !== '').join(' '.repeat(CORNER_GAP))]
+  const width = Math.max(sizeOf(shown) + (shown === '' || tail === '' ? 0 : CORNER_GAP) + sizeOf(tail), ...cut.map(row => sizeOf(rowText(row).trimEnd())))
+  const footing = `${shown}${' '.repeat(Math.max(0, width - sizeOf(shown) - sizeOf(tail)))}${tail}`
+  return {
+    rows: [...cut, footing.trim() === '' ? [] : [{ text: footing, paint: 'dim' }]],
+    hits: drawing.hits.map(hit => ({ ...hit, x: isCorner(hit) ? width - sizeOf(corner) + hit.x - at : hit.x - blank })),
+  }
+}
+
+/** A view that draws as `view` does, each drawing as a reply shows it. */
+export function inReply(view: View): View {
+  return { ...view, draw: (graph, selected, room, pan, finding) => alignedLeft(view.draw(graph, selected, room, pan, finding)) }
+}
+
 /** A still picture: the rows of its graph, and its foot, the counts of what is out of view past its edge and of what was left out of the graph; '' where it has none. */
 export type Still = { rows: Span[][]; foot: string }
 
 /**
- * A graph drawn as a still picture in a room: laid out once in it, as tall as
- * it needs, from its top left corner, with nothing selected. Its foot keeps
- * the counts of what is out of view and of what was left out, and not the
- * corner a pane's has. The columns blank down the whole of its left side are
- * cut away.
+ * A graph drawn as a still picture in a room, as plain text takes it: laid
+ * out once in it, as tall as it needs, from its top left corner, with
+ * nothing selected, at the left edge as a reply shows it. Its foot keeps the
+ * counts of what is out of view and of what was left out, and not the corner,
+ * which plain text has no click for.
  */
 export function stillOf(view: View, graph: Graph, room: Room): Still {
-  const drawing = view.draw(graph, null, room, { x: 0, y: 0 })
-  const last = drawing.rows.at(-1)
-  if (last === undefined) return { rows: [], foot: '' }
-  const corner = drawing.hits.find(hit => 'page' in hit)
-  const foot = rowText(last).slice(0, corner?.x).trimEnd()
-  const rows = drawing.rows.slice(0, -1)
-  const blank = Math.min(...[...rows.map(rowText), foot].filter(text => text !== '').map(text => text.length - text.trimStart().length))
-  return { rows: rows.map(row => after(row, blank)), foot: foot.slice(blank) }
+  const drawing = alignedLeft(view.draw(graph, null, room, { x: 0, y: 0 }))
+  return { rows: drawing.rows.slice(0, -1), foot: drawing.rows.length === 0 ? '' : footOf(drawing).foot }
 }
 
 /** A still picture as one drawing: its rows, and its foot under them where it says anything. */

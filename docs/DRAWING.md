@@ -1,6 +1,6 @@
 # The Drawing
 
-A drawing is rows of painted text, and the rectangles of them that answer a click. Painting one is `graphlet/hooks/paint.ts`, the window it is painted through is `graphlet/hooks/window.ts`, and what both are made of is `graphlet/hooks/draw.ts`. The surface module `graphlet/hooks/surface.tsx` puts a site's rows on the terminal, in a pane, the band, or a tool's or command's row, moves the beads of lines that flow, and posts what a click lands on, whether two make a double click on a box, and how far a drag has gone. A graph in a reply is drawn as a [still picture](REPLIES.md#the-picture), its rows put on the terminal by the hook itself.
+A drawing is rows of painted text, and the rectangles of them that answer a click. Painting one is `graphlet/hooks/paint.ts`, the window it is painted through is `graphlet/hooks/window.ts`, and what both are made of is `graphlet/hooks/draw.ts`. The surface module `graphlet/hooks/surface.tsx` puts a drawing's rows on the terminal, in a pane, the band, a tool's or command's row, or a reply in the fullscreen layout, moves the beads of lines that flow, and posts what a click lands on, whether two make a double click on a box, and how far a drag has gone. A graph in a reply on the main screen is drawn as a [still picture](REPLIES.md#the-picture), its rows put on the terminal by the hook itself.
 
 ## Reading The Picture
 
@@ -128,7 +128,7 @@ In a pane, the same graph with its `Data` group collapsed and `API` selected, in
                 ╭───────────╮
                 │ ▸ Data  2 │
                 ╰───────────╯
-                                      html ↗
+                               copy · html ↗
 ```
 
 The links of `Auth` and `Orders` to the nodes of `Data` are links to its box, and since both reach the very same box, they share one arrowhead.
@@ -192,9 +192,9 @@ The last row of a drawing is its foot. A graph with no nodes has no drawing, and
 
 - Under a graph larger than its room, it counts the nodes out of view past each edge: `← 3 more`, `↑ 2 more · ↓ 5 more`, `12 more →`. A click on a count scrolls the graph most of a room that way.
 - Where nodes or links were left out of a graph past the most that are read, it says how many: `12 nodes and 340 links left out`, or in a narrow room `+12 nodes +340 links`.
-- In its right corner is `html ↗`. A click there opens the graph as a [web page](PAGE.md). Where the row is too narrow for all of it, the corner says only `↗`, and what was left out keeps its place over the corner's words.
+- In its right corner is `copy · html ↗`. A click on `copy` puts the graph on the clipboard as plain text, as `c` does, and one on `html ↗` opens the graph as a [web page](PAGE.md). Where the row is too narrow for all of it, the corner says `copy · ↗`, and then only `↗`, and what was left out keeps its place over the corner's words.
 
-A still picture in a reply keeps the counts and what was left out, and its corner says `copy · html ↗`: `copy` puts the picture on the clipboard as text, and `html ↗` opens the web page. As plain text, on a surface graphlet draws no picture on, it has no corner, and no foot when all of it is in view and nothing was left out.
+A still picture, as plain text takes it, on the main screen, on a surface graphlet draws no picture on, and as a copy, keeps the counts and what was left out, reaching the right edge, and has no corner, since nothing in it can be clicked; and no foot when all of it is in view and nothing was left out. A site's drawing on the main screen has no corner either. In a reply, `alignedLeft` brings the note and the corner in to the right edge of the picture, which stands at the reply's left edge.
 
 ## Moving The Selection
 

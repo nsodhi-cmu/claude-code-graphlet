@@ -151,9 +151,10 @@ export type Graphlet = {
    */
   measure(input: { graph: GraphletGraph; columns: number }): Promise<GraphletSize>
   /**
-   * The graph as plain text: its still picture, as a reply draws it, folded
-   * into a room `columns` wide, a line a row with no blanks at its end. For
-   * what a tool hands back to the model, or a file.
+   * The graph as plain text: its still picture, drawn with nothing selected
+   * and its links kept separate, folded into a room `columns` wide, a line
+   * a row with no blanks at its end. For what a tool hands back to the
+   * model, or a file.
    */
   text(input: { graph: GraphletGraph; columns: number }): Promise<string>
   /**

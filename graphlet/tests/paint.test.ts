@@ -612,10 +612,13 @@ describe('the drawing', () => {
     expect(drawn(readGraph({ nodes: [], links: [] }))).toEqual({ rows: [], hits: [] })
   })
 
-  test('the last row is the foot, and a click in its corner opens the graph as a web page', () => {
+  test('the last row is the foot, and in its corner a click on copy copies the graph as text and one on html ↗ opens it as a web page', () => {
     const drawing = drawn(graphOf(['A', 'B'], [['A', 'B']]))
-    expect(picture(drawing).at(-1)).toBe('                                  html ↗')
-    expect(drawing.hits.at(-1)).toEqual({ x: 34, y: 8, width: 6, height: 1, page: true })
+    expect(picture(drawing).at(-1)).toBe('                           copy · html ↗')
+    expect(drawing.hits.slice(-2)).toEqual([
+      { x: 27, y: 8, width: 4, height: 1, copy: true },
+      { x: 34, y: 8, width: 6, height: 1, page: true },
+    ])
   })
 })
 

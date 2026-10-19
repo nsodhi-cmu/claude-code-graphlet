@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
+import { cellsOf } from './fixture'
 import { beatOf, beyondRow, bounded, canvasOf, clipMiddle, footRow, leftOut, reveal, rowText, sizeOf, spansOf } from '../hooks/draw'
 import type { Paint, Span } from '../hooks/draw'
 
@@ -83,11 +84,25 @@ describe('the last row', () => {
   const page = { x: 20, y: 5 }
   test('what was left out of a graph is said before the corner, short where the row is narrow, and before the corner\'s words', () => {
     const unread = { nodes: 12, links: 340 }
-    expect(rowText(footRow(undefined, 60, page, 9, leftOut(unread)).row)).toBe('12 nodes and 340 links left out  html ↗'.padStart(60))
+    expect(rowText(footRow(undefined, 60, page, 9, leftOut(unread)).row)).toBe('12 nodes and 340 links left out  copy · html ↗'.padStart(60))
     expect(rowText(footRow(undefined, 40, page, 9, leftOut(unread)).row)).toBe('12 nodes and 340 links left out  ↗'.padStart(40))
-    expect(rowText(footRow(undefined, 30, page, 9, leftOut(unread)).row)).toBe('+12 nodes +340 links  html ↗'.padStart(30))
-    expect(rowText(footRow(undefined, 30, page, 9, leftOut({ nodes: 1, links: 0 })).row)).toBe('1 node left out  html ↗'.padStart(30))
-    expect(rowText(footRow({ left: 3, right: 0, above: 0, below: 0 }, 60, page, 9, leftOut(unread)).row)).toBe(`${'← 3 more'.padEnd(21)}12 nodes and 340 links left out  html ↗`)
+    expect(rowText(footRow(undefined, 30, page, 9, leftOut(unread)).row)).toBe('+12 nodes +340 links  ↗'.padStart(30))
+    expect(rowText(footRow(undefined, 30, page, 9, leftOut({ nodes: 1, links: 0 })).row)).toBe('1 node left out  copy · ↗'.padStart(30))
+    expect(rowText(footRow({ left: 3, right: 0, above: 0, below: 0 }, 60, page, 9, leftOut(unread)).row)).toBe(`${'← 3 more'.padEnd(14)}12 nodes and 340 links left out  copy · html ↗`)
+  })
+
+  test('a note of wide characters, as what is being found, keeps the row to the room\'s cells and each of the corner\'s words where a click on it lands', () => {
+    const { row, hits } = footRow(undefined, 40, page, 0, ['/日本語 · no match', '/日本語'])
+    const cells = cellsOf(rowText(row))
+    expect(rowText(row)).toBe(`${' '.repeat(7)}/日本語 · no match  copy · html ↗`)
+    expect(cells).toHaveLength(40)
+    expect(hits.map(hit => cells.slice(hit.x, hit.x + hit.width).join(''))).toEqual(['copy', 'html ↗'])
+  })
+
+  test('a still drawing has no corner: the counts and the note reach the right edge, and nothing in the row but a count takes a click', () => {
+    const { row, hits } = footRow({ left: 0, right: 7, above: 0, below: 0 }, 60, page, 9, leftOut({ nodes: 1, links: 0 }), false)
+    expect(rowText(row)).toBe(`${'7 more →'.padStart(43)}  1 node left out`)
+    expect(hits).toEqual([{ x: 35, y: 9, width: 8, height: 1, by: { x: 20, y: 0 } }])
   })
 })
 

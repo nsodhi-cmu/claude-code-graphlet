@@ -28,7 +28,7 @@ claude --plugin-dir ./graphlet --plugin-dir ../my-mod    # beside a mod that use
 | `graphlet/hooks/view.ts` | A graph as a person looks at it: which way it runs, in focus, with groups collapsed, laid out once for a room. | [API](API.md#a-graph), [DRAWING](DRAWING.md#focus) |
 | `graphlet/hooks/draw.ts` | What a drawing is made of: runs of paint, the rectangles a click lands on, cells, widths, and the foot. | [DRAWING](DRAWING.md) |
 | `graphlet/hooks/page.ts` | The graph as a web page. | [PAGE](PAGE.md) |
-| `graphlet/hooks/reply.ts` | A reply's graph blocks, what the model is told of them, and their still pictures. | [REPLIES](REPLIES.md) |
+| `graphlet/hooks/reply.ts` | A reply's graph blocks, what the model is told of them, their drawings at the reply's edge, and their still pictures. | [REPLIES](REPLIES.md) |
 | `graphlet/hooks/surface.tsx` | The surface module: it paints a drawing and posts clicks, drags, and keys. | [DRAWING](DRAWING.md), [API](API.md#keys-and-the-wheel) |
 | `graphlet/types/index.d.ts` | The contract: a graph's types, and what the mod adds to `$`. | [API](API.md) |
 | `graphlet/tests/` | The tests. | [below](#the-tests) |
@@ -47,7 +47,7 @@ There is no `package.json` and no dependency. Each time Claude Code loads the mo
 - `graphlet/tests/` has a file for each file of `graphlet/hooks/` it tests, beside `fixture.ts`, which holds what several share: `LOOK`, the settings' defaults; `graphOf`, a graph from ids and pairs of them; `undirected`; `numbers`, a seeded source of numbers, so that a test that draws many graphs draws the same ones every run; `picture` and `graphRows`, a drawing as the text of its rows; `cellsOf`, a row as a terminal's cells; and `SHOP`, a graph of a shop's files.
 - A drawing is tested as the whole picture it makes, compared line for line.
 - Some tests draw many graphs from `numbers` and check what must hold of every one. In `view.test.ts`, any graph in any room under any settings is drawn inside its room, with no two boxes on one cell. In `paint.test.ts`, `readOff` reads a picture back as a person reads it, from its characters alone, and the picture must say every link its graph has, in every channel the link crosses, and no link it does not have, with each label beside a link it is true of.
-- The engine's side is tested in `register.test.tsx` through the kit, as a mod and a person drive it. `HOST` is an inline plugin that uses graphlet: its `tier` is `prepend`, so it loads outside graphlet as a mod that depends on it does, and its `register` closes over nothing of the test file. `world` stands in for what lies beneath the plugins, the toasts, the clipboard, the files, the programs, and the temporary folder, and keeps what graphlet did to each. `$.ui.mount` mounts a pane or a block of a reply on a surface, and the test then clicks with `pointer`, types with `key`, runs the surface's clock with `advance`, and presses a reply's buttons with `press`. A test's `options` are the person's settings.
+- The engine's side is tested in `register.test.tsx` through the kit, as a mod and a person drive it. `HOST` is an inline plugin that uses graphlet: its `tier` is `prepend`, so it loads outside graphlet as a mod that depends on it does, and its `register` closes over nothing of the test file. `world` stands in for what lies beneath the plugins, the toasts, the clipboard, the files, the programs, and the temporary folder, and keeps what graphlet did to each. `$.ui.mount` mounts a pane or a block of a reply on a surface, and the test then clicks with `pointer`, types with `key`, runs the surface's clock with `advance`, and presses the host's buttons with `press`. A reply is mounted in the fullscreen layout unless a test says otherwise, and its graphs are Clients keyed `graph:` and their place among the block's graphs. A test's `options` are the person's settings.
 
 ## Probing A Picture
 
@@ -61,7 +61,7 @@ import { graphOf, pictureOf } from '../hooks/reply'
 import { viewOf } from '../hooks/view'
 
 test('probe', () => {
-  const still = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate', motion: 'still' }, true)
+  const still = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate', motion: 'still' }, true, false)
   const graph = readGraph(graphOf(['Start -> Valid?', 'Valid? ->|yes| Save', 'Valid? ->|no| Retry', 'Retry -> Start']))
   expect(picture(pictureOf(still, graph, { columns: 78, rows: 1000 }))).toEqual([])
 })

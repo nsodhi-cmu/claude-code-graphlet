@@ -31,7 +31,7 @@ graphlet/hooks/
   view.ts         a graph as a person looks at it, drawn as their settings say
   draw.ts         what a drawing is made of
   page.ts         the graph as a web page
-  reply.ts        a reply's graph blocks: finding them, reading them, and drawing them still
+  reply.ts        a reply's graph blocks: finding them, reading them, and drawing them at the reply's edge
   surface.tsx     the surface module that paints a drawing and posts clicks and keys
 graphlet/tests/   the tests, one file for each of those it tests
 graphlet/types/   the contract: a graph's types, and what the mod adds to `$`
@@ -46,8 +46,7 @@ The engine reads a hooks module's source before it loads it, and refuses what it
 - What a noun's method takes and answers crosses between mods as plain data. A tree of elements does not cross that way: `$.ui.resolve` takes a `ui.render` argument, and a `Client` is stamped with the plugin whose render hook drew it. So the drawing reaches another mod's site through the `ui.render` chain, as what its `next(e)` resolves to.
 - A mod runs before the mods it lists under `dependencies`. Its hooks are the outer ones: its `ui.render` hook reaches graphlet's through `next(e)`, and its hook on `graphlet.select` hears a call graphlet's own hooks make.
 - A noun's method has no `$` of its own. It calls the engine through the `$` its `engine.create` hook was handed back, and those calls run in the hook that called the method.
-- A `Client` is the only element that receives pointer events and arrow keys, and it receives keys only after a click on it. Its posts reach the hooks of the plugin that drew it, and no other's.
-- A `Button` takes a click anywhere a tree may hold one, a reply's included. Its `key` reaches the drawing plugin's `ui.press` hook as `e.element`, with the drawing's `requestId`, before its `onPress` runs.
+- A `Client` is the only element that receives pointer events and arrow keys, and it receives keys only after a click on it, until Escape gives them back. It may be drawn in any render, a reply's included, and the terminal reports the mouse only in the fullscreen layout. Its posts reach the hooks of the plugin that drew it, and no other's, and answering one with `{ props }` redraws that instance alone. One that fails is heard in `ui.fault`, and the engine then draws its site again, for the hook to leave it out.
 - An event matcher, an environment variable's name, and a `Client`'s `module` path are literals in the source. A call on a plugin's noun is refused from a module whose source does not spell it, which is why a test raises `graphlet.select` through a hook of an inline plugin and not from its own body.
 - In the test kit, an inline plugin's `register` closes over nothing of the test file, and its `tier` says where it loads: `prepend` puts a mod that uses graphlet outside it, as a dependent is.
 - A `ui.render` hook on `AssistantMessage` answers for one block of a reply, its bullet and the room above it included. `next(e)` with a rewritten `text` is the engine's own drawing of that text, so the text before a graph keeps the reply's bullet that way. The stored message is never changed.

@@ -52,7 +52,7 @@ Auth ->|denied| Browser
 ```
 ````
 
-The conversation keeps the block as Claude wrote it, so an export or `/copy` has the arrows. [docs/REPLIES.md](docs/REPLIES.md) has the whole syntax of a block.
+In Claude Code's fullscreen layout you can click the graph and move through it, as in a mod's pane. The conversation keeps the block as Claude wrote it, so an export or `/copy` has the arrows. [docs/REPLIES.md](docs/REPLIES.md) has the whole syntax of a block.
 
 ## In Other Mods
 
@@ -88,12 +88,12 @@ on('graphlet.select', async ($, e, next) => {
 - **Labels.** A link can say what it means, like `yes` or `retry`, in a few words beside its line.
 - **Tones.** A node can be colored by what it means, `good`, `warn`, `bad`, `note`, or `dim`, and a mod can color a link the same way.
 - **Emphasis.** The nodes a graph is most about can be drawn in heavy frames.
-- **Groups.** Nodes can be grouped, each group in a frame with its name, and where a mod draws a graph, a group can be collapsed into one box and opened again.
+- **Groups.** Nodes can be grouped, each group in a frame with its name, and a group can be collapsed into one box and opened again.
 - **Down or right.** A graph runs down the screen, or left to right where that fits better, as a pipeline does.
-- **Fitting its room.** A graph too wide for a reply is folded onto more rows where it can be, and one too large for a pane scrolls, following the selection.
-- **Selecting.** Where a mod draws a graph, a click selects a node and lights its links, the arrow keys move along them, and return or a double click opens the node for the mod to act on.
-- **Finding and focusing.** In a pane, `/` finds a node by its label as you type, and in a large graph, `f` shows only the selected node and the nodes nearest it.
-- **Copy.** `copy`, under a graph in a reply, or `c` where a mod draws one, puts the graph on your clipboard as text, to paste into a pull request or a chat.
+- **Fitting its room.** A graph too wide for a reply is folded onto more rows where it can be, and one too large for its room scrolls, following the selection.
+- **Selecting.** A click selects a node and lights its links, and the arrow keys move along them. Where a mod draws the graph, return or a double click opens the node for the mod to act on.
+- **Finding and focusing.** `/` finds a node by its label as you type, and in a large graph, `f` shows only the selected node and the nodes nearest it.
+- **Copy.** `copy`, under a graph, or `c`, puts the graph on your clipboard as text, to paste into a pull request or a chat.
 - **The web page.** `html ↗`, under a graph, opens it as a web page in your browser, where you can zoom and pan around all of it.
 
 ## Installing
@@ -126,7 +126,7 @@ What graphlet does with that access:
 
 - **Tells Claude** that it can draw graphs, in one section of the system prompt of every session that draws, unless **Graphs in replies** is off. The section rides on every request.
 - **Draws** in Claude's replies where they hold a graph block, where the mods that use it ask it to, and nowhere else.
-- **Keeps** each site's graph, selection, and scroll position in memory for the session, and the graphs of the replies it drew last, for the buttons under them.
+- **Keeps** each graph's selection and scroll position in memory for the session: those of the mods' graphs it drew last, and of the graphs in the replies it drew last.
 - **Writes one file and opens it**, only when you click `html ↗`: the graph as a web page, in your temporary folder, opened with your system's own opener (`xdg-open`, `open`, or `start`).
 - **Copies a graph to your clipboard**, only when you click `copy` or press `c`.
 
@@ -134,9 +134,9 @@ It reads no file, stores nothing between sessions, calls no model, and makes no 
 
 ## Limits
 
-- It draws pictures in the terminal only. On the desktop app, the VS Code extension, and the mobile app, a graph in a reply is shown as plain text, and a mod's graph is left as the mod draws it.
-- A graph in a reply is still: nothing in it can be selected, and it does not scroll. Its web page shows all of it.
-- The mouse reaches a graph only in Claude Code's fullscreen layout, and a pane's graph takes keys only once it has been clicked.
+- It draws pictures in the terminal only. On the desktop app, the VS Code extension, and the mobile app, a graph is shown as plain text.
+- The mouse reaches a graph only in Claude Code's fullscreen layout. On the main screen, a graph in a reply is a still picture.
+- A graph takes keys only once it has been clicked, and keeps them until Escape gives them back to the prompt. A drag on a graph moves it rather than selecting its text: `copy` takes it as text.
 - Where an organization manages Claude Code, Claude is told of graph blocks only if the organization lists graphlet in managed settings. graphlet still draws a block Claude writes.
 - A graph is read up to 1000 nodes and 2000 links. What is past those is left out, and the row under the graph says how much.
 - Where links are too tangled to keep apart, two of them may share a stretch of line. Selecting a node lights its own.

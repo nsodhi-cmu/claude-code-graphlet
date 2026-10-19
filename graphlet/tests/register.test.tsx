@@ -2,7 +2,8 @@ import { expect, test } from 'claude-code/testing'
 import type { Engine, Plugin } from 'claude-code/testing'
 import type { On, RenderPropsOf, RenderSurface } from 'claude-code'
 
-import { LOOK, SHOP, cellsOf, graphOf, picture, undirected } from './fixture'
+import { LOOK, SHOP, cellsOf, graphOf, graphRows, picture, undirected } from './fixture'
+import type { Drawing, Hit } from '../hooks/draw'
 import { readGraph } from '../hooks/layers'
 import { GUIDE, graphOf as graphLines, pictureOf } from '../hooks/reply'
 import { viewOf } from '../hooks/view'
@@ -260,9 +261,9 @@ const mount = ($: Engine, requestId: string, props = PANE) =>
 
 type Pane = Awaited<ReturnType<typeof mount>>
 
-/** The rows graphlet's surface module drew. */
-const rowsOf = async (pane: Pick<Pane, 'drawn'>): Promise<string[]> => {
-  const drawn = (await pane.drawn({ in: 'graph' })) as { children?: Array<{ children?: unknown[] }> }
+/** The rows graphlet's surface module drew, in the Client under `key`. */
+const rowsOf = async (pane: Pick<Pane, 'drawn'>, key = 'graph'): Promise<string[]> => {
+  const drawn = (await pane.drawn({ in: key })) as { children?: Array<{ children?: unknown[] }> }
   return (drawn.children ?? []).map(row =>
     (row.children ?? [])
       .map(span => (typeof span === 'string' ? span : ((span as { children?: string[] }).children ?? []).join('')))
@@ -429,7 +430,7 @@ test('a pane whose owner names no selection opens on the first node the graph na
     '          ┏━━━━━━━┓  ┌──────────┐',
     '          ┃ cache ┃  │ database │',
     '          ┗━━━━━━━┛  └──────────┘',
-    '                                      html ↗',
+    '                               copy · html ↗',
   ])
   expect(await pane.find({ in: 'graph', type: 'Text', text: /^ *cache *$/ })).toMatchObject({ props: { bold: true } })
   await pane.unmount()
@@ -448,9 +449,9 @@ test('a click on a count scrolls the graph and selects nothing; the window stays
   world(on)
   const pane = await mount($, 'free', NARROW)
   const before = await rowsOf(pane)
-  expect(before.at(-1)).toBe('                            2 more →  html ↗')
+  expect(before.at(-1)).toBe('                     2 more →  copy · html ↗')
 
-  await pane.pointer({ type: 'down', x: 30, y: before.length - 1, button: 'left', in: 'graph' })
+  await pane.pointer({ type: 'down', x: 23, y: before.length - 1, button: 'left', in: 'graph' })
   const scrolled = await rowsOf(pane)
   expect(scrolled.at(-1)).toStartWith('← 2 more')
   expect((await said(pane)).heard).toEqual([])
@@ -463,7 +464,7 @@ test('a click on a count scrolls the graph and selects nothing; the window stays
   await pane.key({ key: 'left', in: 'graph' })
   await pane.key({ key: 'left', in: 'graph' })
   expect((await said(pane)).shown.selected).toBe('src/cart.ts')
-  expect((await rowsOf(pane)).at(-1)).toStartWith('                            2 more →')
+  expect((await rowsOf(pane)).at(-1)).toStartWith('                     2 more →')
   await pane.unmount()
 })
 
@@ -550,13 +551,17 @@ test('f draws the graph in focus on the selected node and its nearest, each sayi
   await pane.unmount()
 })
 
-test('c copies the whole graph as plain text, drawn still with nothing selected, and is not the owner\'s; a key held with ctrl is neither graphlet\'s nor the owner\'s', WITH_HOST, async ($, on) => {
+test('c, or a click on copy in the corner, copies the whole graph as plain text, drawn still with nothing selected, and is not the owner\'s; a key held with ctrl is neither graphlet\'s nor the owner\'s', WITH_HOST, async ($, on) => {
   const seen = world(on)
   const pane = await mount($, 'free', NARROW)
   await click(pane, { x: 0, y: 0 })
   await pane.key({ key: 'c', ctrl: true, in: 'graph' })
   await pane.key({ key: 'c', in: 'graph' })
-  expect(seen.copied).toEqual([
+  const corner = ((await pane.find({ type: 'Client' }))?.props.props as Drawing).hits.find(hit => 'copy' in hit) ?? { x: 0, y: 0 }
+  await pane.pointer({ type: 'down', x: corner.x, y: corner.y, button: 'left', in: 'graph' })
+  expect(seen.copied).toHaveLength(2)
+  expect(seen.copied[1]).toBe(seen.copied[0])
+  expect(seen.copied.slice(0, 1)).toEqual([
     [
       '┌───────────────┐  ┌────────────────────┐',
       '│ ○ checkout.ts │  │ ○ pages/invoice.ts │',
@@ -578,7 +583,7 @@ test('c copies the whole graph as plain text, drawn still with nothing selected,
       '                            └───────────────┘',
     ].join('\n'),
   ])
-  expect(seen.toasts).toEqual(['graphlet: copied the graph as text.'])
+  expect(seen.toasts).toEqual(['graphlet: copied the graph as text.', 'graphlet: copied the graph as text.'])
   expect((await said(pane)).heard).toEqual(['select free src/pages/checkout.ts'])
   await pane.unmount()
 })
@@ -600,7 +605,7 @@ test('a mod asks for its graph as plain text, drawn still as a reply draws it, f
   world(on)
   const pane = await mount($, 'free')
   await pane.press({ plugin: 'host', key: 'text' })
-  expect((await said(pane)).heard).toEqual([picture(pictureOf(viewOf(LOOK, true), SHOP, { columns: 78, rows: 1000 })).join('\n')])
+  expect((await said(pane)).heard).toEqual([picture(pictureOf(viewOf(LOOK, true, false), SHOP, { columns: 78, rows: 1000 })).join('\n')])
   await pane.unmount()
 })
 
@@ -626,7 +631,7 @@ test('each pane has its own graph, selection, and window', WITH_HOST, async ($, 
   expect((await said(free)).shown.selected).toBe('src/email.ts')
   expect((await said(held)).shown.selected).toBe('src/ui.ts')
   expect((await rowsOf(held)).at(-1)).toContain('more')
-  expect((await rowsOf(free)).at(-1)?.trim()).toBe('html ↗')
+  expect((await rowsOf(free)).at(-1)?.trim()).toBe('copy · html ↗')
   await free.unmount()
   await held.unmount()
 })
@@ -687,19 +692,63 @@ test('a tool\'s row or a command\'s row holds its graph as a pane does, to click
   await other.unmount()
 })
 
-test('a pane graphlet was told nothing of is left as it is, and so is every surface but the terminal', WITH_HOST, async ($, on) => {
+test('on the main screen, which reports no click, a site\'s graph has no corner', WITH_HOST, async ($, on) => {
+  world(on)
+  const pane = await $.ui.mount({ plugin: 'graphlet', surface: 'terminal', component: 'Pane', requestId: 'ranked', props: NARROW, viewport: { columns: 80, rows: 40, isFullscreen: false } })
+  expect(await rowsOf(pane)).toEqual([
+    '                ┌─────────┐',
+    '                │ request │',
+    '                └────┬────┘',
+    '                     │',
+    '                     ▼',
+    '                ╔════════╗',
+    '                ║ router ║',
+    '                ╚════╤═══╝',
+    '              ┌──────┴─────┐',
+    '              ▼            ▼',
+    '          ┏━━━━━━━┓  ┌──────────┐',
+    '          ┃ cache ┃  │ database │',
+    '          ┗━━━━━━━┛  └──────────┘',
+    ' ',
+  ])
+  expect(((await pane.find({ type: 'Client' }))?.props.props as Drawing).hits.filter(hit => 'copy' in hit || 'page' in hit)).toEqual([])
+  await pane.unmount()
+})
+
+test('a pane graphlet was told nothing of is left as it is; on every surface but the terminal, a site\'s graph is plain text, as it runs and with its groups as they are there, with nothing to click', WITH_HOST, async ($, on) => {
   world(on)
   const other = await mount($, 'someone-elses')
   expect(await other.find({ type: 'Text', text: 'the engine drew this' })).toBeDefined()
   expect(await other.find({ type: 'Client' })).toBeUndefined()
   await other.unmount()
 
-  const terminal = await mount($, 'free')
-  await terminal.unmount()
-  const desktop = await $.ui.mount({ plugin: 'graphlet', surface: 'desktop', component: 'Pane', requestId: 'free', props: PANE })
-  expect(await desktop.find({ type: 'Text', text: 'the engine drew this' })).toBeDefined()
-  expect(await desktop.find({ type: 'Client' })).toBeUndefined()
-  await desktop.unmount()
+  for (const surface of ['desktop', 'mobile'] as const) {
+    const drawn = await $.ui.mount({ plugin: 'graphlet', surface, component: 'Pane', requestId: 'grouped', props: NARROW })
+    expect(String((await drawn.find({ type: 'Code' }))?.props.source).split('\n')).toEqual([
+      '         ┌─────┐',
+      '         │ web │',
+      '         └──┬──┘',
+      '            │',
+      '╭─ Backend ─│─────╮',
+      '│           ▼     │',
+      '│        ┌─────┐  │',
+      '│        │ api │  │',
+      '│        └──┬──┘  │',
+      '│           │     │',
+      '│           ▼     │',
+      '│       ┌──────┐  │',
+      '│       │ auth │  │',
+      '│       └───┬──┘  │',
+      '╰───────────│─────╯',
+      '            │',
+      '            ▼',
+      '      ╭───────────╮',
+      '      │ ▸ Data  1 │',
+      '      ╰───────────╯',
+    ])
+    expect(await drawn.find({ type: 'Client' })).toBeUndefined()
+    await drawn.unmount()
+  }
 })
 
 test('graphs are drawn as the person\'s settings say', { ...WITH_HOST, options: { scroll: 'sheet', labels: 'clip', links: 'merged' } }, async ($, on) => {
@@ -886,14 +935,14 @@ const replies = (on: On): void => {
   })
 }
 
-/** A surface drawing a block of a reply, in a transcript 80 columns wide. */
-const say = ($: Engine, surface: RenderSurface, text: string, rest: Partial<RenderPropsOf['AssistantMessage']> = {}) =>
+/** A surface drawing a block of a reply, in a transcript 80 columns wide, in the fullscreen layout unless it says otherwise. */
+const say = <P extends RenderSurface>($: Engine, surface: P, text: string, rest: Partial<RenderPropsOf['AssistantMessage']> = {}, isFullscreen = true) =>
   $.ui.mount({
     plugin: 'graphlet',
     surface,
     component: 'AssistantMessage',
     props: { text, isFirstOfReply: true, ...rest },
-    viewport: { columns: 80, rows: 40 },
+    viewport: { columns: 80, rows: 40, isFullscreen },
   })
 
 /** What a drawn element says: its own text and its children's. */
@@ -902,7 +951,7 @@ const textOf = (node: unknown): string =>
 
 /**
  * A drawn tree as the lines a terminal shows: each Text its lines, a Markdown
- * its text, a Button its label, a Box's margins as blank rows above and
+ * its text, a Button its label, a Client the rows it was handed, a Box's margins as blank rows above and
  * columns to the left, and a row Box its children on one line, the first and
  * last as far apart as its width holds where it spaces them between.
  */
@@ -912,6 +961,7 @@ const screenOf = (node: unknown): string[] => {
   if (type === 'Text') return textOf(node).split('\n')
   if (type === 'Markdown') return String(props.text).split('\n')
   if (type === 'Button') return [String(props.label)]
+  if (type === 'Client') return picture(props.props as Drawing)
   if (props.flexDirection === 'row') {
     const [first = '', ...after] = children.map(child => screenOf(child)[0] ?? '')
     const rest = after.join('')
@@ -923,7 +973,27 @@ const screenOf = (node: unknown): string[] => {
   return [...above, ...children.flatMap(screenOf).map(line => (line === '' ? '' : `${left}${line}`))]
 }
 
-test('a graph block in a reply is drawn in its place, in color, under the engine\'s own drawing of the text before it', async ($, on) => {
+type Reply = Awaited<ReturnType<typeof say<'terminal'>>>
+
+/** The Clients a reply block is drawn with, in order: the key of each, and the drawing its module was handed. */
+const clientsOf = async (reply: Reply): Promise<Array<{ key: string; drawing: Drawing }>> =>
+  (await reply.findAll({ type: 'Client' })).map(client => ({ key: String(client.props.key), drawing: client.props.props as Drawing }))
+
+/** Where in a drawing a click does what `is` asks for. */
+const hitOf = (drawing: Drawing, is: (hit: Hit) => boolean): Hit => {
+  const hit = drawing.hits.find(is)
+  if (hit === undefined) throw new Error('no such hit')
+  return hit
+}
+
+/** A click on a hit of the Client under `key`. */
+const press = (reply: Reply, key: string, at: Hit) => reply.pointer({ type: 'down', x: at.x, y: at.y, button: 'left', in: key })
+
+/** What the selected box shows, as the surface module under `key` drew it last: none where nothing is selected. */
+const selectedIn = async (reply: Reply, key: string): Promise<string[]> =>
+  (await reply.findAll({ in: key, type: 'Text' })).filter(text => text.props.inverse === true).map(text => text.text.trim())
+
+test('a graph block in a reply is drawn in its place, in color, under the engine\'s own drawing of the text before it, with its corner to copy it and open it by', async ($, on) => {
   replies(on)
   const reply = await say($, 'terminal', REPLY)
   expect(screenOf(await reply.drawn())).toEqual([
@@ -934,8 +1004,18 @@ test('a graph block in a reply is drawn in its place, in color, under the engine
     '',
     '  The dashed line is the retry.',
   ])
-  expect((await reply.findAll({ type: 'Text', text: /Ask for a correction/ })).map(text => text.props.color)).toContain('warning')
+  const [graph] = await clientsOf(reply)
+  expect(graph?.drawing.rows.flat().filter(span => span.text.includes('Ask for a correction')).map(span => span.paint)).toEqual(['warn'])
   expect(await reply.find({ type: 'Markdown' })).toMatchObject({ props: { text: 'The dashed line is the retry.' } })
+  await reply.unmount()
+})
+
+test('on the main screen, which reports no click, a graph in a reply is drawn still, in color, with no corner', async ($, on) => {
+  replies(on)
+  const reply = await say($, 'terminal', REPLY, {}, false)
+  expect(screenOf(await reply.drawn())).toEqual(['● Here is how a request flows:', '', ...FLOW.map(line => `  ${line}`), '', '  The dashed line is the retry.'])
+  expect(await reply.find({ type: 'Client' })).toBeUndefined()
+  expect((await reply.findAll({ type: 'Text', text: /Ask for a correction/ })).map(text => text.props.color)).toContain('warning')
   await reply.unmount()
 })
 
@@ -953,15 +1033,89 @@ test('a graph in a reply runs right where that fits the reply\'s width in half t
   await reply.unmount()
 })
 
-test('a click on copy, in the corner under a reply\'s picture, copies the picture as text, and one on html ↗ opens the graph as a web page', async ($, on) => {
+test('in a reply, nothing is selected until a box is clicked; then the arrows move the selection, return opens nothing, and no mod hears any of it, since none owns the graph', WITH_HOST, async ($, on) => {
+  world(on)
+  replies(on)
+  const reply = await say($, 'terminal', REPLY)
+  const [{ key = '', drawing = { rows: [], hits: [] } } = {}] = await clientsOf(reply)
+  expect(await selectedIn(reply, key)).toEqual([])
+  await press(reply, key, hitOf(drawing, hit => 'node' in hit && hit.node === 'Valid?'))
+  expect(await selectedIn(reply, key)).toEqual(['Valid?'])
+  await reply.key({ key: 'down', in: key })
+  await reply.key({ key: 'return', in: key })
+  await reply.key({ key: 'x', in: key })
+  expect(await selectedIn(reply, key)).toEqual(['Ask for a correction'])
+  await reply.unmount()
+  const pane = await mount($, 'free')
+  expect((await said(pane)).heard).toEqual([])
+  await pane.unmount()
+})
+
+test('in a reply, space folds a group into one box and opens it again, / finds a node by its label, and c copies the graph as it stands', async ($, on) => {
+  const seen = world(on)
+  replies(on)
+  const block = ['Client -> API', 'Backend:', '  API -> Auth', '  API -> Orders', 'Data:', '  Postgres', 'Orders -> Postgres']
+  const reply = await say($, 'terminal', ['The tiers:', '', '```graphlet', ...block, '```'].join('\n'))
+  const [{ key = '', drawing = { rows: [], hits: [] } } = {}] = await clientsOf(reply)
+  await press(reply, key, hitOf(drawing, hit => 'node' in hit && hit.node === 'Auth'))
+  await reply.key({ key: 'space', in: key })
+  expect(await selectedIn(reply, key)).toEqual(['▸ Backend'])
+  await reply.key({ key: 'c', in: key })
+  expect(seen.copied[0]?.split('\n')).toEqual([
+    '┌────────┐  ╭──────────────╮ ╭─ Data ────────╮',
+    '│ Client ├─▶│ ▸ Backend  3 ├┐│               │',
+    '└────────┘  ╰──────────────╯││  ┌──────────┐ │',
+    '                            └──▶│ Postgres │ │',
+    '                             │  └──────────┘ │',
+    '                             │               │',
+    '                             ╰───────────────╯',
+  ])
+  await reply.key({ key: 'space', in: key })
+  expect(await selectedIn(reply, key)).toEqual(['API'])
+  for (const typed of ['/', 'g', 'r', 'e']) await reply.key({ key: typed, in: key })
+  expect(await selectedIn(reply, key)).toEqual(['Postgres'])
+  expect(await rowsOf(reply, key)).toEqual([
+    '           ╭─ Backend ────────────╮',
+    '           │                      │',
+    '┌────────┐ │           ┌──────┐   │ ╭─ Data ────────╮',
+    '│ Client ├┐│         ┌▶│ Auth │   │ │               │',
+    '└────────┘││  ┌─────┐│ └──────┘   │ │  ╔══════════╗ │',
+    '          └──▶│ API ├┤            │┌──▶║ Postgres ║ │',
+    '           │  └─────┘│ ┌────────┐ │││  ╚══════════╝ │',
+    '           │         └▶│ Orders ├──┘│               │',
+    '           │           └────────┘ │ ╰───────────────╯',
+    '           │                      │',
+    '           ╰──────────────────────╯',
+    '                         /gre · 1 of 1  copy · html ↗',
+  ])
+  await reply.unmount()
+})
+
+test('in a reply, a graph too large to fold into the reply\'s width is copied whole, as a mod\'s graph is', async ($, on) => {
+  const seen = world(on)
+  replies(on)
+  const label = (layer: number, item: number): string => `layer ${layer} item ${item}`
+  const lines = Array.from({ length: 4 * 14 }, (_, at) => `${label(Math.floor(at / 14), at % 14)} -> ${label(Math.floor(at / 14) + 1, at % 14)}`)
+  const reply = await say($, 'terminal', ['```graphlet', ...lines, '```'].join('\n'))
+  const [graph] = await clientsOf(reply)
+  if (graph === undefined) throw new Error('the graph is drawn')
+  expect(picture(graph.drawing).at(-1)).toBe('                                                      50 more →  copy · html ↗')
+  await press(reply, graph.key, hitOf(graph.drawing, hit => 'copy' in hit))
+  expect(seen.copied[0]).not.toMatch(/more/)
+  expect(Array.from({ length: 5 * 14 }, (_, at) => label(Math.floor(at / 14), at % 14)).filter(one => !seen.copied[0]?.includes(one))).toEqual([])
+  await reply.unmount()
+})
+
+test('in a reply, a click on copy in the corner copies the graph as text, as it is drawn there, and one on html ↗ opens it as a web page', async ($, on) => {
   const seen = world(on)
   replies(on)
   const reply = await say($, 'terminal', `${REPLY}\n\n\`\`\`graphlet\nOne -> Two\n\`\`\``)
-  expect(await reply.findAll({ type: 'Button' })).toHaveLength(4)
-  await reply.press({ plugin: 'graphlet', key: 'copy:0' })
+  const [flow, two] = await clientsOf(reply)
+  if (flow === undefined || two === undefined) throw new Error('two graphs are drawn')
+  await press(reply, flow.key, hitOf(flow.drawing, hit => 'copy' in hit))
   expect(seen.copied).toEqual([FLOW.join('\n')])
   expect(seen.toasts).toEqual(['graphlet: copied the graph as text.'])
-  await reply.press({ plugin: 'graphlet', key: 'page:1' })
+  await press(reply, two.key, hitOf(two.drawing, hit => 'page' in hit))
   expect(seen.written.map(file => file.path)).toEqual([expect.stringMatching(/^\/var\/tmp\/graphlet-reply-[A-Za-z0-9]*-1\.html$/)])
   expect(seen.written[0]?.text).toContain('<title>reply</title>')
   expect(seen.written[0]?.text).toContain('>One</tspan>')
@@ -1000,15 +1154,22 @@ test('on every other surface, a graph block becomes its picture as plain text, f
   }
 })
 
-test('a graph in a reply keeps its links separate whatever the setting, since nothing in a reply can be selected to tell merged links apart', { options: { links: 'merged' } }, async ($, on) => {
+test('a graph in a reply draws its links as the setting says where it can be clicked, to tell merged links apart, and keeps them separate where it is still: on the main screen and every other surface', { options: { links: 'merged' } }, async ($, on) => {
   replies(on)
   const block = ['A -> C', 'B -> C', 'B -> D']
   const graph = readGraph(graphLines(block))
-  const drawnAs = (links: 'separate' | 'merged'): string[] => picture(pictureOf(viewOf({ ...LOOK, links }, true), graph, { columns: 78, rows: 1000 }))
+  const drawnAs = (links: 'separate' | 'merged'): string[] => picture(pictureOf(viewOf({ ...LOOK, links }, true, false), graph, { columns: 78, rows: 1000 }))
   expect(drawnAs('separate')).not.toEqual(drawnAs('merged'))
-  const reply = await say($, 'desktop', ['```graphlet', ...block, '```'].join('\n'))
-  expect(screenOf(await reply.drawn())).toEqual(['● ```text', ...drawnAs('separate'), '```'])
-  await reply.unmount()
+  const text = ['```graphlet', ...block, '```'].join('\n')
+  const clicked = await say($, 'terminal', text)
+  expect(graphRows((await clientsOf(clicked))[0]?.drawing ?? { rows: [], hits: [] })).toEqual(drawnAs('merged'))
+  await clicked.unmount()
+  const still = await say($, 'terminal', text, {}, false)
+  expect(screenOf(await still.drawn())).toEqual(['', ...drawnAs('separate').map(line => `  ${line}`)])
+  await still.unmount()
+  const desktop = await say($, 'desktop', text)
+  expect(screenOf(await desktop.drawn())).toEqual(['● ```text', ...drawnAs('separate'), '```'])
+  await desktop.unmount()
 })
 
 test('the model is told of graph blocks wherever the session draws, and not in a run that draws nowhere', async ($, on) => {

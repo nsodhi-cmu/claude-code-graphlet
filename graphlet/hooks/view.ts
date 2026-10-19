@@ -153,9 +153,10 @@ export type View = {
  * finds better. A view keeps the layouts it last made, each by what its
  * graph holds, which way it runs, and the columns of its room, and its rows
  * too for one that runs right, and hands the same one back for the same
- * graph in such a room.
+ * graph in such a room. Its drawings have a corner to copy and open the graph
+ * by where it `hasCorner`, as a drawing to click has.
  */
-export function viewOf(look: Look, fold = false): View {
+export function viewOf(look: Look, fold = false, hasCorner = true): View {
   const kept = new Map<string, Layout>()
   const laidAs = (graph: Graph, room: Room, direction: Direction): Layout => {
     const key = `${direction} ${room.columns} ${direction === 'right' ? room.rows : ''} ${JSON.stringify(graph)}`
@@ -183,7 +184,7 @@ export function viewOf(look: Look, fold = false): View {
         : Math.max(layout.columns, ...layout.shelves.map(shelf => shelf.across))
       return { columns: across, rows: layout.shelves.length === 0 ? 0 : layout.rows + 1 }
     },
-    draw: (graph, selected, room, pan, finding) => paint(laid(graph, room), graph, selected, room, pan, finding, look.motion === 'flowing'),
+    draw: (graph, selected, room, pan, finding) => paint(laid(graph, room), graph, selected, room, pan, finding, look.motion === 'flowing', hasCorner),
     show: (graph, selected, room, from) => showIn(laid(graph, room), selected, room, from),
     scroll: (graph, room, from, by) => scrollIn(laid(graph, room), room, from, by),
     step: (graph, selected, move, room, pan) => stepIn(laid(graph, room), graph, selected, move, room, pan),
