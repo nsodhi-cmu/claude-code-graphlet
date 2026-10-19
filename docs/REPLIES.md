@@ -34,7 +34,7 @@ Ask for a correction -> Read the request
 - A tone in brackets at the end of a label is its node's: `[plain]`, `[dim]`, `[note]`, `[good]`, `[warn]`, or `[bad]`, in any case. The first tone given for a node holds. Brackets that name no tone are part of the label.
 - A label in bold, as Markdown writes it, `**Valid?**`, gives its node a priority of 1, so that a graph with a bold label and a label not bold draws the bold one heavy, as [DRAWING.md](DRAWING.md#reading-the-picture) tells. Its asterisks are not part of the label, so the same label bold and not is the same node, and its tone may stand inside the bold or after it. A label with an asterisk between the two pairs is not bold.
 - A label left blank, by an arrow at the start or the end of a line or a tone written alone, is passed over.
-- A line that is a name and a colon alone, `Backend:`, with the next line indented under it, opens a group named so, and the lines indented under it are in it, up to a line indented no more than it; with nothing indented under it, it names a node, colon and all, as ever. A node is in the first group it is named under, wherever else it is named, so links between groups may be written on lines of their own. A group's id is its name after `group:`, so that no node's label is one. A line with no link on it that opens a group as Mermaid writes it, `subgraph Backend`, `subgraph "Back end"`, or `subgraph api["API tier"]`, opens a group too, named by what it shows, for the lines up to a line `end`. A group in a group is not drawn inside it: a node is in the innermost group it is named under. Blank lines are passed over.
+- A line that is a name and a colon alone, `Backend:`, with the next line indented under it, opens a group named so, and the lines indented under it are in it, up to a line indented no more than it; with nothing indented under it, it names a node, colon and all, as any line with no link does. A node is in the first group it is named under, wherever else it is named, so links between groups may be written on lines of their own. A group's id is its name after `group:`, so that no node's label is one. A line with no link on it that opens a group as Mermaid writes it, `subgraph Backend`, `subgraph "Back end"`, or `subgraph api["API tier"]`, opens a group too, named by what it shows, for the lines up to a line `end`. A group in a group is not drawn inside it: a node is in the innermost group it is named under. Blank lines are passed over.
 
 ```graphlet
 Client -> API
@@ -89,6 +89,7 @@ A reply that opens with a graph has no text before it for the engine to draw, an
    ┌──────┐
    │ Done │
    └──────┘
+                          copy · html ↗
 
   The dashed line is the retry.
 ```
@@ -107,7 +108,15 @@ A reply that opens with a graph has no text before it for the engine to draw, an
 
 ## On Other Surfaces
 
-On the desktop app, the VS Code extension, and the mobile app, graphlet draws no picture of its own. The hook rewrites the block's `text` instead: each graph block becomes its picture as plain text, in a fenced code block marked `text`, and the engine draws the reply as it draws any other. The picture is made as on the terminal, to the width the surface measured, and has no color. `fencedOf` fences it with more backticks than any run of them inside it, so that no label closes the fence early.
+On the desktop app, the VS Code extension, and the mobile app, graphlet draws no picture of its own. The hook rewrites the block's `text` instead: each graph block becomes its picture as plain text, in a fenced code block marked `text`, and the engine draws the reply as it draws any other. The picture is made as on the terminal, to the width the surface measured, and has no color. `fencedOf` fences it with more backticks than any run of them inside it, so that no label closes the fence early. A block `lint -> test -> build -> deploy` reaches the engine there as:
+
+````
+```text
+┌──────┐  ┌──────┐  ┌───────┐  ┌────────┐
+│ lint ├─▶│ test ├─▶│ build ├─▶│ deploy │
+└──────┘  └──────┘  └───────┘  └────────┘
+```
+````
 
 ## Why A Block, And Not A Tool
 

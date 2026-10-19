@@ -47,7 +47,7 @@ A graph drawn still, in a reply, cannot scroll, so its layers are folded into th
 - The node given up first is the one whose links to the nodes above would add fewest lanes past the layer, as `folded` reckons it: one where more than one of its links reach nodes above, which may share a lane; where one does, none if a link of the node it reaches already passes the layer, else one. Then the one with the fewest links to nodes above it; then one that takes no node down with it; and of those, the one the graph names last, so a folded layer keeps the nodes named first, in a row in the order they were named. Since a node's links share their lanes, the children of one node folded onto rows of their own are reached down one lane.
 - A node with a link that runs one way to a node of its own layer stays, so that no link turns back up for the fold.
 
-Each layer under a fold is then folded in turn. A node with many lanes past it, or a layer whose every node links within it, may still be wider than the room, and so may a box widened for its ports, which the fold cannot know of; `layoutOf` then folds again into the room less what it overflowed by, as long as that makes it narrower. A picture still too wide keeps the count of what is past its edge, as a pane's does. A graph of more than `FOLDED_NODES` nodes or `FOLDED_LINKS` links is not folded at all, since folding it would take long.
+Each layer under a fold is then folded in turn. A node with many lanes past it, or a layer whose every node links within it, may still be wider than the room, and so may a box widened for its ports, which the fold cannot know of; `layoutOf` then folds again into the room less what it overflowed by, up to `REFOLDS` times, as long as that makes it narrower. A picture still too wide keeps the count of what is past its edge, as a pane's does. A graph of more than `FOLDED_NODES` nodes or `FOLDED_LINKS` links is not folded at all, since folding it would take long.
 
 ## Stretches And Lanes
 
@@ -57,7 +57,7 @@ A link between two nodes of one layer is no stretch. Those are kept apart, by la
 
 ## The Order Within A Layer
 
-A layer starts in the order the graph names its nodes in, with its lanes after them. While any two stretches cross, the layers are ordered against their neighbors: on the way down each layer by the layer above it, and on the way back up each by the layer below, a slot going to the middle of the places of what it is joined to there. That is done a few times over, and the ordering whose stretches cross least is the one kept.
+A layer starts in the order the graph names its nodes in, with its lanes after them. While any two stretches cross, the layers are ordered against their neighbors: on the way down each layer by the layer above it, and on the way back up each by the layer below, a slot going to the middle of the places of what it is joined to there. That is done `SWEEPS` times over, or until nothing crosses, and the ordering whose stretches cross least is the one kept, its crossings counted by `crossingsOf` as Barth, Jünger and Mutzel count them.
 
 With nothing crossing, nothing is reordered, so the nodes of a layer stay in the order the graph names them in, but for keeping each group's together. The order never depends on what is selected or where the window stands.
 

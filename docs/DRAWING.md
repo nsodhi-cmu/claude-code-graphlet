@@ -30,21 +30,22 @@ A drawing is rows of painted text, and the rectangles of them that answer a clic
 - A box with a heavy frame, `┏━┓`, and a bold label is a node the graph puts foremost: one of the highest priority its nodes have, where that is above 0 and above another node's.
 - A frame with round corners, `╭─ Backend ─╮`, holds the nodes of a group, and nothing else. A line that crosses its border is a link into the group or out of it, and passes over the border, which is broken there.
 - A box with round corners that says `▸` and a count, `▸ Backend  3`, is a collapsed group, standing for all its nodes: its links are theirs. Selected, it has a double frame, as any box does.
+- A box with a double frame, `╔═╗`, is the selected node's, and its links, their labels, and the boxes they reach are lit, as [What Is Selected](#what-is-selected) tells.
 
 An undirected graph is drawn the same way, with no arrowheads and no flow, and in a graph with links of both kinds, each is drawn as its kind is:
 
 ```
-                 ┌─────┐
-                 │  A  │
-                 └──┬──┘
-               ┌────┴───┐
-            ┌──┴──┐  ┌──┴──┐
-            │  B  │  │  C  │
-            └──┬──┘  └─┬─┬─┘
-               └───────┘ │
-                     ┌───┴──┐
-                     │ D  ↺ │
-                     └──────┘
+                ┌─────┐
+                │  A  │
+                └──┬──┘
+              ┌────┴───┐
+           ┌──┴──┐  ┌──┴──┐
+           │  B  │  │  C  │
+           └──┬──┘  └─┬─┬─┘
+              └───────┘ │
+                    ┌───┴──┐
+                    │ D  ↺ │
+                    └──────┘
 ```
 
 - A link meets both its boxes at ticks, and every line is solid.
@@ -54,25 +55,26 @@ An undirected graph is drawn the same way, with no arrowheads and no flow, and i
 A link's label is written beside its line, just past the box it leaves, in the paint of a label and lit with its link:
 
 ```
-                 ┌──────┐
-                 │ Read │
-                 └──┬───┘
-                    │ ▲
-                    │ └┈┈┈┈┐
-                    ▼      ┊
-               ┌────────┐  ┊
-               │ Valid? │  ┊
-               └┬────┬──┘  ┊
-                │yes │no   ┊
-                └┐   └───┐ ┊
-                 ▼       ▼ ┊retry
-             ┌──────┐  ┌───┴───────┐
-             │ Save │  │ Ask again │
-             └──────┘  └───────────┘
+             ┌──────┐
+             │ Read │
+             └──┬───┘
+                │ ▲
+                │ └┈┈┈┈┐
+                ▼      ┊
+           ┌────────┐  ┊
+           │ Valid? │  ┊
+           └┬────┬──┘  ┊
+            │yes │no   ┊
+            │    └──┐ ┌┘
+            ▼       ▼ ┊retry
+        ┌──────┐  ┌───┴───────┐
+        │ Save │  │ Ask again │
+        └──────┘  └───────────┘
 ```
 
 - The words beside a line where it leaves a box are the label of every link of that line, since links with different labels never share one.
 - A link down the drawing has its label under the box it leaves; a link back up, over the box it leaves, beside the dashed line.
+- A line in color is a link in a tone, and the same holds of it: links of different tones never share a line.
 
 ### Groups
 
@@ -103,6 +105,34 @@ A link's label is written beside its line, just past the box it leaves, in the p
            ╰─────────────────────────╯
 ```
 
+In a pane, the same graph with its `Data` group collapsed and `API` selected, in a room 44 columns wide, with the foot under it:
+
+```
+                 ┌─────────┐
+                 │ Browser │
+                 └────┬────┘
+                      │
+          ╭─ Backend ─│──────────╮
+          │           ▼          │
+          │        ╔═════╗       │
+          │        ║ API ║       │
+          │        ╚══╤══╝       │
+          │     ┌─────┴────┐     │
+          │     ▼          ▼     │
+          │ ┌──────┐  ┌────────┐ │
+          │ │ Auth │  │ Orders │ │
+          │ └───┬──┘  └────┬───┘ │
+          ╰─────│──────────│─────╯
+                └─────┬────┘
+                      ▼
+                ╭───────────╮
+                │ ▸ Data  2 │
+                ╰───────────╯
+                                      html ↗
+```
+
+The links of `Auth` and `Orders` to the nodes of `Data` are links to its box, and since both reach the very same box, they share one arrowhead.
+
 ### A Graph That Runs Right
 
 A graph that runs right has its layers side by side, each a column of boxes, and its links run across the room:
@@ -123,7 +153,7 @@ A graph that runs right has its layers side by side, each a column of boxes, and
 - A link's label is written on its line, just past the box it leaves.
 - A box is as tall as its ports down its side need, its label in its middle.
 
-`paint` works the picture out across and along the window, as the layout is laid out, and turns it where it writes it: a line's ways, its arrowheads, and the ticks of a box's frame are turned, `turnedOf`, while a box is drawn where it stands and its words, and a label, are written across the room as ever.
+`paint` works the picture out across and along the window, as the layout is laid out, and turns it where it writes it: a line's ways, its arrowheads, and the ticks of a box's frame are turned, `turnedOf`, while a box is drawn where it stands and its words, and a label, are written across the room, as in a graph that runs down.
 
 ## What Is Selected
 
