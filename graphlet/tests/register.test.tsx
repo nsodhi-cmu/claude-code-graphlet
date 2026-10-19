@@ -50,25 +50,25 @@ const HOST: Plugin = {
     const heard: string[] = []
 
     on('graphlet.select', async ($, e, next) => {
-      heard.push(`select ${e.pane} ${e.node}`)
+      heard.push(`select ${e.site} ${e.node}`)
       return next(e)
     })
     on('graphlet.open', async ($, e, next) => {
-      heard.push(`open ${e.pane} ${e.node}`)
+      heard.push(`open ${e.site} ${e.node}`)
       return next(e)
     })
     on('graphlet.key', async ($, e, next) => {
-      heard.push(`key ${e.pane} ${e.key} ${e.selected}`)
+      heard.push(`key ${e.site} ${e.key} ${e.selected}`)
       return next(e)
     })
     on('graphlet.collapse', async ($, e, next) => {
-      heard.push(`collapse ${e.pane} ${e.group} ${e.isCollapsed}`)
+      heard.push(`collapse ${e.site} ${e.group} ${e.isCollapsed}`)
       return next(e)
     })
     on('ui.press', { plugin: 'host' }, async ($, e) => {
-      if (e.element === 'wheel') await $.graphlet.scroll({ pane: e.requestId, by: 1 })
-      if (e.element === 'drift') await $.graphlet.scroll({ pane: e.requestId, by: Number.NaN })
-      if (e.element === 'right') heard.push(`step ${await $.graphlet.step({ pane: e.requestId, move: 'right' })}`)
+      if (e.element === 'wheel') await $.graphlet.scroll({ site: e.requestId, by: 1 })
+      if (e.element === 'drift') await $.graphlet.scroll({ site: e.requestId, by: Number.NaN })
+      if (e.element === 'right') heard.push(`step ${await $.graphlet.step({ site: e.requestId, move: 'right' })}`)
       $.ui.invalidate('ui.render')
       return { element: e.element }
     })
@@ -81,7 +81,7 @@ const HOST: Plugin = {
       links: Array.from({ length: 180 }, (_, index) => ({ from: `d${index < 30 ? 0 : (index * 7) % 60}`, to: `d${(index * 13 + 5) % 60}` })),
     }
     on('ui.render', { component: 'Pane', requestId: 'dense' }, async ($, e, next) => {
-      await $.graphlet.show({ pane: 'dense', graph: DENSE, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
+      await $.graphlet.show({ site: 'dense', graph: DENSE, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
       return next(e)
     })
     const RANKED = {
@@ -99,7 +99,7 @@ const HOST: Plugin = {
     }
     on('ui.render', { component: 'Pane', requestId: 'ranked' }, async ($, e, next) => {
       const { Box, Text } = $.ui.resolve(e)
-      const shown = await $.graphlet.show({ pane: 'ranked', graph: RANKED, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
+      const shown = await $.graphlet.show({ site: 'ranked', graph: RANKED, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
       const drawing = await next(e)
       return (
         <Box flexDirection="column">
@@ -125,7 +125,7 @@ const HOST: Plugin = {
     }
     on('ui.render', { component: 'Pane', requestId: 'grouped' }, async ($, e, next) => {
       const { Box, Text } = $.ui.resolve(e)
-      const shown = await $.graphlet.show({ pane: 'grouped', graph: GROUPED, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
+      const shown = await $.graphlet.show({ site: 'grouped', graph: GROUPED, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
       const drawing = await next(e)
       return (
         <Box flexDirection="column">
@@ -135,7 +135,7 @@ const HOST: Plugin = {
       )
     })
     on('ui.render', { component: 'Pane', requestId: 'big' }, async ($, e, next) => {
-      await $.graphlet.show({ pane: 'big', graph: HUB, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
+      await $.graphlet.show({ site: 'big', graph: HUB, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
       return next(e)
     })
     on('ui.render', { component: 'Pane' }, async ($, e, next) => {
@@ -144,7 +144,7 @@ const HOST: Plugin = {
       const columns = e.props.bodyColumns
       const size = await $.graphlet.measure({ graph: GRAPH, columns })
       const shown = await $.graphlet.show({
-        pane: e.requestId,
+        site: e.requestId,
         graph: GRAPH,
         columns,
         rows: e.props.scroll.bodyRows,
@@ -705,7 +705,7 @@ const RING_HOST: Plugin = {
       isDirected: false,
     }
     on('ui.render', { component: 'Pane', requestId: 'ring' }, async ($, e, next) => {
-      await $.graphlet.show({ pane: 'ring', graph: RING, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
+      await $.graphlet.show({ site: 'ring', graph: RING, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
       return next(e)
     })
   },

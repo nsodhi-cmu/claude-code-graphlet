@@ -46,7 +46,7 @@ export type GraphletGroup = {
   tone?: GraphletTone
   /**
    * Whether the group is drawn collapsed, as one box that stands for all it
-   * holds, until the person or the mod opens it in a pane with `collapse`.
+   * holds, until the person or the mod opens it in a site with `collapse`.
    * Left out, it is drawn open, in its frame.
    */
   isCollapsed?: boolean
@@ -104,10 +104,10 @@ export type GraphletMove = 'left' | 'right' | 'up' | 'down'
 /** A size in a surface's cells. */
 export type GraphletSize = { columns: number; rows: number }
 
-/** What a pane is to hold. */
+/** What a site is to hold. */
 export type GraphletShow = {
-  /** The pane the graph is drawn in: the id it was opened with. */
-  pane: string
+  /** The site the graph is drawn in, by the id its owner's `ui.render` hook sees as `e.requestId`: a pane's id, the one it was opened with. */
+  site: string
   graph: GraphletGraph
   /** The room the drawing may take, in cells. */
   columns: number
@@ -120,7 +120,7 @@ export type GraphletShow = {
   selected?: string
 }
 
-/** What was drawn for a pane. */
+/** What was drawn for a site. */
 export type GraphletShown = {
   /** The rows the drawing takes, never more than it was given. */
   rows: number
@@ -129,7 +129,7 @@ export type GraphletShown = {
 }
 
 /** How far to scroll a graph: by cells, or by turns of the wheel. */
-export type GraphletScroll = { pane: string; by: number | { x: number; y: number } }
+export type GraphletScroll = { site: string; by: number | { x: number; y: number } }
 
 /**
  * What graphlet adds to `$`. A mod that lists graphlet under `dependencies`
@@ -146,23 +146,23 @@ export type Graphlet = {
    */
   measure(input: { graph: GraphletGraph; columns: number }): Promise<GraphletSize>
   /**
-   * Says what a pane holds. The pane's own `ui.render` hook calls this and
+   * Says what a site holds. The site's own `ui.render` hook calls this and
    * then `next(e)`, which resolves to the drawing, for it to place among its
    * own elements.
    */
   show(input: GraphletShow): Promise<GraphletShown>
-  /** The node a move from the selected one lands on in the graph a pane holds; null when the pane holds none. */
-  step(input: { pane: string; move: GraphletMove }): Promise<string | null>
-  /** Scrolls the graph a pane holds. A turn of the wheel reaches the pane, whose owner passes it on. */
+  /** The node a move from the selected one lands on in the graph a site holds; null when the site holds none. */
+  step(input: { site: string; move: GraphletMove }): Promise<string | null>
+  /** Scrolls the graph a site holds. A turn of the wheel reaches the site, whose owner passes it on. */
   scroll(input: GraphletScroll): Promise<void>
   /**
    * Selects a node, or the box of a collapsed group, by its id. Graphlet
    * calls this itself when the person clicks a node or moves with the arrow
    * keys, so a hook on `graphlet.select` hears it. A
-   * pane whose owner gives `show` no `selected` draws the node this was last
+   * site whose owner gives `show` no `selected` draws the node this was last
    * called with.
    */
-  select(input: { pane: string; node: string }): Promise<void>
+  select(input: { site: string; node: string }): Promise<void>
   /**
    * Does nothing. Graphlet calls it when the person opens a node, by return
    * on the selected one or a double click on its box, for a hook on
@@ -170,20 +170,20 @@ export type Graphlet = {
    * going to the file a node stands for. Those on the box of a collapsed
    * group open the group instead, with `collapse`.
    */
-  open(input: { pane: string; node: string }): Promise<void>
+  open(input: { site: string; node: string }): Promise<void>
   /**
-   * Collapses a group of the graph a pane holds into one box, or opens it
+   * Collapses a group of the graph a site holds into one box, or opens it
    * again. Graphlet calls this itself when the person does either, so a hook
-   * on `graphlet.collapse` hears it. A pane draws a group as this was last
+   * on `graphlet.collapse` hears it. A site draws a group as this was last
    * called for it there, and else as the group's `isCollapsed` says.
    */
-  collapse(input: { pane: string; group: string; isCollapsed: boolean }): Promise<void>
+  collapse(input: { site: string; group: string; isCollapsed: boolean }): Promise<void>
   /**
    * Does nothing. Graphlet calls it with each key pressed over a graph that
    * it has no use for itself, and the node selected as it was pressed, for a
    * hook on `graphlet.key` to answer.
    */
-  key(input: { pane: string; key: string; selected: string | null }): Promise<void>
+  key(input: { site: string; key: string; selected: string | null }): Promise<void>
 }
 
 declare module 'claude-code' {

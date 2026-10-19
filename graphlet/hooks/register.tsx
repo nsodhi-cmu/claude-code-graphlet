@@ -11,7 +11,7 @@ import { GUIDE, fencedOf, partsOf, pictureOf, stillOf } from './reply'
 import { MOVES, collapsedOf, focusOf, leadOf, viewOf } from './view'
 
 /**
- * What a pane holds, as it was last drawn: the graph it was given, that
+ * What a site holds, as it was last drawn: the graph it was given, that
  * graph with its groups collapsed as they are there, the graph as drawn, in
  * focus or not, the room, the selected node, and where its window stood.
  */
@@ -20,21 +20,21 @@ type Held = { given: Graph; whole: Graph; graph: Graph; room: Room; selected: st
 const ORIGIN: Pan = { x: 0, y: 0 }
 
 const held = new Map<string, Held>()
-/** The node the person last picked in each pane. */
+/** The node the person last picked in each site. */
 const picked = new Map<string, string>()
-/** Where the person scrolled each pane's window to. A pane is missing while its window follows the selection. */
+/** Where the person scrolled each site's window to. A site is missing while its window follows the selection. */
 const scrolled = new Map<string, Pan>()
 /** The graphs of each reply block drawn lately, in order, by the block's request, and the room they were drawn in: what a click on the corner of one of their pictures copies or opens. */
 const replied = new Map<string, { graphs: Graph[]; room: Room }>()
 /** How many reply blocks' graphs are kept for their corners, those drawn last: a block is drawn again as it comes back into view. */
 const KEPT_REPLIES = 64
-/** Whether each group of each pane's graph is collapsed, as `collapse` was last called for it there. */
+/** Whether each group of each site's graph is collapsed, as `collapse` was last called for it there. */
 const shutIn = new Map<string, Map<string, boolean>>()
-/** The panes whose graph is drawn in focus on the selected node. */
+/** The sites whose graph is drawn in focus on the selected node. */
 const focused = new Set<string>()
-/** What the person is typing to find, in each pane where they are finding a node. */
+/** What the person is typing to find, in each site where they are finding a node. */
 const finding = new Map<string, string>()
-/** How far the person has dragged each pane's graph since the button went down, as far as it has scrolled the graph for, and in which drag. */
+/** How far the person has dragged each site's graph since the button went down, as far as it has scrolled the graph for, and in which drag. */
 const dragged = new Map<string, { grab: unknown; at: Pan }>()
 
 /** The nodes whose labels hold what is being found, in the graph's order: none while nothing is typed. */
@@ -128,42 +128,42 @@ export const register: Register = (on, options) => {
       show: async input => {
         const given = readGraph(input.graph)
         const room = { columns: cellsOf(input.columns), rows: cellsOf(input.rows) }
-        const shut = new Set(given.groups.filter(group => shutIn.get(input.pane)?.get(group.id) ?? group.isCollapsed === true).map(group => group.id))
+        const shut = new Set(given.groups.filter(group => shutIn.get(input.site)?.get(group.id) ?? group.isCollapsed === true).map(group => group.id))
         const graph = collapsedOf(given, shut)
-        const wanted = input.selected ?? picked.get(input.pane)
+        const wanted = input.selected ?? picked.get(input.site)
         const group = given.nodes.find(node => node.id === wanted)?.group
         const standing = group !== undefined && shut.has(group) ? group : wanted
         const selected = graph.nodes.find(node => node.id === standing)?.id ?? leadOf(graph)
-        const before = held.get(input.pane)
-        if (before?.selected !== selected) scrolled.delete(input.pane)
-        const drawn = focused.has(input.pane) ? focusOf(graph, selected) : graph
-        const query = finding.get(input.pane)
+        const before = held.get(input.site)
+        if (before?.selected !== selected) scrolled.delete(input.site)
+        const drawn = focused.has(input.site) ? focusOf(graph, selected) : graph
+        const query = finding.get(input.site)
         const found = query === undefined ? undefined : { query, found: foundIn(given, query).map(id => graph.nodes.find(node => node.id === id)?.id ?? given.nodes.find(node => node.id === id)?.group ?? id) }
-        const pan = scrolled.get(input.pane) ?? view.show(drawn, selected, room, before?.pan ?? ORIGIN)
+        const pan = scrolled.get(input.site) ?? view.show(drawn, selected, room, before?.pan ?? ORIGIN)
         const drawing = view.draw(drawn, selected, room, pan, found)
-        held.set(input.pane, { given, whole: graph, graph: drawn, room, selected, pan, drawing })
+        held.set(input.site, { given, whole: graph, graph: drawn, room, selected, pan, drawing })
         return { rows: drawing.rows.length, selected }
       },
       step: async input => {
-        const at = held.get(input.pane)
+        const at = held.get(input.site)
         return at === undefined ? null : view.step(at.graph, at.selected, input.move, at.room, at.pan)
       },
       scroll: async input => {
-        const at = held.get(input.pane)
+        const at = held.get(input.site)
         if (at === undefined || (typeof input.by === 'number' ? !Number.isFinite(input.by) : !isPan(input.by))) return
-        scrolled.set(input.pane, view.scroll(at.graph, at.room, scrolled.get(input.pane) ?? at.pan, input.by))
+        scrolled.set(input.site, view.scroll(at.graph, at.room, scrolled.get(input.site) ?? at.pan, input.by))
         built.ui.invalidate('ui.render')
       },
       select: async input => {
-        picked.set(input.pane, input.node)
+        picked.set(input.site, input.node)
         built.ui.invalidate('ui.render')
       },
       open: async () => undefined,
       collapse: async input => {
-        shutIn.set(input.pane, new Map(shutIn.get(input.pane)).set(input.group, input.isCollapsed === true))
-        const first = held.get(input.pane)?.given.nodes.find(node => node.group === input.group)
-        if (input.isCollapsed !== true && picked.get(input.pane) === input.group && first !== undefined) picked.set(input.pane, first.id)
-        scrolled.delete(input.pane)
+        shutIn.set(input.site, new Map(shutIn.get(input.site)).set(input.group, input.isCollapsed === true))
+        const first = held.get(input.site)?.given.nodes.find(node => node.group === input.group)
+        if (input.isCollapsed !== true && picked.get(input.site) === input.group && first !== undefined) picked.set(input.site, first.id)
+        scrolled.delete(input.site)
         built.ui.invalidate('ui.render')
       },
       key: async () => undefined,
@@ -252,7 +252,7 @@ export const register: Register = (on, options) => {
   on('ui.message', async ($, e, next) => {
     const at = held.get(e.requestId)
     if (at === undefined || typeof e.data !== 'object' || e.data === null) return next(e)
-    const pane = e.requestId
+    const site = e.requestId
     const { node, isOpened, group, by, drag, grab, isDropped, key, page, isChord } = e.data as {
       node?: unknown
       isOpened?: unknown
@@ -265,50 +265,50 @@ export const register: Register = (on, options) => {
       page?: unknown
       isChord?: unknown
     }
-    const query = finding.get(pane)
+    const query = finding.get(site)
     const typed = key === 'space' ? ' ' : typeof key === 'string' && isChord !== true && charactersOf(key).length === 1 ? key : undefined
     /** Whether a node of the graph as drawn is the box of a collapsed group. */
     const isShut = (id: string): boolean => at.whole.nodes.some(one => one.id === id && one.holds !== undefined)
     /** Opens a collapsed group, and where its box was selected, selects the first node it holds. */
     const expand = async (group: string): Promise<void> => {
-      await $.graphlet.collapse({ pane, group, isCollapsed: false })
+      await $.graphlet.collapse({ site, group, isCollapsed: false })
       const first = at.given.nodes.find(one => one.group === group)
-      if (at.selected === group && first !== undefined) await $.graphlet.select({ pane, node: first.id })
+      if (at.selected === group && first !== undefined) await $.graphlet.select({ site, node: first.id })
     }
     /** Opens a node: a collapsed group's box by opening the group, and any other by `open`. */
-    const open = async (id: string): Promise<void> => (isShut(id) ? expand(id) : $.graphlet.open({ pane, node: id }))
-    /** Selects a node, opening the collapsed group it is in, where it is one and not the selected one already, and draws the pane again either way. */
+    const open = async (id: string): Promise<void> => (isShut(id) ? expand(id) : $.graphlet.open({ site, node: id }))
+    /** Selects a node, opening the collapsed group it is in, where it is one and not the selected one already, and draws the site again either way. */
     const pick = async (to: string | undefined): Promise<void> => {
       const shut = at.given.nodes.find(one => one.id === to)?.group
-      if (shut !== undefined && isShut(shut)) await $.graphlet.collapse({ pane, group: shut, isCollapsed: false })
-      if (to !== undefined && to !== at.selected) await $.graphlet.select({ pane, node: to })
+      if (shut !== undefined && isShut(shut)) await $.graphlet.collapse({ site, group: shut, isCollapsed: false })
+      if (to !== undefined && to !== at.selected) await $.graphlet.select({ site, node: to })
       else $.ui.invalidate('ui.render')
     }
     if (isChord === true) {
       return {}
     } else if (typeof node === 'string') {
-      finding.delete(pane)
-      if (node !== at.selected) await $.graphlet.select({ pane, node })
+      finding.delete(site)
+      if (node !== at.selected) await $.graphlet.select({ site, node })
       else $.ui.invalidate('ui.render')
       if (isOpened === true) await open(node)
     } else if (typeof group === 'string') {
-      await $.graphlet.collapse({ pane, group, isCollapsed: true })
+      await $.graphlet.collapse({ site, group, isCollapsed: true })
     } else if (isPan(by)) {
-      await $.graphlet.scroll({ pane, by })
+      await $.graphlet.scroll({ site, by })
     } else if (isPan(drag)) {
-      const last = dragged.get(pane)
+      const last = dragged.get(site)
       const before = last !== undefined && last.grab === grab ? last.at : ORIGIN
-      if (isDropped === true) dragged.delete(pane)
-      else dragged.set(pane, { grab, at: drag })
-      if (before.x !== drag.x || before.y !== drag.y) await $.graphlet.scroll({ pane, by: { x: before.x - drag.x, y: before.y - drag.y } })
+      if (isDropped === true) dragged.delete(site)
+      else dragged.set(site, { grab, at: drag })
+      if (before.x !== drag.x || before.y !== drag.y) await $.graphlet.scroll({ site, by: { x: before.x - drag.x, y: before.y - drag.y } })
     } else if (page === true) {
-      await openPage($, pane, pane, at.whole, view.direction(at.whole, at.room))
+      await openPage($, site, site, at.whole, view.direction(at.whole, at.room))
     } else if (query !== undefined && key === 'backspace' && query === '') {
-      finding.delete(pane)
+      finding.delete(site)
       $.ui.invalidate('ui.render')
     } else if (query !== undefined && (typed !== undefined || key === 'backspace')) {
       const asked = typed === undefined ? charactersOf(query).slice(0, -1).join('') : `${query}${typed}`
-      finding.set(pane, asked)
+      finding.set(site, asked)
       await pick(foundIn(at.given, asked)[0])
     } else if (query !== undefined && key === 'return') {
       const found = foundIn(at.given, query)
@@ -318,22 +318,22 @@ export const register: Register = (on, options) => {
     } else if (key === 'space' && at.selected !== null && isShut(at.selected)) {
       await expand(at.selected)
     } else if (key === 'space' && at.selected !== null && at.given.nodes.some(one => one.id === at.selected && one.group !== undefined)) {
-      await $.graphlet.collapse({ pane, group: at.given.nodes.find(one => one.id === at.selected)?.group ?? '', isCollapsed: true })
+      await $.graphlet.collapse({ site, group: at.given.nodes.find(one => one.id === at.selected)?.group ?? '', isCollapsed: true })
     } else if (key === '/') {
-      finding.set(pane, '')
+      finding.set(site, '')
       $.ui.invalidate('ui.render')
     } else if (key === 'c') {
       await copyGraph($, { ...at.whole, direction: view.direction(at.whole, at.room) }, { columns: MOST_CELLS, rows: MOST_CELLS }, e.surface)
     } else if (key === 'f') {
-      if (focused.has(pane)) focused.delete(pane)
-      else focused.add(pane)
-      scrolled.delete(pane)
+      if (focused.has(site)) focused.delete(site)
+      else focused.add(site)
+      scrolled.delete(site)
       $.ui.invalidate('ui.render')
     } else if (typeof key === 'string') {
       const move = MOVES[key]
       const to = move === undefined ? null : view.step(at.graph, at.selected, move, at.room, at.pan)
-      if (move === undefined) await $.graphlet.key({ pane, key, selected: at.selected })
-      else if (to !== null && to !== at.selected) await $.graphlet.select({ pane, node: to })
+      if (move === undefined) await $.graphlet.key({ site, key, selected: at.selected })
+      else if (to !== null && to !== at.selected) await $.graphlet.select({ site, node: to })
     }
     return {}
   })

@@ -50,7 +50,7 @@ A group may be collapsed: drawn as one box with round corners, doubled where it 
 
 ## Showing A Graph
 
-A pane belongs to the mod that opened it, and so does its `ui.render` hook. That hook says what the pane holds, and then calls `next(e)`, which resolves to graphlet's drawing, for the mod to place among its own elements:
+graphlet calls the place a graph is drawn its site, and knows it by the id its owner's `ui.render` hook sees as `e.requestId`: for a pane, the id the pane was opened with. A pane belongs to the mod that opened it, and so does its `ui.render` hook. That hook says what the pane holds, and then calls `next(e)`, which resolves to graphlet's drawing, for the mod to place among its own elements:
 
 ```tsx
 on('ui.render', { component: 'Pane', requestId: 'mine' }, async ($, e, next) => {
@@ -67,7 +67,7 @@ on('ui.render', { component: 'Pane', requestId: 'mine' }, async ($, e, next) => 
       { from: 'c', to: 'a' },
     ],
   }
-  await $.graphlet.show({ pane: 'mine', graph, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows - 1 })
+  await $.graphlet.show({ site: 'mine', graph, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows - 1 })
   return (
     <Box flexDirection="column">
       <Text bold>My graph</Text>
@@ -84,13 +84,13 @@ A mod runs before the mods it depends on, so its hook is the outer one and graph
 | Method | What it does |
 | :- | :- |
 | `measure({ graph, columns })` | Answers the size of the graph's drawing in a room `columns` wide and as tall as it needs: the rows it takes, and the columns it is laid out across, its longest layer's or the room's running down and all its layers' running right, which are more than `columns` when the graph scrolls sideways. |
-| `show({ pane, graph, columns, rows, selected? })` | Says what a pane holds and the room the drawing may take. Answers the rows the drawing takes, and the node drawn as selected. A drawing of a graph with nodes takes at least two rows, a row of the graph and its foot, and no more than it was given where it was given two or more. |
-| `step({ pane, move })` | Answers the node a move from the selected one lands on, for a mod that has keys of its own: `left`, `right`, `up`, or `down`. |
-| `scroll({ pane, by })` | Scrolls the graph: by cells, `{ x, y }`, or by turns of the wheel, a number. |
-| `select({ pane, node })` | Selects a node. |
-| `open({ pane, node })` | Does nothing. |
-| `collapse({ pane, group, isCollapsed })` | Collapses a group into one box, or opens it again. |
-| `key({ pane, key, selected })` | Does nothing. |
+| `show({ site, graph, columns, rows, selected? })` | Says what a site holds and the room the drawing may take. Answers the rows the drawing takes, and the node drawn as selected. A drawing of a graph with nodes takes at least two rows, a row of the graph and its foot, and no more than it was given where it was given two or more. |
+| `step({ site, move })` | Answers the node a move from the selected one lands on, for a mod that has keys of its own: `left`, `right`, `up`, or `down`. |
+| `scroll({ site, by })` | Scrolls the graph: by cells, `{ x, y }`, or by turns of the wheel, a number. |
+| `select({ site, node })` | Selects a node. |
+| `open({ site, node })` | Does nothing. |
+| `collapse({ site, group, isCollapsed })` | Collapses a group into one box, or opens it again. |
+| `key({ site, key, selected })` | Does nothing. |
 
 A room has at least one cell each way and at most `MOST_CELLS`, in `graphlet/hooks/draw.ts`, whatever is asked: a count that is no number is taken as one. A room narrower than the narrowest a graph is laid out for, `LEAST_COLUMNS` in `graphlet/hooks/layout.ts`, is drawn as that wide. A scroll by what is no number is ignored.
 
@@ -104,7 +104,7 @@ Graphlet calls `$.graphlet.select` itself when the person clicks the box of a no
 
 ```ts
 on('graphlet.select', async ($, e, next) => {
-  if (e.pane === 'mine') await remember($, e.node)
+  if (e.site === 'mine') await remember($, e.node)
   return next(e)
 })
 ```
@@ -117,7 +117,7 @@ To open a node is to ask for what it stands for: the file, the state, the step. 
 
 ```ts
 on('graphlet.open', async ($, e, next) => {
-  if (e.pane === 'mine') await goTo($, e.node)
+  if (e.site === 'mine') await goTo($, e.node)
   return next(e)
 })
 ```
@@ -157,7 +157,7 @@ A turn of the wheel is not a key or a click. It reaches the pane, as `ui.scroll`
 ```ts
 on('ui.scroll', { component: 'Pane', requestId: 'mine' }, async ($, e, next) => {
   if (e.origin.kind !== 'person') return next(e)
-  await $.graphlet.scroll({ pane: 'mine', by: e.by })
+  await $.graphlet.scroll({ site: 'mine', by: e.by })
   return {}
 }).catch(($, e, next) => next(e))
 ```

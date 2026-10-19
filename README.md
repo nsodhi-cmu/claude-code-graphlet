@@ -70,12 +70,12 @@ on('ui.render', { component: 'Pane', requestId: 'my-pane' }, async ($, e, next) 
     nodes: [{ id: 'a', label: 'Parse' }, { id: 'b', label: 'Check' }, { id: 'c', label: 'Emit' }],
     links: [{ from: 'a', to: 'b' }, { from: 'b', to: 'c' }],
   }
-  await $.graphlet.show({ pane: 'my-pane', graph, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
+  await $.graphlet.show({ site: 'my-pane', graph, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
   return next(e)
 })
 
 on('graphlet.select', async ($, e, next) => {
-  if (e.pane === 'my-pane') $.ui.toast(`picked ${e.node}`)
+  if (e.site === 'my-pane') $.ui.toast(`picked ${e.node}`)
   return next(e)
 })
 ```
