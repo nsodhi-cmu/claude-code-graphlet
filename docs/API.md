@@ -59,7 +59,7 @@ graphlet calls the place a graph is drawn its site, and knows it by the id its o
 | The row of a tool's result | `ToolResult`, the call's `tool_use_id` |
 | The row of a command's output | `CommandOutput`, the row's id |
 
-Every site draws its graph the same way: whole, through a window that scrolls, with a selection that the mouse and, once the graph has been clicked, the keys move, and `copy · html ↗` in the corner of its foot. A graph Claude draws in a reply is drawn by the same surface module and answers the same clicks and keys, as [REPLIES.md](REPLIES.md#the-picture) tells, but no mod owns it.
+Every site draws its graph the same way: on the terminal, whole, through a window that scrolls, with a selection that the mouse and, once the graph has been clicked, the keys move, and `copy · html ↗` in the corner of its foot; on the desktop app, VS Code, and the mobile app, as a picture over a row of controls, as [On Other Surfaces](#on-other-surfaces) tells. A graph Claude draws in a reply is drawn by the same surface module and answers the same clicks and keys, as [REPLIES.md](REPLIES.md#the-picture) tells, but no mod owns it.
 
 A site's `ui.render` hook is its owner's: a pane's, the mod that opened it; the band's, every mod that draws there; a tool's row, the mod whose tool it is, which matches on `e.props.tool`; a command's row, the mod whose command it is, on `e.props.command`. That hook says what the site holds, and then calls `next(e)`, which resolves to graphlet's drawing, for the mod to place among its own elements:
 
@@ -100,13 +100,13 @@ on('ui.render', { component: 'ToolResult' }, async ($, e, next) => {
 
 A mod runs before the mods it depends on, so its hook is the outer one and graphlet's is the one `next(e)` reaches. Graphlet's hook draws a site `show` has named, and passes every other on. The band is shared by every mod that draws there, so it is drawn only on a render where `show` named it since it was last drawn, and so left as the engine or another mod draws it once its owner stops; and it yields to a survey, as the engine asks of a band.
 
-On the terminal, the drawing is a `Client`, the surface module that paints the graph and posts what the person does. On the main screen, where the terminal reports no click, its foot has no corner. Where that Client fails, a `ui.fault` hook notes it and writes why to the debug log, and the site is drawn from then on as the rows of its drawing, painted as they are, with no corner and nothing to click. On every other surface, the desktop app's and the mobile app's, the drawing is the graph as plain text, a `Code` element with no language: drawn still, running the way it runs on the terminal, with its groups as they are there, folded into the site's columns and as tall as it needs, with nothing selected and no corner.
+On the terminal, the drawing is a `Client`, the surface module that paints the graph and posts what the person does. On the main screen, where the terminal reports no click, its foot has no corner. Where that Client fails, a `ui.fault` hook notes it and writes why to the debug log, and the site is drawn from then on as the rows of its drawing, painted as they are, with no corner and nothing to click. On the desktop app, VS Code, and the mobile app, the drawing is the graph's picture with controls under it. On any surface besides those and the terminal, it is the graph as plain text, a `Code` element with no language: drawn still, running the way it runs on the terminal, with its groups as they are there, folded into the site's columns and as tall as it needs, with nothing selected and no corner.
 
 | Method | What it does |
 | :- | :- |
 | `measure({ graph, columns })` | Answers the size of the graph's drawing in a room `columns` wide and as tall as it needs: the rows it takes, and the columns it is laid out across, its longest layer's or the room's running down and all its layers' running right, which are more than `columns` when the graph scrolls sideways. |
 | `text({ graph, columns })` | Answers the graph as plain text: its still picture, drawn with nothing selected and its links kept separate, folded into a room `columns` wide, a line a row with no blanks at its end. For what a tool hands back to the model, or a file. |
-| `show({ site, graph, columns, rows, selected? })` | Says what a site holds and the room the drawing may take. Answers the rows the drawing takes, and the node drawn as selected. A drawing of a graph with nodes takes at least two rows, a row of the graph and its foot, and no more than it was given where it was given two or more. |
+| `show({ site, graph, columns, rows, selected? })` | Says what a site holds and the room the drawing may take. Answers the rows the drawing takes on the terminal, and the node drawn as selected. A drawing of a graph with nodes takes at least two rows, a row of the graph and its foot, and no more than it was given where it was given two or more. |
 | `step({ site, move })` | Answers the node a move from the selected one lands on, for a mod that has keys of its own: `left`, `right`, `up`, or `down`. |
 | `scroll({ site, by })` | Scrolls the graph: by cells, `{ x, y }`, or by turns of the wheel, a number. |
 | `select({ site, node })` | Selects a node. |
@@ -122,7 +122,7 @@ A room has at least one cell each way and at most `MOST_CELLS`, in `graphlet/hoo
 
 A pane has one node selected. Either the mod says which, by giving `show` a `selected`, or graphlet keeps it: the node `select` was last called with, or the first the graph names of the nodes of its highest priority.
 
-Graphlet calls `$.graphlet.select` itself when the person clicks the box of a node not selected, or moves with the arrow keys or `h` `j` `k` `l` while the graph has the keyboard. Every method of the noun is also an event, so a mod hears the pick in a hook, where it may act on it and pass it on:
+Graphlet calls `$.graphlet.select` itself when the person clicks the box of a node not selected, moves with the arrow keys or `h` `j` `k` `l` while the graph has the keyboard, or picks a node with the controls under its picture on another surface. Every method of the noun is also an event, so a mod hears the pick in a hook, where it may act on it and pass it on:
 
 ```ts
 on('graphlet.select', async ($, e, next) => {
@@ -135,7 +135,7 @@ A mod that says which node is selected hears each pick the same way, and the dra
 
 ## Opening A Node
 
-To open a node is to ask for what it stands for: the file, the state, the step. The person opens the selected node with return, or any node with a double click on its box or on its name at the window's edge, two clicks there within `DOUBLE_CLICK_MS` of each other in `graphlet/hooks/surface.tsx`; the first of the two selects it, as any click does. Graphlet then calls `$.graphlet.open`, which does nothing: a mod that has something to open hooks `graphlet.open`.
+To open a node is to ask for what it stands for: the file, the state, the step. The person opens the selected node with return, or any node with a double click on its box or on its name at the window's edge, two clicks there within `DOUBLE_CLICK_MS` of each other in `graphlet/hooks/surface.tsx`; the first of the two selects it, as any click does; and under its picture on another surface, the person opens the selected node with `Open`. Graphlet then calls `$.graphlet.open`, which does nothing: a mod that has something to open hooks `graphlet.open`.
 
 ```ts
 on('graphlet.open', async ($, e, next) => {
@@ -151,6 +151,7 @@ A pane draws each group collapsed or open as `$.graphlet.collapse` was last call
 - space, with the box of a collapsed group selected, opens the group; with a node of an open group selected, collapses it, and the group's box is then selected;
 - return, or a double click, on the box of a collapsed group opens the group, in place of opening a node;
 - a click on a frame's label collapses its group;
+- `Collapse` or `Expand`, under the picture on another surface, does as space does;
 - finding a node in a collapsed group, with `/`, opens the group.
 
 A node in a collapsed group is drawn as the group's box selected, and `show` answers the group's id as `selected`. A collapsed group's box is selected as a node is, so a click on it, a step onto it, and a key pressed with it selected all name the group's id, and so does `graphlet.select`. Opening a group whose box is selected, by space, return, or a double click, selects the first node it holds with `select`, so a mod that says which node is selected hears which. The web page and `c` take the graph as the pane has it, its groups collapsed or open.
@@ -174,11 +175,11 @@ A drag from where a click does nothing, on no box, name, count, frame's label, o
 
 The terminal reports the mouse only in Claude Code's fullscreen layout. On the main screen, as with `CLAUDE_CODE_NO_FLICKER=0` and in tmux by default, nothing is clicked or dragged.
 
-A turn of the wheel is not a key or a click. It reaches a pane or the band, as `ui.scroll`, and the site's owner passes it on, as here for a pane; the engine raises no `ui.scroll` for a tool's or a command's row, whose graph a drag, a click on a count, or the selection scrolls:
+A turn of the wheel is not a key or a click. It reaches a pane or the band, as `ui.scroll`, and the site's owner hands it to `$.graphlet.scroll`, as here for a pane, while the pane's tree fits the pane, as a drawing sized to the pane's rows does on the terminal; a taller tree, as a picture on another surface may be, it passes on with `next(e)`, and the engine scrolls it. The engine raises no `ui.scroll` for a tool's or a command's row, whose graph a drag, a click on a count, or the selection scrolls:
 
 ```ts
 on('ui.scroll', { component: 'Pane', requestId: 'mine' }, async ($, e, next) => {
-  if (e.origin.kind !== 'person') return next(e)
+  if (e.origin.kind !== 'person' || e.contentRows > e.bodyRows) return next(e)
   await $.graphlet.scroll({ site: 'mine', by: e.by })
   return {}
 }).catch(($, e, next) => next(e))
@@ -186,6 +187,21 @@ on('ui.scroll', { component: 'Pane', requestId: 'mine' }, async ($, e, next) => 
 
 A click on one of the counts under a graph larger than its room scrolls it a page that way, and that graphlet answers itself.
 
+## On Other Surfaces
+
+On the desktop app, VS Code, and the mobile app, a site's drawing is the graph as a [picture in SVG](SVG.md), drawn whole, running the way it runs on the terminal, with its groups as they are there and its selected node selected, folded into the site's columns, its links kept separate whatever the `links` setting. Where that leaves the picture short enough, it lights a node and its links as the pointer passes over it, as [SVG.md](SVG.md#on-a-surface) tells, and it moves the selected node's links where the person's `motion` setting is `flowing`. Under it, a dim line says what was left out of the graph, or what is out of focus, where anything is, and a row of controls does what the terminal's keys do, each raising the method a key raises, so the site's owner hears it the same way:
+
+| Control | What it does |
+| :- | :- |
+| `Node`, a list of all the nodes, in the order the picture of all of them is read, on the desktop app and VS Code | Selects the node picked, as a click on its box does. A node in focus or out of it may be picked. |
+| `‹` and `›`, on the mobile app, which draws no list, and where a node's id is longer than an option of a list may be, `MOST_VALUE_CHARS` | Selects the node before or after the selected one in that order, round from the last to the first. |
+| `Open` | Opens the selected node, as return does. Not drawn while the box of a collapsed group is selected. |
+| `Collapse` or `Expand`, and the group's label | Collapses the selected node's group, or opens the collapsed group whose box is selected and selects the first node it holds, as space does. Drawn while the selected node is in a group. |
+| `Focus` or `Show all` | Draws the graph in focus on the selected node, or all of it again, as `f` does. Drawn where the graph, with its groups as they are there, has more than `FOCUS_NODES` nodes. |
+| `Open in browser`, on the desktop app and VS Code | Opens the graph as a [web page](PAGE.md), as a click on `html ↗` does. |
+
+Each control is keyed `graphlet:graph:` and what it does, `node`, `previous`, `next`, `open`, `group`, `focus`, or `page`, by which graphlet's own `ui.press` and `ui.select` hooks tell which was used, and which no key of another plugin's starts with. The picture itself is not clicked, dragged, or given keys: nothing there finds a node or copies the graph. Where the picture would be longer than an `Svg` may be, `MOST_SVG_CHARS`, the drawing is the graph as plain text, as on any other surface.
+
 ## What Graphlet Keeps
 
-For each site `show` has named, the `KEPT_SITES` it named last, graphlet keeps what it was last given, the node last picked there, where the person scrolled the window to, the groups collapsed or opened there, whether it is drawn in focus, and what is being found; and the same for each graph of the reply blocks it drew last. A window the person scrolled stays where they left it until another node is selected, and then follows the selection again. It also keeps the layouts it last made, `KEPT_LAYOUTS` of them, each by what its graph holds, which way it runs, and how wide its room is, and how tall too running right, so that a key press, a click, or a render of the same graph in the same room does not lay the graph out again; and the Clients that failed, which it draws still. None of it outlives the session, or a reload of the mod.
+For each site `show` has named, the `KEPT_SITES` it named last, graphlet keeps what it was last given, the node last picked there, where the person scrolled the window to, the groups collapsed or opened there, whether it is drawn in focus, what is being found, and what its picture last showed on another surface, for its controls to act on; and the same for each graph of the reply blocks it drew last. A window the person scrolled stays where they left it until another node is selected, and then follows the selection again. It also keeps the layouts it last made, `KEPT_LAYOUTS` of them, each by what its graph holds, which way it runs, and how wide its room is, and how tall too running right, so that a key press, a click, or a render of the same graph in the same room does not lay the graph out again; and the Clients that failed, which it draws still. None of it outlives the session, or a reload of the mod.

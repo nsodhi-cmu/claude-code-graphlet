@@ -1,6 +1,6 @@
 # The Picture In SVG
 
-A graph drawn in SVG is what the [web page](PAGE.md) shows, and what the desktop app, VS Code, and the mobile app show in place of the terminal's picture in a [reply](REPLIES.md#on-other-surfaces). Drawing it is `svgOf` in `graphlet/hooks/svg.ts`; a view's `vector`, in `graphlet/hooks/view.ts`, lays a graph out for a surface's room and draws it there.
+A graph drawn in SVG is what the [web page](PAGE.md) shows, and what the desktop app, VS Code, and the mobile app show in place of the terminal's picture, in a [reply](REPLIES.md#on-other-surfaces) and in a [mod's site](API.md#on-other-surfaces). Drawing it is `svgOf` in `graphlet/hooks/svg.ts`; a view's `vector`, in `graphlet/hooks/view.ts`, lays a graph out for a surface's room and draws it there.
 
 ## The Drawing
 
@@ -18,7 +18,7 @@ Every node is marked by its place in the graph, `n` and the place, and every lin
 
 ## What Is Selected
 
-The drawing may be given a selected node. Its box is bordered in the accent, with a second border inside it, and its words are bold. Every link that touches it is lit, in the accent, and so are the borders of the boxes at the other ends of those links. Everything else keeps its own color.
+The drawing may be given a selected node, as a site's is. Its box is bordered in the accent, with a second border inside it, and its words are bold. Every link that touches it is lit, in the accent, and so are the borders of the boxes at the other ends of those links. Everything else keeps its own color.
 
 Where the person's `motion` setting is `flowing`, the lit links move, as [on the terminal](DRAWING.md#flowing): a lit link that runs one way, with no link running back between the same two nodes, runs beads toward the node it reaches, and every other lit link brightens and fades. Neither moves for a person whose system asks for less motion.
 

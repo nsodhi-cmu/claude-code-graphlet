@@ -1,4 +1,4 @@
-import type { Elements, EngineInterface, Register, RenderElement, RenderSurface, RenderViewport } from 'claude-code'
+import type { Elements, EngineInterface, Register, RenderElement, RenderInput, RenderSurface, RenderViewport } from 'claude-code'
 
 import type { Graphlet } from '../types'
 import { MOST_CELLS, MOST_TREE_CHARS, bounded, charactersOf, cornerless, leftOut, rowText, sizeOf, styleOf } from './draw'
@@ -9,8 +9,9 @@ import type { Direction } from './layout'
 import { pageOf } from './page'
 import { GUIDE, fencedOf, inReply, partsOf, pictureOf } from './reply'
 import { TIP_ODDS, tipOf } from './tips'
-import { MOVES, collapsedOf, focusOf, leadOf, viewOf } from './view'
+import { FOCUS_NODES, MOVES, collapsedOf, focusOf, leadOf, viewOf } from './view'
 import type { Vector, View } from './view'
+import { stepThrough } from './window'
 
 /**
  * What a place holds, as it was last drawn: the view it is drawn by, the
@@ -20,6 +21,7 @@ import type { Vector, View } from './view'
  * and the drawing.
  */
 type Held = { view: View; given: Graph; whole: Graph; graph: Graph; room: Room; most: number; selected: string | null; pan: Pan; drawing: Drawing }
+
 
 /**
  * What graphlet keeps for a place a graph is drawn, a mod's site or a graph
@@ -79,6 +81,15 @@ const siteOf = (site: string): Place => {
   return place
 }
 
+/** What a map holds under `key`, made where it holds nothing, kept as the last asked for; and what it holds past the `most` asked for last let go. */
+function keptIn<V>(map: Map<string, V>, key: string, made: () => V, most: number): V {
+  const kept = map.get(key) ?? made()
+  map.delete(key)
+  map.set(key, kept)
+  for (const old of [...map.keys()].slice(0, Math.max(0, map.size - most))) map.delete(old)
+  return kept
+}
+
 /** The nodes whose labels hold what is being found, in the graph's order: none while nothing is typed. */
 const foundIn = (graph: Graph, query: string): string[] =>
   query.trim() === '' ? [] : graph.nodes.filter(node => node.label.toLowerCase().includes(query.trim().toLowerCase())).map(node => node.id)
@@ -125,6 +136,28 @@ const scrollIn = (place: Place, by: Pan | number): void => {
   const at = place.held
   if (at !== undefined) place.scrolled = at.view.scroll(at.graph, at.room, place.scrolled ?? at.pan, by)
 }
+
+/** Draws a place in focus on its selected node, or all of it again; the window follows the selection again. */
+const focusIn = (place: Place): void => {
+  place.isFocused = !place.isFocused
+  place.scrolled = undefined
+}
+
+/** Whether a node of a graph as it was last drawn is the box of a collapsed group. */
+const isShutIn = (at: Held, id: string): boolean => at.whole.nodes.some(node => node.id === id && node.holds !== undefined)
+
+/** The group of the node selected in a graph as it was last drawn, or the collapsed group whose box is selected, which of the two, and what it says: none where the selected node is in no group. */
+const groupOf = (at: Held): { id: string; label: string; isShut: boolean } | undefined => {
+  const isShut = at.selected !== null && isShutIn(at, at.selected)
+  const id = isShut ? at.selected : at.given.nodes.find(node => node.id === at.selected)?.group
+  return id === undefined || id === null ? undefined : { id, label: at.given.groups.find(group => group.id === id)?.label ?? id, isShut }
+}
+
+/** A graph as it was last drawn, its groups as they are there, running the way it runs there. */
+const runningOf = (at: Held): Graph & { direction: Direction } => ({ ...at.whole, direction: at.view.direction(at.whole, at.room) })
+
+/** A room as wide as `room`, and as tall as a graph needs. */
+const tallOf = (room: Room): Room => ({ columns: room.columns, rows: MOST_CELLS })
 
 /**
  * How graphs are drawn: as the plugin's options say, in a mod's site; folded
@@ -180,7 +213,7 @@ const cellsOf = (asked: unknown): number =>
 const textOf = (graph: Graph, room: Room): string => pictureOf(still, graph, room).rows.map(row => rowText(row).trimEnd()).join('\n')
 
 /** A site's graph as plain text, as it runs and with its groups as they are there, folded into the site's columns. */
-const plainOf = (at: Held): string => textOf({ ...at.whole, direction: at.view.direction(at.whole, at.room) }, { columns: at.room.columns, rows: MOST_CELLS })
+const plainOf = (at: Held): string => textOf(runningOf(at), tallOf(at.room))
 
 /** A drawing's rows as Text, painted as they are: for where nothing in them can be clicked. */
 const rowsOf = (Text: Elements['terminal']['Text'], drawing: Drawing) =>
@@ -207,6 +240,11 @@ const siteTreeOf = (elements: Pick<Elements['terminal'], 'Box' | 'Text' | 'Clien
 type Vectored = 'desktop' | 'vscode' | 'mobile'
 const VECTORED: ReadonlySet<string> = new Set<Vectored>(['desktop', 'vscode', 'mobile'])
 
+/** The components a mod's site is drawn in. */
+type SiteComponent = 'Pane' | 'AbovePrompt' | 'ToolResult' | 'CommandOutput'
+/** A site drawn on a surface that draws vectors. */
+type VectorSite = Extract<RenderInput<SiteComponent>, { surface: Vectored }>
+
 /** What a control graphlet draws under a picture runs: the person's act is a hook's to answer, by the control's key. */
 const NOTHING = (): void => undefined
 
@@ -214,6 +252,8 @@ const NOTHING = (): void => undefined
 const CONTROL = 'graphlet:'
 /** The key of a control under a picture: the key of the graph it is under, and what it does. */
 const controlKeyOf = (key: string, does: string): string => `${CONTROL}${key}:${does}`
+/** The most characters a value of a `Select`'s option may take: a node whose id is longer is not listed. */
+const MOST_VALUE_CHARS = 10_000
 
 /** A graph's picture on a surface that draws vectors, and under it what was left out of the graph, where anything was, and its controls, in a row. */
 const pictureTreeOf = (elements: Pick<Elements[Vectored], 'Box' | 'Text' | 'Svg'>, vector: Vector, graph: Graph, controls: RenderElement[]) => {
@@ -228,6 +268,71 @@ const pictureTreeOf = (elements: Pick<Elements[Vectored], 'Box' | 'Text' | 'Svg'
       ]}
     </Box>
   )
+}
+
+/** The nodes of a site's graph in the order its picture is read, with its groups as they are there and all of it, in focus or not. */
+const orderIn = (at: Held): string[] => still.order(runningOf(at), tallOf(at.room))
+
+/**
+ * The controls that pick a node under a site's picture: a list of all its
+ * nodes, in the order the picture is read, the selected one picked, where
+ * the surface draws one and every node's id fits an option; and else a step
+ * back and a step on through them.
+ */
+const pickersOf = ($: EngineInterface, e: VectorSite, at: Held) => {
+  const order = orderIn(at)
+  if (e.surface === 'mobile' || order.some(id => id.length > MOST_VALUE_CHARS)) {
+    const { Button } = $.ui.resolve(e)
+    return [<Button key={controlKeyOf(GRAPH, 'previous')} label="‹" onPress={NOTHING} />, <Button key={controlKeyOf(GRAPH, 'next')} label="›" onPress={NOTHING} />]
+  }
+  const { Select } = $.ui.resolve(e)
+  const nameOf = (id: string): string => {
+    const node = at.whole.nodes.find(one => one.id === id)
+    return node === undefined ? id : [node.mark, node.label].filter(word => word !== undefined).join(' ')
+  }
+  const options = order.map(id => ({ value: id, label: nameOf(id) }))
+  return [<Select key={controlKeyOf(GRAPH, 'node')} label="Node" options={options} {...(at.selected === null ? {} : { value: at.selected })} onSelect={NOTHING} />]
+}
+
+/**
+ * A site's graph on a surface that draws vectors: its picture, running the
+ * way it runs on the terminal, with its groups as they are there, folded
+ * into the site's columns and whole, with the selected node selected; and
+ * under it controls that do what the terminal's keys do. They pick a node;
+ * open the selected node, where it is not the box of a collapsed group;
+ * collapse the selected node's group, or open the collapsed group whose box
+ * is selected; in a graph larger than a graph in focus, draw it in focus,
+ * and all of it again; and, except on the mobile app, open it as a web page.
+ * Where the picture is too large for the surface, the graph is plain text.
+ */
+const vectorSiteOf = ($: EngineInterface, e: VectorSite, place: Place, at: Held) => {
+  const { Button, Code } = $.ui.resolve(e)
+  const whole = runningOf(at)
+  const vector = still.vector({ ...at.graph, direction: whole.direction }, at.selected, tallOf(at.room))
+  if (vector === undefined) return <Code source={plainOf(at)} wrap="truncate-end" />
+  const group = groupOf(at)
+  const controls = [
+    ...pickersOf($, e, at),
+    ...(at.selected === null || group?.isShut === true ? [] : [<Button key={controlKeyOf(GRAPH, 'open')} label="Open" onPress={NOTHING} />]),
+    ...(group === undefined ? [] : [<Button key={controlKeyOf(GRAPH, 'group')} label={`${group.isShut ? 'Expand' : 'Collapse'} ${group.label}`} onPress={NOTHING} />]),
+    ...(at.whole.nodes.length <= FOCUS_NODES ? [] : [<Button key={controlKeyOf(GRAPH, 'focus')} label={place.isFocused ? 'Show all' : 'Focus'} onPress={NOTHING} />]),
+    ...(e.surface === 'mobile' ? [] : [<Button key={controlKeyOf(GRAPH, 'page')} label="Open in browser" onPress={NOTHING} />]),
+  ]
+  return pictureTreeOf($.ui.resolve(e), vector, at.graph, controls)
+}
+
+/**
+ * A site's graph as its surface draws it: on the terminal, to click and move
+ * through; on a surface that draws vectors, as a picture with controls under
+ * it; and on any other, as plain text, drawn still, running the way it runs
+ * on the terminal, with its groups as they are there, folded into the site's
+ * columns and as tall as it needs.
+ */
+const siteDrawingOf = ($: EngineInterface, e: RenderInput<SiteComponent>, place: Place, at: Held) => {
+  if (e.surface === 'terminal') return siteTreeOf($.ui.resolve(e), e.requestId, e.viewport, at)
+  if (VECTORED.has(e.surface)) return vectorSiteOf($, e, place, at)
+  const { Code } = $.ui.resolve(e)
+  return <Code source={plainOf(at)} wrap="truncate-end" />
 }
 
 /** Puts a graph on the clipboard as plain text, as `textOf` draws it, and says whether it went. */
@@ -285,6 +390,50 @@ type Acts = {
   key: (key: string, selected: string | null) => Promise<void>
 }
 
+/** A site's acts: the noun's methods, raised for the site's owner to hear. */
+const siteActsOf = ($: EngineInterface, site: string): Acts => ({
+  select: node => $.graphlet.select({ site, node }),
+  collapse: (group, isCollapsed) => $.graphlet.collapse({ site, group, isCollapsed }),
+  scroll: by => $.graphlet.scroll({ site, by }),
+  open: node => $.graphlet.open({ site, node }),
+  key: (key, selected) => $.graphlet.key({ site, key, selected }),
+})
+
+/** A reply's graph's acts, done in its place. */
+const replyActsOf = (place: Place): Acts => ({
+  select: async node => pickIn(place, node),
+  collapse: async (group, isCollapsed) => collapseIn(place, group, isCollapsed),
+  scroll: async by => scrollIn(place, by),
+  open: async () => undefined,
+  key: async () => undefined,
+})
+
+/**
+ * What the acts on a graph as it was last drawn come to: opening a collapsed
+ * group, which, where its box was selected, selects the first node it holds;
+ * opening a node, a collapsed group's box by opening the group and any other
+ * by `open`; and selecting a node, opening the collapsed group it is in,
+ * where it is one and not the selected one already, and drawing the place
+ * again either way.
+ */
+const movesOf = (at: Held, acts: Acts, redraw: () => void) => {
+  const expand = async (group: string): Promise<void> => {
+    await acts.collapse(group, false)
+    const first = at.given.nodes.find(one => one.group === group)
+    if (at.selected === group && first !== undefined) await acts.select(first.id)
+  }
+  return {
+    expand,
+    open: async (id: string): Promise<void> => (isShutIn(at, id) ? expand(id) : acts.open(id)),
+    pick: async (to: string | undefined): Promise<void> => {
+      const shut = at.given.nodes.find(one => one.id === to)?.group
+      if (shut !== undefined && isShutIn(at, shut)) await acts.collapse(shut, false)
+      if (to !== undefined && to !== at.selected) await acts.select(to)
+      else redraw()
+    },
+  }
+}
+
 /** What a control under a picture is, by its key: the key of the graph it is under, and what it does; none for a key graphlet gave no control. */
 const controlOf = (element: string): { key: string; does: string } | undefined => {
   if (!element.startsWith(CONTROL)) return undefined
@@ -311,10 +460,7 @@ export const register: Register = (on, options) => {
       text: async input => textOf(readGraph(input.graph), { columns: cellsOf(input.columns), rows: MOST_CELLS }),
       show: async input => {
         hasDrawn = true
-        const place = siteOf(input.site)
-        sites.delete(input.site)
-        sites.set(input.site, place)
-        for (const old of [...sites.keys()].slice(0, Math.max(0, sites.size - KEPT_SITES))) sites.delete(old)
+        const place = keptIn(sites, input.site, placeOf, KEPT_SITES)
         const room = { columns: cellsOf(input.columns), rows: cellsOf(input.rows) }
         const { drawing, selected } = drawIn(place, readGraph(input.graph), room, MOST_TREE_CHARS, view, input.selected, leadOf)
         place.asks += 1
@@ -345,38 +491,26 @@ export const register: Register = (on, options) => {
   })
 
   on('ui.render', { component: 'Pane' }, async ($, e, next) => {
-    const at = sites.get(e.requestId)?.held
-    if (at === undefined) return next(e)
-    if (e.surface === 'terminal') return siteTreeOf($.ui.resolve(e), e.requestId, e.viewport, at)
-    const { Code } = $.ui.resolve(e)
-    return <Code source={plainOf(at)} wrap="truncate-end" />
+    const place = sites.get(e.requestId)
+    return place?.held === undefined ? next(e) : siteDrawingOf($, e, place, place.held)
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const place = sites.get(e.requestId)
     const isAsked = place !== undefined && place.asks > 0
     if (place !== undefined) place.asks = Math.max(0, place.asks - 1)
-    const at = place?.held
-    if (!isAsked || at === undefined || e.props.hasSurvey) return next(e)
-    if (e.surface === 'terminal') return siteTreeOf($.ui.resolve(e), e.requestId, e.viewport, at)
-    const { Code } = $.ui.resolve(e)
-    return <Code source={plainOf(at)} wrap="truncate-end" />
+    if (!isAsked || place?.held === undefined || e.props.hasSurvey) return next(e)
+    return siteDrawingOf($, e, place, place.held)
   })
 
   on('ui.render', { component: 'ToolResult' }, async ($, e, next) => {
-    const at = sites.get(e.requestId)?.held
-    if (at === undefined) return next(e)
-    if (e.surface === 'terminal') return siteTreeOf($.ui.resolve(e), e.requestId, e.viewport, at)
-    const { Code } = $.ui.resolve(e)
-    return <Code source={plainOf(at)} wrap="truncate-end" />
+    const place = sites.get(e.requestId)
+    return place?.held === undefined ? next(e) : siteDrawingOf($, e, place, place.held)
   })
 
   on('ui.render', { component: 'CommandOutput' }, async ($, e, next) => {
-    const at = sites.get(e.requestId)?.held
-    if (at === undefined) return next(e)
-    if (e.surface === 'terminal') return siteTreeOf($.ui.resolve(e), e.requestId, e.viewport, at)
-    const { Code } = $.ui.resolve(e)
-    return <Code source={plainOf(at)} wrap="truncate-end" />
+    const place = sites.get(e.requestId)
+    return place?.held === undefined ? next(e) : siteDrawingOf($, e, place, place.held)
   })
 
   on('prompt.compose', async ($, e, next) => {
@@ -399,10 +533,7 @@ export const register: Register = (on, options) => {
       const text = shown.map(part => ('text' in part ? part.text : fencedOf(bounded(pictureOf(still, part.graph, room), share)))).join('\n\n')
       return next({ ...e, props: { ...e.props, text } })
     }
-    const kept = replies.get(e.requestId) ?? new Map<string, Place>()
-    replies.delete(e.requestId)
-    replies.set(e.requestId, kept)
-    for (const old of [...replies.keys()].slice(0, Math.max(0, replies.size - KEPT_REPLIES))) replies.delete(old)
+    const kept = keptIn(replies, e.requestId, () => new Map<string, Place>(), KEPT_REPLIES)
     const [first, ...rest] = shown
     const lead = first !== undefined && 'text' in first ? [await next({ ...e, props: { ...e.props, text: first.text } })] : []
     const following = lead.length > 0 ? rest : shown
@@ -470,13 +601,52 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
-  /** A press on a control under a reply's picture on a surface that draws vectors: a web page of the graph as it was pictured, or where graphlet keeps it no longer, a toast that says so. */
+  /**
+   * A press on a control under a picture on a surface that draws vectors: in
+   * a reply, a web page of the graph as it was pictured, or where graphlet
+   * keeps it no longer, a toast that says so; and in a site, a web page of the
+   * graph as it was drawn, a step back or on through its nodes in the order
+   * the picture is read, opening the selected node, collapsing its group or
+   * opening the collapsed group whose box it is, and drawing the graph in
+   * focus or all of it again.
+   */
   on('ui.press', { plugin: 'graphlet' }, async ($, e, next) => {
     const control = controlOf(e.element)
-    if (control === undefined || e.component !== 'AssistantMessage') return next(e)
-    const pictured = replies.get(e.requestId)?.get(control.key)?.pictured
-    if (pictured === undefined) $.ui.toast('graphlet: that graph is no longer kept; scroll it out of view and back to draw it again.')
-    else if (control.does === 'page') await openPage($, pageNameOf(e.requestId, control.key), 'reply', pictured, pictured.direction)
+    if (control === undefined) return next(e)
+    const { key, does } = control
+    if (e.component === 'AssistantMessage') {
+      const pictured = replies.get(e.requestId)?.get(key)?.pictured
+      if (pictured === undefined) $.ui.toast('graphlet: that graph is no longer kept; scroll it out of view and back to draw it again.')
+      else if (does === 'page') await openPage($, pageNameOf(e.requestId, key), 'reply', pictured, pictured.direction)
+      return next(e)
+    }
+    const place = sites.get(e.requestId)
+    const at = place?.held
+    if (place === undefined || at === undefined || key !== GRAPH) return next(e)
+    const acts = siteActsOf($, e.requestId)
+    const moves = movesOf(at, acts, () => $.ui.invalidate('ui.render'))
+    const group = groupOf(at)
+    if (does === 'page') {
+      const graph = runningOf(at)
+      await openPage($, e.requestId, e.requestId, graph, graph.direction)
+    } else if (does === 'previous' || does === 'next') await moves.pick(stepThrough(orderIn(at), at.selected, does === 'next' ? 1 : -1))
+    else if (does === 'open' && at.selected !== null) await moves.open(at.selected)
+    else if (does === 'group' && group?.isShut === true) await moves.expand(group.id)
+    else if (does === 'group' && group !== undefined) await acts.collapse(group.id, true)
+    else if (does === 'focus') {
+      focusIn(place)
+      $.ui.invalidate('ui.render')
+    }
+    return next(e)
+  })
+
+  /** A pick of a node from the list under a site's picture on a surface that draws vectors: it is selected, as a click on its box selects it. */
+  on('ui.select', { plugin: 'graphlet' }, async ($, e, next) => {
+    const control = controlOf(e.element)
+    const at = sites.get(e.requestId)?.held
+    if (control?.key === GRAPH && control.does === 'node' && at !== undefined && at.whole.nodes.some(node => node.id === e.value)) {
+      await movesOf(at, siteActsOf($, e.requestId), () => $.ui.invalidate('ui.render')).pick(e.value)
+    }
     return next(e)
   })
 
@@ -490,21 +660,9 @@ export const register: Register = (on, options) => {
     const redraw = (): void => {
       if (!isReply) $.ui.invalidate('ui.render')
     }
-    const acts: Acts = isReply
-      ? {
-          select: async node => pickIn(place, node),
-          collapse: async (group, isCollapsed) => collapseIn(place, group, isCollapsed),
-          scroll: async by => scrollIn(place, by),
-          open: async () => undefined,
-          key: async () => undefined,
-        }
-      : {
-          select: node => $.graphlet.select({ site, node }),
-          collapse: (group, isCollapsed) => $.graphlet.collapse({ site, group, isCollapsed }),
-          scroll: by => $.graphlet.scroll({ site, by }),
-          open: node => $.graphlet.open({ site, node }),
-          key: (key, selected) => $.graphlet.key({ site, key, selected }),
-        }
+    const acts = isReply ? replyActsOf(place) : siteActsOf($, site)
+    const { expand, open, pick } = movesOf(at, acts, redraw)
+    const selectedGroup = groupOf(at)
     const { node, isOpened, group, by, drag, grab, isDropped, key, copy, page, isChord } = e.data as {
       node?: unknown
       isOpened?: unknown
@@ -520,23 +678,6 @@ export const register: Register = (on, options) => {
     }
     const query = place.finding
     const typed = key === 'space' ? ' ' : typeof key === 'string' && isChord !== true && charactersOf(key).length === 1 ? key : undefined
-    /** Whether a node of the graph as drawn is the box of a collapsed group. */
-    const isShut = (id: string): boolean => at.whole.nodes.some(one => one.id === id && one.holds !== undefined)
-    /** Opens a collapsed group, and where its box was selected, selects the first node it holds. */
-    const expand = async (group: string): Promise<void> => {
-      await acts.collapse(group, false)
-      const first = at.given.nodes.find(one => one.group === group)
-      if (at.selected === group && first !== undefined) await acts.select(first.id)
-    }
-    /** Opens a node: a collapsed group's box by opening the group, and any other by `open`. */
-    const open = async (id: string): Promise<void> => (isShut(id) ? expand(id) : acts.open(id))
-    /** Selects a node, opening the collapsed group it is in, where it is one and not the selected one already, and draws the place again either way. */
-    const pick = async (to: string | undefined): Promise<void> => {
-      const shut = at.given.nodes.find(one => one.id === to)?.group
-      if (shut !== undefined && isShut(shut)) await acts.collapse(shut, false)
-      if (to !== undefined && to !== at.selected) await acts.select(to)
-      else redraw()
-    }
     if (isChord === true) {
       return {}
     } else if (typeof node === 'string') {
@@ -553,11 +694,12 @@ export const register: Register = (on, options) => {
       place.dragged = isDropped === true ? undefined : { grab, at: drag }
       if (before.x !== drag.x || before.y !== drag.y) await acts.scroll({ x: before.x - drag.x, y: before.y - drag.y })
     } else if (copy === true || (query === undefined && key === 'c')) {
-      const graph = { ...at.whole, direction: at.view.direction(at.whole, at.room) }
+      const graph = runningOf(at)
       const isFitting = isReply && still.measure(graph, at.room.columns).columns <= at.room.columns
       await copyGraph($, graph, isFitting ? at.room : SHEET, e.surface)
     } else if (page === true) {
-      await openPage($, isReply ? pageNameOf(site, e.element) : site, isReply ? 'reply' : site, at.whole, at.view.direction(at.whole, at.room))
+      const graph = runningOf(at)
+      await openPage($, isReply ? pageNameOf(site, e.element) : site, isReply ? 'reply' : site, graph, graph.direction)
     } else if (query !== undefined && key === 'backspace' && query === '') {
       place.finding = undefined
       redraw()
@@ -570,16 +712,15 @@ export const register: Register = (on, options) => {
       await pick(found[(found.indexOf(at.selected ?? '') + 1) % Math.max(found.length, 1)])
     } else if (key === 'return' && at.selected !== null) {
       await open(at.selected)
-    } else if (key === 'space' && at.selected !== null && isShut(at.selected)) {
-      await expand(at.selected)
-    } else if (key === 'space' && at.selected !== null && at.given.nodes.some(one => one.id === at.selected && one.group !== undefined)) {
-      await acts.collapse(at.given.nodes.find(one => one.id === at.selected)?.group ?? '', true)
+    } else if (key === 'space' && selectedGroup?.isShut === true) {
+      await expand(selectedGroup.id)
+    } else if (key === 'space' && selectedGroup !== undefined) {
+      await acts.collapse(selectedGroup.id, true)
     } else if (key === '/') {
       place.finding = ''
       redraw()
     } else if (key === 'f') {
-      place.isFocused = !place.isFocused
-      place.scrolled = undefined
+      focusIn(place)
       redraw()
     } else if (typeof key === 'string') {
       const move = MOVES[key]

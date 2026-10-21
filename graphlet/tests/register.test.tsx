@@ -162,6 +162,14 @@ const HOST: Plugin = {
       await $.graphlet.show({ site: e.requestId, graph: GRAPH, columns: (e.viewport?.columns ?? 80) - 2, rows: 1000 })
       return next(e)
     })
+    const HUGE = {
+      nodes: Array.from({ length: 400 }, (_, index) => ({ id: `n${index}`, label: `node number ${index}` })),
+      links: Array.from({ length: 800 }, (_, index) => ({ from: `n${index % 400}`, to: `n${(index * 7 + 1) % 400}` })),
+    }
+    on('ui.render', { component: 'Pane', requestId: 'huge' }, async ($, e, next) => {
+      await $.graphlet.show({ site: 'huge', graph: HUGE, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
+      return next(e)
+    })
     on('ui.render', { component: 'Pane', requestId: 'big' }, async ($, e, next) => {
       await $.graphlet.show({ site: 'big', graph: HUB, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
       return next(e)
@@ -662,12 +670,13 @@ test('the band is drawn only on a render where its owner says what it holds: onc
   await band.unmount()
 })
 
-test('the band drawn on two surfaces at once is drawn with the graph on the terminal, as each surface\'s render names it', WITH_HOST, async ($, on) => {
+test('the band drawn on two surfaces at once is drawn with the graph on the terminal and as a picture on the desktop app, as each surface\'s render names it', WITH_HOST, async ($, on) => {
   world(on)
   const desk = await $.ui.mount({ plugin: 'graphlet', surface: 'desktop', component: 'AbovePrompt', requestId: 'band', props: BAND })
   const term = await $.ui.mount({ plugin: 'graphlet', surface: 'terminal', component: 'AbovePrompt', requestId: 'band', props: BAND })
   await Promise.all([desk.redraw(), term.redraw()])
   expect(JSON.stringify(await term.drawn())).toContain('surface.tsx')
+  expect(await desk.find({ type: 'Svg' })).toBeDefined()
   await Promise.all([desk.unmount(), term.unmount()])
 })
 
@@ -716,40 +725,12 @@ test('on the main screen, which reports no click, a site\'s graph has no corner'
   await pane.unmount()
 })
 
-test('a pane graphlet was told nothing of is left as it is; on every surface but the terminal, a site\'s graph is plain text, as it runs and with its groups as they are there, with nothing to click', WITH_HOST, async ($, on) => {
+test('a pane graphlet was told nothing of is left as it is', WITH_HOST, async ($, on) => {
   world(on)
   const other = await mount($, 'someone-elses')
   expect(await other.find({ type: 'Text', text: 'the engine drew this' })).toBeDefined()
   expect(await other.find({ type: 'Client' })).toBeUndefined()
   await other.unmount()
-
-  for (const surface of ['desktop', 'mobile'] as const) {
-    const drawn = await $.ui.mount({ plugin: 'graphlet', surface, component: 'Pane', requestId: 'grouped', props: NARROW })
-    expect(String((await drawn.find({ type: 'Code' }))?.props.source).split('\n')).toEqual([
-      '         ┌─────┐',
-      '         │ web │',
-      '         └──┬──┘',
-      '            │',
-      '╭─ Backend ─│─────╮',
-      '│           ▼     │',
-      '│        ┌─────┐  │',
-      '│        │ api │  │',
-      '│        └──┬──┘  │',
-      '│           │     │',
-      '│           ▼     │',
-      '│       ┌──────┐  │',
-      '│       │ auth │  │',
-      '│       └───┬──┘  │',
-      '╰───────────│─────╯',
-      '            │',
-      '            ▼',
-      '      ╭───────────╮',
-      '      │ ▸ Data  1 │',
-      '      ╰───────────╯',
-    ])
-    expect(await drawn.find({ type: 'Client' })).toBeUndefined()
-    await drawn.unmount()
-  }
 })
 
 /** The words of each control under a picture, by its key, in order: a Button's label, and a Select's label and options with the picked one marked. */
@@ -760,6 +741,77 @@ const controlsOf = async (drawn: Pick<Pane, 'findAll'>): Promise<string[]> => [
   }),
   ...(await drawn.findAll({ type: 'Button' })).map(one => `${String(one.props.key)} ${String(one.props.label)}`),
 ]
+
+test('on the desktop app, VS Code, and the mobile app, a site\'s graph is a picture in SVG, running as it runs on the terminal, with its groups as they are there and its selected node selected, over controls that pick, open, and fold its nodes, and, except on the mobile app, open it as a web page', WITH_HOST, async ($, on) => {
+  world(on)
+  for (const surface of ['desktop', 'vscode', 'mobile'] as const) {
+    const drawn = await $.ui.mount({ plugin: 'graphlet', surface, component: 'Pane', requestId: 'grouped', props: NARROW })
+    const svg = await drawn.find({ type: 'Svg' })
+    const source = String(svg?.props.source)
+    expect(svg?.props).toMatchObject({ isInteractive: true, alt: 'A graph of 4 nodes and 3 links: web → api; api → auth; auth → Data.' })
+    expect(source).toStartWith('<svg xmlns="http://www.w3.org/2000/svg" ')
+    expect(source).toMatch(/<g class="node plain selected n0"[^>]*>(?:(?!<\/g>).)*>web</)
+    expect(source).toContain('>Backend</text>')
+    expect(source).toMatch(/<g class="node plain n3"[^>]*>(?:(?!<\/g>).)*>▸<\/tspan><tspan[^>]*>Data<\/tspan><tspan class="badge"[^>]*>1</)
+    expect(await controlsOf(drawn)).toEqual(
+      surface === 'mobile'
+        ? ['graphlet:graph:previous ‹', 'graphlet:graph:next ›', 'graphlet:graph:open Open']
+        : ['graphlet:graph:node Node: [web] | api | auth | ▸ Data', 'graphlet:graph:open Open', 'graphlet:graph:page Open in browser'],
+    )
+    expect(await drawn.find({ type: 'Client' })).toBeUndefined()
+    await drawn.unmount()
+  }
+})
+
+test('under a site\'s picture, a pick from the list selects a node, the group control collapses the selected node\'s group and opens it again, open opens a node, and each is heard by the owner', WITH_HOST, async ($, on) => {
+  const seen = world(on)
+  const pane = await $.ui.mount({ plugin: 'graphlet', surface: 'desktop', component: 'Pane', requestId: 'grouped', props: NARROW })
+  await pane.select({ key: 'graphlet:graph:node', value: 'auth' })
+  expect(await controlsOf(pane)).toEqual(['graphlet:graph:node Node: web | api | [auth] | ▸ Data', 'graphlet:graph:open Open', 'graphlet:graph:group Collapse Backend', 'graphlet:graph:page Open in browser'])
+  await pane.press({ key: 'graphlet:graph:group' })
+  expect(await controlsOf(pane)).toEqual(['graphlet:graph:node Node: web | [▸ Backend] | ▸ Data', 'graphlet:graph:group Expand Backend', 'graphlet:graph:page Open in browser'])
+  await pane.press({ key: 'graphlet:graph:group' })
+  await pane.press({ key: 'graphlet:graph:open' })
+  await pane.redraw()
+  expect((await said(pane)).heard).toEqual(['select grouped auth', 'collapse grouped back true', 'collapse grouped back false', 'select grouped api', 'open grouped api'])
+  await pane.press({ key: 'graphlet:graph:page' })
+  expect(seen.written.map(file => file.path)).toEqual(['/var/tmp/graphlet-grouped.html'])
+  expect(seen.written[0]?.text).toContain('>Backend</text>')
+  expect(seen.ran).toEqual([['xdg-open', '/var/tmp/graphlet-grouped.html']])
+  await pane.unmount()
+})
+
+test('on the mobile app, the controls under a site\'s picture step through its nodes in the order the picture is read, round from the last to the first', WITH_HOST, async ($, on) => {
+  world(on)
+  const pane = await $.ui.mount({ plugin: 'graphlet', surface: 'mobile', component: 'Pane', requestId: 'grouped', props: NARROW })
+  await pane.press({ key: 'graphlet:graph:previous' })
+  await pane.press({ key: 'graphlet:graph:previous' })
+  await pane.press({ key: 'graphlet:graph:next' })
+  expect((await said(pane)).heard).toEqual(['select grouped data', 'select grouped auth', 'select grouped data'])
+  await pane.unmount()
+})
+
+test('under the picture of a large graph, a control draws it in focus on the selected node and its nearest, and all of it again', WITH_HOST, async ($, on) => {
+  world(on)
+  const pane = await $.ui.mount({ plugin: 'graphlet', surface: 'vscode', component: 'Pane', requestId: 'big', props: PANE })
+  const nodes = async (): Promise<number> => String((await pane.find({ type: 'Svg' }))?.props.source).match(/<g class="node /g)?.length ?? 0
+  expect(await nodes()).toBe(41)
+  await pane.press({ key: 'graphlet:graph:focus' })
+  expect(await nodes()).toBe(24)
+  expect(await pane.find({ type: 'Text', text: '17 nodes and 17 links left out' })).toBeDefined()
+  expect((await controlsOf(pane)).filter(control => control.startsWith('graphlet:graph:focus'))).toEqual(['graphlet:graph:focus Show all'])
+  await pane.press({ key: 'graphlet:graph:focus' })
+  expect(await nodes()).toBe(41)
+  await pane.unmount()
+})
+
+test('a graph too large for a picture a surface takes is plain text there, as it runs and with its groups as they are there', WITH_HOST, async ($, on) => {
+  world(on)
+  const pane = await $.ui.mount({ plugin: 'graphlet', surface: 'desktop', component: 'Pane', requestId: 'huge', props: PANE })
+  expect(await pane.find({ type: 'Svg' })).toBeUndefined()
+  expect(String((await pane.find({ type: 'Code' }))?.props.source)).toContain('node number 0')
+  await pane.unmount()
+})
 
 test('graphs are drawn as the person\'s settings say', { ...WITH_HOST, options: { scroll: 'sheet', labels: 'clip', links: 'merged' } }, async ($, on) => {
   world(on)

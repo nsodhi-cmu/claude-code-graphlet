@@ -90,7 +90,7 @@ on('graphlet.select', async ($, e, next) => {
 - **Emphasis**: heavy frames for the nodes that matter most.
 - **Groups**, framed and named, that collapse into one box and open again.
 - **Down or right**, whichever fits better.
-- **Pictures beyond the terminal**: on the desktop app, VS Code, and the mobile app, a graph in a reply is drawn as a picture that follows your light or dark setting and, where you point, lights a node's links.
+- **Pictures beyond the terminal**: on the desktop app, VS Code, and the mobile app, a graph is drawn as a picture that follows your light or dark setting and, where you point, lights a node's links.
 - **Fitting its room**: a graph folds to a reply's width, and scrolls, following the selection, when it is too large.
 - **Selecting**: click a node to light its links, and move along them with the arrow keys. In a mod's graph, return or a double click opens a node.
 - **Finding and focusing**: `/` finds a node as you type, and in a large graph, `f` shows just the selected node and its nearest.
@@ -111,7 +111,7 @@ In `/config`, or `/plugin configure graphlet@claude-code-graphlet`. The first ch
 
 ## Limits
 
-- On the desktop app, VS Code, and the mobile app, a graph in a reply is a picture: nothing there copies a graph as text, the mobile app opens no web page, and a mod's graph is a still picture in text. VS Code draws them from extension 2.1.299.
+- On the desktop app, VS Code, and the mobile app, a graph is a picture: a mod's graph has a row of controls under it in place of clicks and keys, nothing there copies a graph as text, and the mobile app opens no web page. VS Code draws it from extension 2.1.299.
 - The mouse reaches a graph only in Claude Code's fullscreen layout. On the main screen, a reply's graph is a still picture.
 - A clicked graph keeps the keys until Escape. A drag moves it rather than selecting its text, so use `copy`.
 - Where an organization manages Claude Code, Claude is told it can draw graphs only if graphlet is listed in managed settings.
