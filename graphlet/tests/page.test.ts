@@ -25,7 +25,7 @@ const boxes = (page: string): Box[] =>
  */
 type Drawn = { from: number; to: number; isDashed: boolean; path: string; xs: number[]; ys: number[]; tip: { x: number; y: number } }
 
-const LINK = /<g class="link" data-from="(\d+)" data-to="(\d+)"><path( stroke-dasharray="[^"]*")? d="([^"]*)"\/>(?:<polygon points="([^"]*)"\/>)?<\/g>/g
+const LINK = /<g class="link e(\d+) e(\d+)"><path( stroke-dasharray="[^"]*")? d="([^"]*)"\/>(?:<polygon points="([^"]*)"\/>)?<\/g>/g
 
 const links = (page: string): Drawn[] =>
   [...page.matchAll(LINK)].map(([, from, to, dashes, path = '', head = '']) => {
@@ -49,8 +49,8 @@ const rows = (graph: Graph, page: string): Array<Array<Box & { id: string }>> =>
   return tops.map(top => stood.filter(box => box.y === top).sort((a, b) => a.x - b.x))
 }
 
-/** The width and the height of a page's drawing. */
-const size = (page: string): number[] => numbers(/viewBox="0 0 ([^"]*)"/.exec(page)?.[1] ?? '')
+/** Where a page's drawing starts, and its width and its height. */
+const size = (page: string): number[] => numbers(/viewBox="([^"]*)"/.exec(page)?.[1] ?? '')
 
 const isOver = (a: Box, b: Box): boolean => a.x < b.right && b.x < a.right && a.y < b.bottom && b.y < a.bottom
 
@@ -59,17 +59,17 @@ describe('the nodes of a page', () => {
     const page = pageOf(SHOP, 'Shop')
     expect(boxes(page)).toHaveLength(SHOP.nodes.length)
     for (const node of SHOP.nodes) expect(count(page, `>${node.label}<`)).toBe(1)
-    expect(page).toMatch(/<g class="node dim"[^>]*><rect[^>]*><text><tspan[^>]*><tspan class="mark">→<\/tspan><tspan[^>]*>money\.ts<\/tspan><tspan class="badge"[^>]*>2<\/tspan>/)
-    expect(count(page, 'class="node bad"')).toBe(2)
+    expect(page).toMatch(/<g class="node dim n7"[^>]*><rect[^>]*><text><tspan[^>]*><tspan class="mark">→<\/tspan><tspan[^>]*>money\.ts<\/tspan><tspan class="badge"[^>]*>2<\/tspan>/)
+    expect(count(page, 'class="node bad n')).toBe(2)
   })
 
   test('a node the graph puts foremost has a heavy box and bold words, and no other node has', () => {
     const page = pageOf(readGraph({ ...SHOP, nodes: SHOP.nodes.map(node => ({ ...node, ...(node.id === 'src/cart.ts' ? { priority: 3 } : {}) })) }), 'Shop')
-    expect(count(page, ' foremost"')).toBe(1)
-    expect(page).toMatch(/<g class="node bad foremost"[^>]*><rect[^>]*><text><tspan[^>]*><tspan class="mark">●<\/tspan><tspan[^>]*>cart\.ts</)
+    expect(count(page, ' foremost n')).toBe(1)
+    expect(page).toMatch(/<g class="node bad foremost n1"[^>]*><rect[^>]*><text><tspan[^>]*><tspan class="mark">●<\/tspan><tspan[^>]*>cart\.ts</)
     const widthOf = (rule: RegExp): number => Number(rule.exec(page)?.[1])
     expect(widthOf(/\.foremost \.box \{ stroke-width: ([\d.]+); \}/)).toBe(2 * widthOf(/\n\.box \{[^}]*stroke-width: ([\d.]+); \}/))
-    expect(count(pageOf(SHOP, 'Shop'), ' foremost"')).toBe(0)
+    expect(count(pageOf(SHOP, 'Shop'), ' foremost n')).toBe(0)
   })
 
   test('a label too long for one line is on several, one under another, and every box of its layer is taller for it', () => {
@@ -112,12 +112,12 @@ describe('the nodes of a page', () => {
     ]
     for (const graph of graphs) {
       const page = pageOf(graph, 'Any')
-      const [width = NaN, height = NaN] = size(page)
+      const [left = NaN, top = NaN, width = NaN, height = NaN] = size(page)
       const stood = boxes(page)
       expect(page).not.toMatch(/NaN|Infinity|undefined/)
       expect(stood).toHaveLength(graph.nodes.length)
       expect(links(page)).toHaveLength(graph.links.length)
-      expect(stood.filter(box => box.x < 0 || box.y < 0 || box.right > width || box.bottom > height)).toEqual([])
+      expect(stood.filter(box => box.x < left || box.y < top || box.right > left + width || box.bottom > top + height)).toEqual([])
       expect(stood.filter(box => stood.some(other => other !== box && isOver(box, other)))).toEqual([])
     }
   })
@@ -198,7 +198,7 @@ describe('the links of a page', () => {
       ],
     })
     const page = pageOf(graph, 'labels')
-    expect(page).toMatch(/<g class="link" data-from="0" data-to="1"><path [^>]*\/><polygon [^>]*\/><text x="[\d.]+" y="[\d.]+">&lt;i&gt;yes&lt;\/i&gt;<\/text><\/g>/)
+    expect(page).toMatch(/<g class="link e0 e1"><path [^>]*\/><polygon [^>]*\/><text x="[\d.]+" y="[\d.]+">&lt;i&gt;yes&lt;\/i&gt;<\/text><\/g>/)
     expect(count(page, '&lt;i&gt;yes')).toBe(1)
     expect(page).not.toContain('<i>yes')
   })
@@ -254,21 +254,21 @@ describe('an undirected graph on a page', () => {
 describe('a graph of both kinds on a page', () => {
   test('a link that runs one way has an arrowhead, and one that runs no way has none', () => {
     const page = pageOf(readGraph({ nodes: ['a', 'b', 'c'].map(id => ({ id, label: id })), links: [{ from: 'a', to: 'b' }, { from: 'b', to: 'c', isDirected: false }, { from: 'c', to: 'a', isDirected: false }] }), '')
-    expect([...page.matchAll(/<g class="link"[^>]*>(.*?)<\/g>/g)].map(([, inner = '']) => inner.includes('<polygon'))).toEqual([true, false, false])
+    expect([...page.matchAll(/<g class="link[^"]*">(.*?)<\/g>/g)].map(([, inner = '']) => inner.includes('<polygon'))).toEqual([true, false, false])
   })
 })
 
 describe('links between the same two nodes on a page', () => {
   test('a link between the same two boxes as one before it, of the same kind, runs beside it, so the two never lie on one line', () => {
     const page = pageOf(readGraph({ nodes: ['a', 'b'].map(id => ({ id, label: id })), links: [{ from: 'a', to: 'b', label: 'start' }, { from: 'a', to: 'b', label: 'resume' }] }), '')
-    const [first = [], second = []] = [...page.matchAll(/<g class="link"[^>]*><path d="([^"]*)"/g)].map(([, path = '']) => numbers(path))
+    const [first = [], second = []] = [...page.matchAll(/<g class="link[^"]*"><path d="([^"]*)"/g)].map(([, path = '']) => numbers(path))
     expect(first).not.toEqual(second)
     expect((first[0] ?? 0) - (second[0] ?? 0)).toBeGreaterThan(0)
     expect([first[1], first.at(-1)]).toEqual([second[1], second.at(-1)])
   })
 
   test('a link of each kind between the same two boxes, twins between boxes of one layer, and twins that run back up all run apart, the ones back up on the far side', () => {
-    const pathsOf = (graph: Graph): number[][] => [...pageOf(graph, '').matchAll(/<g class="link"[^>]*><path(?: stroke-dasharray="[^"]*")? d="([^"]*)"/g)].map(([, path = '']) => numbers(path))
+    const pathsOf = (graph: Graph): number[][] => [...pageOf(graph, '').matchAll(/<g class="link[^"]*"><path(?: stroke-dasharray="[^"]*")? d="([^"]*)"/g)].map(([, path = '']) => numbers(path))
     const [one, none] = pathsOf(readGraph({ nodes: ['a', 'b'].map(id => ({ id, label: id })), links: [{ from: 'a', to: 'b' }, { from: 'a', to: 'b', isDirected: false }] }))
     expect(one).not.toEqual(none)
     const flat = readGraph({ nodes: ['a', 'b'].map(id => ({ id, label: id, layer: 0 })), links: [{ from: 'a', to: 'b', label: 'x' }, { from: 'a', to: 'b', label: 'y' }] })
@@ -291,7 +291,7 @@ describe('the page as a document', () => {
       links: [{ from: 'a', to: 'b', tone: 'bad' }, { from: 'a', to: 'c' }],
     })
     const page = pageOf(graph, '')
-    expect(count(page, '<g class="link toned bad" data-from="0" data-to="1">')).toBe(1)
+    expect(count(page, '<g class="link toned bad e0 e1">')).toBe(1)
     expect(links(page).map(link => [link.from, link.to])).toEqual([[0, 2]])
     expect(page).toContain('.link.toned { color: var(--tone); }')
   })
@@ -336,13 +336,15 @@ describe('the page as a document', () => {
     expect(page).toContain('&lt;b&gt;')
     expect(page).toContain('it&#39;s')
     expect(page).toContain('<title>&lt;/title&gt;&lt;script&gt;alert(3)&lt;/script&gt;</title>')
-    expect(page).toContain('<g class="node plain"')
+    expect(page).toContain('<g class="node plain n0"')
     expect(count(page, '<script')).toBe(1)
     expect(page).not.toMatch(/img|onload|"quotes"|it's/)
   })
 
-  test('the page fetches nothing: it names no address, and has no source, link or import', () => {
-    expect(pageOf(SHOP, 'Shop')).not.toMatch(/https?:|\/\/|src=|href=|url\(|@import|<link|<iframe/)
+  test('the page fetches nothing: it names no address but the namespace of SVG, and has no source, link or import', () => {
+    const page = pageOf(SHOP, 'Shop')
+    expect(count(page, ' xmlns="http://www.w3.org/2000/svg"')).toBe(1)
+    expect(page.replace(' xmlns="http://www.w3.org/2000/svg"', '')).not.toMatch(/https?:|\/\/|src=|href=|url\(|@import|<link|<iframe/)
   })
 
   test('an empty graph gives a page that says there is nothing to draw', () => {
@@ -350,6 +352,7 @@ describe('the page as a document', () => {
     expect(page).toStartWith('<!doctype html>')
     expect(page).toContain('<title>Empty</title>')
     expect(page).toContain('Nothing to draw')
+    expect(page).toContain('--page:')
     expect(page).not.toMatch(/<svg|<script/)
   })
 })
