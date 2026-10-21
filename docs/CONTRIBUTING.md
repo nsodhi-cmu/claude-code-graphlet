@@ -26,10 +26,10 @@ A graph is clicked only in Claude Code's fullscreen layout, and takes keys once 
 | `graphlet/hooks/layers.ts` | Reading a graph, and putting it in layers. | [LAYERS](LAYERS.md) |
 | `graphlet/hooks/layout.ts` | Boxes on shelves, and the wires in the channels between them. | [LAYOUT](LAYOUT.md) |
 | `graphlet/hooks/paint.ts` | Painting a layout through a window. | [DRAWING](DRAWING.md) |
-| `graphlet/hooks/window.ts` | What a room shows of a layout, and where a scroll or a step goes. | [DRAWING](DRAWING.md#the-window) |
-| `graphlet/hooks/view.ts` | A graph as a person looks at it: which way it runs, in focus, with groups collapsed, laid out once for a room. | [API](API.md#a-graph), [DRAWING](DRAWING.md#focus) |
+| `graphlet/hooks/window.ts` | What a room shows of a layout, where a scroll or a step goes, and the order a layout is read in. | [DRAWING](DRAWING.md#the-window), [SVG](SVG.md#on-a-surface) |
+| `graphlet/hooks/view.ts` | A graph as a person looks at it: which way it runs, in focus, with groups collapsed, laid out once for a room, and drawn in cells or in SVG. | [API](API.md#a-graph), [DRAWING](DRAWING.md#focus), [SVG](SVG.md#on-a-surface) |
 | `graphlet/hooks/draw.ts` | What a drawing is made of: runs of paint, the rectangles a click lands on, cells, widths, and the foot. | [DRAWING](DRAWING.md) |
-| `graphlet/hooks/svg.ts` | A graph drawn in SVG, for the web page. | [SVG](SVG.md) |
+| `graphlet/hooks/svg.ts` | A graph drawn in SVG, for the web page and for a surface that takes a picture. | [SVG](SVG.md) |
 | `graphlet/hooks/page.ts` | The graph as a web page. | [PAGE](PAGE.md) |
 | `graphlet/hooks/reply.ts` | A reply's graph blocks, what the model is told of them, their drawings at the reply's edge, and their still pictures. | [REPLIES](REPLIES.md) |
 | `graphlet/hooks/tips.ts` | The tips on the hint line under the prompt, and which one is shown. | |

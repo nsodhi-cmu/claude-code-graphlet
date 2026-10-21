@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { numbers } from './fixture'
+import { LOOK, busy, numbers } from './fixture'
 import type { GraphletMove } from '../types'
 import { rowText, sizeOf } from '../hooks/draw'
 import { ranksOf, readGraph } from '../hooks/layers'
@@ -12,7 +12,7 @@ const LOOKS: Look[] = (['pinned', 'sheet'] as const).flatMap(scroll =>
   (['wrap', 'clip'] as const).flatMap(labels => (['separate', 'merged'] as const).map(links => ({ scroll, labels, links, motion: 'still' as const }))),
 )
 
-test('any graph, in any room, under any settings, is drawn inside its room with no two boxes on one cell, and every move and scroll has an answer', () => {
+test('any graph, in any room, under any settings, is drawn inside its room with no two boxes on one cell, every move and scroll has an answer, and its picture in SVG holds every node once and is short enough for a surface', () => {
   const next = numbers(7)
   const pick = (below: number): number => Math.floor(next() * below)
   for (let run = 0; run < 300; run += 1) {
@@ -54,7 +54,32 @@ test('any graph, in any room, under any settings, is drawn inside its room with 
     for (const move of ['left', 'right', 'up', 'down'] as const) expect(ids.has(view.step(graph, selected, move, room, pan))).toBe(true)
     expect(view.scroll(graph, room, pan, pick(7) - 3).x).toBeGreaterThanOrEqual(0)
     expect(view.measure(graph, room.columns).rows).toBeGreaterThanOrEqual(drawing.rows.length)
+
+    const vector = view.vector(graph, selected, room)
+    expect(vector === undefined).toBe(graph.nodes.length === 0)
+    expect(view.order(graph, room).toSorted()).toEqual(graph.nodes.map(node => node.id).toSorted())
+    const source = vector?.source ?? ''
+    expect(source).not.toMatch(/NaN|Infinity|undefined/)
+    expect(source.match(/<g class="node /g)?.length ?? 0).toBe(graph.nodes.length)
+    const [left = 0, top = 0, wide = 0, tall = 0] = (/viewBox="([^"]*)"/.exec(source)?.[1] ?? '').split(' ').map(Number)
+    const boxes = [...source.matchAll(/<rect class="(?:box|hull)" x="([\d.-]+)" y="([\d.-]+)" width="([\d.]+)" height="([\d.]+)"/g)].map(([whole = '', ...sizes]) => {
+      const [x = NaN, y = NaN, width = NaN, height = NaN] = sizes.map(Number)
+      return { isBox: whole.includes('"box"'), x, y, right: x + width, bottom: y + height }
+    })
+    expect(boxes.filter(box => box.x < left || box.y < top || box.right > left + wide || box.bottom > top + tall)).toEqual([])
+    const nodes = boxes.filter(box => box.isBox)
+    expect(nodes.filter(box => nodes.some(other => other !== box && box.x < other.right && other.x < box.right && box.y < other.bottom && other.y < box.bottom))).toEqual([])
   }
+})
+
+test('a picture in SVG lights the node the pointer is over while that leaves it short enough for a surface, and else does not, and is none where even that is too long', () => {
+  const view = viewOf(LOOK, true, false)
+  const room = { columns: 80, rows: 1000 }
+  expect(view.vector(readGraph(busy(12, 20)), null, room)?.source).toContain(':hover)')
+  const unlit = view.vector(readGraph(busy(250, 500)), null, room)?.source
+  expect(unlit).toBeDefined()
+  expect(unlit).not.toContain(':hover)')
+  expect(view.vector(readGraph(busy(1000, 2000)), null, room)).toBeUndefined()
 })
 
 test('the letters under the arrows move as the arrows do', () => {

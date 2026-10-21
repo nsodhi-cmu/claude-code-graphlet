@@ -149,9 +149,12 @@ const CORNERS: ReadonlyArray<ReadonlyArray<{ text: string; does?: 'copy' | 'page
 /** The room between the counts and the corner. */
 export const CORNER_GAP = 2
 
+/** How many of a thing there are, in words: `1 node`, `3 nodes`. */
+export const countOf = (count: number, what: string): string => `${count} ${what}${count === 1 ? '' : 's'}`
+
 /** How many of a graph's nodes and links were left out, said in full and said short: nothing where none were. */
 export function leftOut(unread: { nodes: number; links: number }): string[] {
-  const many = (count: number, what: string): string[] => (count === 0 ? [] : [`${count} ${what}${count === 1 ? '' : 's'}`])
+  const many = (count: number, what: string): string[] => (count === 0 ? [] : [countOf(count, what)])
   const told = [...many(unread.nodes, 'node'), ...many(unread.links, 'link')]
   return told.length === 0 ? [] : [`${told.join(' and ')} left out`, told.map(one => `+${one}`).join(' ')]
 }

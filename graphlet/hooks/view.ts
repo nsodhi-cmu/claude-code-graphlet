@@ -7,7 +7,8 @@ import { LEAST_COLUMNS, breadthOf, layoutOf } from './layout'
 import type { Direction, Layout, Look } from './layout'
 import { paint } from './paint'
 import type { Finding } from './paint'
-import { scrollIn, showIn, sightOf, stepIn } from './window'
+import { MOST_SVG_CHARS, altOf, svgOf } from './svg'
+import { orderOf, scrollIn, showIn, sightOf, stepIn } from './window'
 
 // A graph as a person looks at it: laid out for a room, seen through a
 // window, with one node selected.
@@ -21,6 +22,8 @@ const LEAST_CHANNEL_COLUMNS = 2
 const FEWER_ROWS = 2
 /** How many nodes a graph in focus shows: the selected one and those nearest it, about as many as a pane shows whole. */
 export const FOCUS_NODES = 24
+/** How many pixels a cell of a layout is in a picture drawn in SVG, across a layer: running down, about the width of a character of a surface's code font, so that a graph laid out in a surface's columns is drawn about as wide as they are; running right, about the height of its line. */
+const SURFACE_CELL: Readonly<Record<Direction, number>> = { down: 8, right: 16 }
 
 /**
  * A graph in focus on its selected node: that node and those nearest it, by
@@ -127,6 +130,9 @@ function isRighter(down: Layout, right: Layout, room: Room): boolean {
   return isFitting && FEWER_ROWS * right.columns <= down.rows
 }
 
+/** A graph drawn for a surface that draws vectors: its SVG document, and what it says for a reader who cannot see it. */
+export type Vector = { source: string; alt: string }
+
 /** What a view does with a graph, drawing it as it was made to. */
 export type View = {
   /** Which way a graph runs in a room: as it says, or as `isRighter` finds better. */
@@ -135,6 +141,10 @@ export type View = {
   measure: (graph: Graph, columns: number) => GraphletSize
   /** Draws the graph through a window at `pan`, with what is being found marked. */
   draw: (graph: Graph, selected: string | null, room: Room, pan: Pan, finding?: Finding) => Drawing
+  /** Draws the graph whole, in SVG, laid out as for `room`: none for a graph with no nodes, or one whose document is longer than a surface takes. */
+  vector: (graph: Graph, selected: string | null, room: Room) => Vector | undefined
+  /** The graph's nodes in the order its picture, laid out as for `room`, is read. */
+  order: (graph: Graph, room: Room) => string[]
   /** Where the window stands to show the selected node: as near `from` as it can. */
   show: (graph: Graph, selected: string | null, room: Room, from: Pan) => Pan
   /** Where the window stands after it is scrolled from `from`: by cells, or by turns of the wheel. */
@@ -154,7 +164,9 @@ export type View = {
  * graph holds, which way it runs, and the columns of its room, and its rows
  * too for one that runs right, and hands the same one back for the same
  * graph in such a room. Its drawings have a corner to copy and open the graph
- * by where it `hasCorner`, as a drawing to click has.
+ * by where it `hasCorner`, as a drawing to click has. Its pictures in SVG
+ * light the node the pointer is over, where that leaves the document short
+ * enough for a surface, and move the selected node's links as `look` says.
  */
 export function viewOf(look: Look, fold = false, hasCorner = true): View {
   const kept = new Map<string, Layout>()
@@ -185,6 +197,15 @@ export function viewOf(look: Look, fold = false, hasCorner = true): View {
       return { columns: across, rows: layout.shelves.length === 0 ? 0 : layout.rows + 1 }
     },
     draw: (graph, selected, room, pan, finding) => paint(laid(graph, room), graph, selected, room, pan, finding, look.motion === 'flowing', hasCorner),
+    vector: (graph, selected, room) => {
+      if (graph.nodes.length === 0) return undefined
+      const layout = laid(graph, room)
+      const drawn = (isLighting: boolean): string => svgOf(graph, layout, SURFACE_CELL[layout.direction], { selected, isFlowing: look.motion === 'flowing', isLighting })
+      const lit = drawn(true)
+      const source = lit.length <= MOST_SVG_CHARS ? lit : drawn(false)
+      return source.length > MOST_SVG_CHARS ? undefined : { source, alt: altOf(graph) }
+    },
+    order: (graph, room) => orderOf(laid(graph, room)),
     show: (graph, selected, room, from) => showIn(laid(graph, room), selected, room, from),
     scroll: (graph, room, from, by) => scrollIn(laid(graph, room), room, from, by),
     step: (graph, selected, move, room, pan) => stepIn(laid(graph, room), graph, selected, move, room, pan),

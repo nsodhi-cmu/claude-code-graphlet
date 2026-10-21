@@ -8,7 +8,8 @@ import type { Direction, Layout, Place, Shelf } from './layout'
 
 // The window a layout is seen through: how much of it a room shows, where
 // the window stands to show the selected node, and where a scroll or a step
-// of the selection takes it. A window stands as its layout is laid out, its
+// of the selection takes it; and the order a layout is read in, for a step
+// through it where there is no window. A window stands as its layout is laid out, its
 // `x` across the shelves and its `y` along the layers, which for a graph
 // that runs right are down the room and across it; what the room hands it,
 // a scroll by cells and an arrow key, is turned to match.
@@ -125,4 +126,15 @@ export function stepIn(
     (a, b) => Math.abs(seenAt(a) - seenAt(place)) - Math.abs(seenAt(b) - seenAt(place)),
   )[0]
   return (to === undefined ? undefined : idOf(to)) ?? selected
+}
+
+/** The nodes in the order a layout is read: its shelves from the first, and each across. */
+export const orderOf = (layout: Layout): string[] =>
+  layout.shelves.flatMap(shelf => shelf.places.toSorted((a, b) => a.x - b.x).flatMap(place => ('node' in place.slot ? [place.slot.node.id] : [])))
+
+/** The node a step along `order` lands on from the selected one, `way` a step on or back, round from the last to the first; from none selected, the first or the last. */
+export function stepThrough(order: readonly string[], selected: string | null, way: 1 | -1): string | undefined {
+  const at = order.indexOf(selected ?? '')
+  const from = at === -1 ? (way === 1 ? -1 : 0) : at
+  return order[(from + way + order.length) % order.length]
 }

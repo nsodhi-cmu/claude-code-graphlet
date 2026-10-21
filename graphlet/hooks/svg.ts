@@ -1,5 +1,5 @@
 import type { GraphletNode, GraphletTone } from '../types'
-import { sizeOf } from './draw'
+import { countOf, sizeOf } from './draw'
 import type { Graph, Link, Node, Slot } from './layers'
 import { labelOf, linesOf } from './layout'
 import type { Direction, Frame, Layout } from './layout'
@@ -53,6 +53,10 @@ const ARC_DEPTH = 40
 const LOOP = { reach: 30, span: 16 }
 /** How far a group's frame stands out from its first and last layers, and how far from what it holds across them. */
 const FRAME_PAD = { along: 26, across: 12 }
+/** The most characters of what a picture says for a reader who cannot see it; the links past them are counted. */
+const MOST_ALT_CHARS = 1000
+/** The most characters of an SVG document a surface takes. */
+export const MOST_SVG_CHARS = 131_072
 
 /** The tones a node, a link, or a frame may be drawn in, each a class of the drawing's style. One the drawing does not know is drawn plain. */
 const TONES: readonly GraphletTone[] = ['plain', 'dim', 'note', 'good', 'warn', 'bad']
@@ -479,3 +483,29 @@ export function svgOf(graph: Graph, layout: Layout, cell: number, seen: Seen): s
   return `<svg xmlns="http://www.w3.org/2000/svg" ${size} class="${seen.isFlowing ? 'flowing' : 'still'}">\n${style}\n${[back, ...frames, ...links, ...nodes].join('\n')}\n</svg>`
 }
 
+/**
+ * What a picture of a graph says for a reader who cannot see it: how many
+ * nodes and links it has, then each link, by the labels of its two ends,
+ * with an arrow where it runs one way and a dash where it runs no way, and
+ * its label after it; and each node no link joins. What would run past
+ * `MOST_ALT_CHARS` is counted instead.
+ */
+export function altOf(graph: Graph): string {
+  const labelOfNode = new Map(graph.nodes.map(node => [node.id, node.label]))
+  const said = [
+    ...graph.links.map(link => {
+      const [from, to] = [labelOfNode.get(link.from) ?? link.from, labelOfNode.get(link.to) ?? link.to]
+      return `${from} ${link.isDirected ? '→' : '—'} ${to}${link.label === undefined ? '' : ` (${link.label})`}`
+    }),
+    ...graph.nodes.filter(node => !graph.links.some(link => link.from === node.id || link.to === node.id)).map(node => node.label),
+  ]
+  const head = `A graph of ${countOf(graph.nodes.length, 'node')} and ${countOf(graph.links.length, 'link')}`
+  const kept: string[] = []
+  for (const one of said) {
+    if ([head, ...kept, one].join('; ').length > MOST_ALT_CHARS) break
+    kept.push(one)
+  }
+  const listed = kept.length === 0 ? head : `${head}: ${kept.join('; ')}`
+  const rest = said.length - kept.length
+  return rest === 0 ? `${listed}.` : `${listed}; and ${rest} more.`
+}

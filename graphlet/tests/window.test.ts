@@ -5,7 +5,9 @@ import { LOOK, SHOP, graphOf, picture } from './fixture'
 import type { Hit, Pan } from '../hooks/draw'
 import { readGraph } from '../hooks/layers'
 import type { Graph } from '../hooks/layers'
+import { layoutOf } from '../hooks/layout'
 import { viewOf } from '../hooks/view'
+import { orderOf, stepThrough } from '../hooks/window'
 
 const pinned = viewOf(LOOK)
 const sheet = viewOf({ ...LOOK, scroll: 'sheet' })
@@ -326,5 +328,19 @@ describe('moving the selection', () => {
     const empty = readGraph({ nodes: [], links: [] })
     expect(pinned.show(empty, null, WHOLE, { x: 5, y: 5 })).toEqual(ORIGIN)
     expect(pinned.scroll(empty, WHOLE, ORIGIN, 3)).toEqual(ORIGIN)
+  })
+})
+
+describe('the order a layout is read in', () => {
+  test('a layout is read a shelf at a time, from the first, and each shelf across', () => {
+    const graph = graphOf(['top1', 'top2', 'x', 'y', 'under'], [['top1', 'y'], ['top2', 'x'], ['x', 'under']])
+    expect(orderOf(layoutOf(graph, WHOLE, LOOK, true, 'down'))).toEqual(['top1', 'top2', 'y', 'x', 'under'])
+  })
+
+  test('a step through it goes on or back from the selected node, round from the last to the first, and from none selected to the first or the last', () => {
+    const order = ['a', 'b', 'c']
+    expect([stepThrough(order, 'b', 1), stepThrough(order, 'c', 1), stepThrough(order, 'a', -1)]).toEqual(['c', 'a', 'c'])
+    expect([stepThrough(order, null, 1), stepThrough(order, null, -1)]).toEqual(['a', 'c'])
+    expect(stepThrough([], null, 1)).toBeUndefined()
   })
 })

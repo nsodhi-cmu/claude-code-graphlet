@@ -4,7 +4,7 @@ import { LOOK, SHOP, graphOf } from './fixture'
 import { readGraph } from '../hooks/layers'
 import type { Graph } from '../hooks/layers'
 import { layoutOf } from '../hooks/layout'
-import { svgOf } from '../hooks/svg'
+import { altOf, svgOf } from '../hooks/svg'
 import type { Seen } from '../hooks/svg'
 
 const ROOM = { columns: 80, rows: 1000 }
@@ -87,4 +87,23 @@ test('what a graph says is escaped in a picture, and what no XML document may ho
   expect(svg).toContain('>half  of  a pair</tspan>')
   expect(svg).toContain('>it&#39;s</text>')
   expect(svg).not.toMatch(/[\ud800-\udfff\ufffe]/)
+})
+
+describe('what a picture says for a reader who cannot see it', () => {
+  test('how many nodes and links the graph has, each link by its ends, its way, and its label, and each node no link joins', () => {
+    const graph = readGraph({
+      nodes: [{ id: 'a', label: 'Start' }, { id: 'b', label: 'Valid?' }, { id: 'c', label: 'Peer' }, { id: 'd', label: 'Alone' }],
+      links: [{ from: 'a', to: 'b' }, { from: 'b', to: 'a', label: 'retry' }, { from: 'b', to: 'c', isDirected: false }],
+    })
+    expect(altOf(graph)).toBe('A graph of 4 nodes and 3 links: Start → Valid?; Valid? → Start (retry); Valid? — Peer; Alone.')
+    expect(altOf(graphOf(['only'], []))).toBe('A graph of 1 node and 0 links: only.')
+  })
+
+  test('what would run long is counted instead', () => {
+    const ids = Array.from({ length: 200 }, (_, index) => `node number ${index}`)
+    const alt = altOf(graphOf(ids, ids.slice(1).map((id, index) => [ids[index] ?? '', id])))
+    expect(alt.length).toBeLessThanOrEqual(1000 + '; and 999 more.'.length)
+    expect(alt).toStartWith('A graph of 200 nodes and 199 links: node number 0 → node number 1; ')
+    expect(alt).toMatch(/; and \d+ more\.$/)
+  })
 })

@@ -1,6 +1,6 @@
 # The Picture In SVG
 
-A graph drawn in SVG is what the [web page](PAGE.md) shows. Drawing it is `svgOf` in `graphlet/hooks/svg.ts`.
+A graph drawn in SVG is what the [web page](PAGE.md) shows, and what a view draws for a surface that takes a picture in SVG. Drawing it is `svgOf` in `graphlet/hooks/svg.ts`; a view's `vector`, in `graphlet/hooks/view.ts`, lays a graph out for a surface's room and draws it there.
 
 ## The Drawing
 
@@ -31,3 +31,9 @@ With `isLighting`, the drawing has a rule for each node: while the pointer is ov
 The colors are set once for a light scheme and once for a dark one, and the surface picks by the person's own setting.
 
 The document is as large as what it draws: every box, lane, frame, frame title, and link label, and the points each curve passes through and is pulled toward, with `PAD` around them, all on a sheet with rounded corners and a dim border, in the color of the page, under the rest. Its `width` and `height` are that size in pixels, so a surface draws it at that size, or smaller where its room is narrower.
+
+## On A Surface
+
+A view's `vector` draws a graph whole, laid out as the view lays it out for the room, with a cell of the layout `SURFACE_CELL` pixels across a layer: running down, about the width of a character of a surface's code font, so that a graph laid out in a surface's columns is drawn about as wide as they are. It draws the selected node it is given, and moves its links as the view's `motion` says. The engine takes an `Svg` of no more than `MOST_SVG_CHARS` characters, so the drawing has the rules that light a node as the pointer passes where that leaves it short enough, and else it has none; where even that is too long, the view draws none, and the graph is drawn as plain text instead.
+
+Beside the document, the view answers what the picture says for a reader who cannot see it, `altOf`: how many nodes and links the graph has, then each link by the labels of its two ends, with `→` where it runs one way and `—` where it runs no way, and its label after it in parentheses, and then each node no link joins. What would run past `MOST_ALT_CHARS` characters is counted instead: `; and 12 more`. A view's `order` is the graph's nodes in the order its picture is read, `orderOf` in `graphlet/hooks/window.ts`: its layers from the first, and each across.

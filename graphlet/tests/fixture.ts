@@ -69,3 +69,9 @@ export const SHOP_GRAPH: GraphletGraph = {
 }
 
 export const SHOP = readGraph(SHOP_GRAPH)
+
+/** A graph of `count` nodes and `links` links, each node linked to nodes all over the graph: as busy as a graph is drawn. */
+export const busy = (count: number, links: number): GraphletGraph => ({
+  nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: `node number ${index}` })),
+  links: Array.from({ length: links }, (_, index) => ({ from: `n${index % count}`, to: `n${(index * 7 + 1) % count}` })),
+})
