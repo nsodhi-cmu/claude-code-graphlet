@@ -1,6 +1,4 @@
-# Written by Claude Code each time it loads the mod, for the version that loaded it.
 graphlet/.claude-plugin/types/
 graphlet/evals/results/
-# Each person's own instructions for their coding agent; the rules for everyone are docs/CONTRIBUTING.md.
 CLAUDE.md
 AGENTS.md
