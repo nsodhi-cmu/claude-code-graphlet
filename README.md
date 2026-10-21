@@ -52,7 +52,7 @@ Storage:
 ```
 ````
 
-In Claude Code's fullscreen layout, click a graph to move through it. [docs/REPLIES.md](docs/REPLIES.md) has the block's whole syntax.
+In Claude Code's fullscreen layout, click a graph to move through it. On the desktop app, VS Code, and the mobile app, the graph is drawn as a picture. [docs/REPLIES.md](docs/REPLIES.md) has the block's whole syntax.
 
 ## In Other Mods
 
@@ -90,11 +90,12 @@ on('graphlet.select', async ($, e, next) => {
 - **Emphasis**: heavy frames for the nodes that matter most.
 - **Groups**, framed and named, that collapse into one box and open again.
 - **Down or right**, whichever fits better.
+- **Pictures beyond the terminal**: on the desktop app, VS Code, and the mobile app, a graph in a reply is drawn as a picture that follows your light or dark setting and, where you point, lights a node's links.
 - **Fitting its room**: a graph folds to a reply's width, and scrolls, following the selection, when it is too large.
 - **Selecting**: click a node to light its links, and move along them with the arrow keys. In a mod's graph, return or a double click opens a node.
 - **Finding and focusing**: `/` finds a node as you type, and in a large graph, `f` shows just the selected node and its nearest.
 - **Copy**: `copy`, or `c`, puts the graph on your clipboard as text.
-- **The web page**: `html ↗` opens the graph in your browser, to zoom and pan.
+- **The web page**: `html ↗`, or `Open in browser` on the desktop app and VS Code, opens the graph in your browser, to zoom and pan.
 
 ## Settings
 
@@ -110,7 +111,7 @@ In `/config`, or `/plugin configure graphlet@claude-code-graphlet`. The first ch
 
 ## Limits
 
-- The desktop and mobile apps show a graph as a still picture in text. The VS Code extension doesn't draw mods yet; run `claude` in its terminal instead.
+- On the desktop app, VS Code, and the mobile app, a graph in a reply is a picture: nothing there copies a graph as text, the mobile app opens no web page, and a mod's graph is a still picture in text. VS Code draws them from extension 2.1.299.
 - The mouse reaches a graph only in Claude Code's fullscreen layout. On the main screen, a reply's graph is a still picture.
 - A clicked graph keeps the keys until Escape. A drag moves it rather than selecting its text, so use `copy`.
 - Where an organization manages Claude Code, Claude is told it can draw graphs only if graphlet is listed in managed settings.
@@ -120,4 +121,4 @@ In `/config`, or `/plugin configure graphlet@claude-code-graphlet`. The first ch
 
 ## Security and Privacy
 
-graphlet makes no network requests, calls no model, and keeps nothing between sessions. The only file it writes is the web page `html ↗` opens, in your temporary folder.
+graphlet makes no network requests, calls no model, and keeps nothing between sessions. The only file it writes is the web page `html ↗` and `Open in browser` open, in your temporary folder.

@@ -194,7 +194,7 @@ The last row of a drawing is its foot. A graph with no nodes has no drawing, and
 - Where nodes or links were left out of a graph past the most that are read, it says how many: `12 nodes and 340 links left out`, or in a narrow room `+12 nodes +340 links`.
 - In its right corner is `copy · html ↗`. A click on `copy` puts the graph on the clipboard as plain text, as `c` does, and one on `html ↗` opens the graph as a [web page](PAGE.md). Where the row is too narrow for all of it, the corner says `copy · ↗`, and then only `↗`, and what was left out keeps its place over the corner's words.
 
-A still picture, as plain text takes it, on the main screen, on a surface graphlet draws no picture on, and as a copy, keeps the counts and what was left out, reaching the right edge, and has no corner, since nothing in it can be clicked; and no foot when all of it is in view and nothing was left out. A site's drawing on the main screen has no corner either. In a reply, `alignedLeft` brings the note and the corner in to the right edge of the picture, which stands at the reply's left edge.
+A still picture, as plain text takes it, on the main screen, on a surface graphlet draws no `Client` or `Svg` on, in place of an `Svg` too long for its surface, and as a copy, keeps the counts and what was left out, reaching the right edge, and has no corner, since nothing in it can be clicked; and no foot when all of it is in view and nothing was left out. A site's drawing on the main screen has no corner either. In a reply, `alignedLeft` brings the note and the corner in to the right edge of the picture, which stands at the reply's left edge.
 
 ## Moving The Selection
 

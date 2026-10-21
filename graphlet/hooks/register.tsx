@@ -1,7 +1,7 @@
-import type { Elements, EngineInterface, Register, RenderSurface, RenderViewport } from 'claude-code'
+import type { Elements, EngineInterface, Register, RenderElement, RenderSurface, RenderViewport } from 'claude-code'
 
 import type { Graphlet } from '../types'
-import { MOST_CELLS, MOST_TREE_CHARS, bounded, charactersOf, cornerless, rowText, sizeOf, styleOf } from './draw'
+import { MOST_CELLS, MOST_TREE_CHARS, bounded, charactersOf, cornerless, leftOut, rowText, sizeOf, styleOf } from './draw'
 import type { Drawing, Pan, Room } from './draw'
 import { readGraph } from './layers'
 import type { Graph } from './layers'
@@ -10,7 +10,7 @@ import { pageOf } from './page'
 import { GUIDE, fencedOf, inReply, partsOf, pictureOf } from './reply'
 import { TIP_ODDS, tipOf } from './tips'
 import { MOVES, collapsedOf, focusOf, leadOf, viewOf } from './view'
-import type { View } from './view'
+import type { Vector, View } from './view'
 
 /**
  * What a place holds, as it was last drawn: the view it is drawn by, the
@@ -29,8 +29,9 @@ type Held = { view: View; given: Graph; whole: Graph; graph: Graph; room: Room; 
  * selected node; what the person is typing to find, missing while they are
  * not finding a node; how far they have dragged the graph since the button
  * went down, as far as it has scrolled the graph for, and in which drag; how
- * many times `show` named it since the band last drew it; and what was last
- * drawn there.
+ * many times `show` named it since the band last drew it; what was last
+ * drawn there; and in a reply, the graph its picture last showed on a
+ * surface that draws vectors, running the way it ran.
  */
 type Place = {
   picked?: string
@@ -41,6 +42,7 @@ type Place = {
   dragged?: { grab: unknown; at: Pan }
   asks: number
   held?: Held
+  pictured?: Graph & { direction: Direction }
 }
 
 const ORIGIN: Pan = { x: 0, y: 0 }
@@ -187,6 +189,9 @@ const rowsOf = (Text: Elements['terminal']['Text'], drawing: Drawing) =>
 /** Whether the terminal reports the mouse: in the fullscreen layout, and not on the main screen. */
 const isClickable = (viewport: RenderViewport | undefined): boolean => viewport?.isFullscreen !== false
 
+/** The key of the Client that draws a site's graph, and of a site's graph among the controls under its picture; the key of each of a reply's graphs starts with it. */
+const GRAPH = 'graph'
+
 /**
  * A site's graph on the terminal: to click and move through; on the main
  * screen, with no corner, since nothing there can be clicked; and where its
@@ -194,8 +199,35 @@ const isClickable = (viewport: RenderViewport | undefined): boolean => viewport?
  */
 const siteTreeOf = (elements: Pick<Elements['terminal'], 'Box' | 'Text' | 'Client'>, site: string, viewport: RenderViewport | undefined, at: Held) => {
   const { Box, Text, Client } = elements
-  if (faulted.has(faultOf(site, 'graph'))) return <Box flexDirection="column">{rowsOf(Text, cornerless(at.drawing))}</Box>
-  return <Client key="graph" module="./surface.tsx" props={isClickable(viewport) ? at.drawing : cornerless(at.drawing)} />
+  if (faulted.has(faultOf(site, GRAPH))) return <Box flexDirection="column">{rowsOf(Text, cornerless(at.drawing))}</Box>
+  return <Client key={GRAPH} module="./surface.tsx" props={isClickable(viewport) ? at.drawing : cornerless(at.drawing)} />
+}
+
+/** The surfaces that draw a picture in SVG, an `Svg`: the desktop app, VS Code, and the mobile app. */
+type Vectored = 'desktop' | 'vscode' | 'mobile'
+const VECTORED: ReadonlySet<string> = new Set<Vectored>(['desktop', 'vscode', 'mobile'])
+
+/** What a control graphlet draws under a picture runs: the person's act is a hook's to answer, by the control's key. */
+const NOTHING = (): void => undefined
+
+/** What the key of every control graphlet draws under a picture starts with, so that it is no other plugin's. */
+const CONTROL = 'graphlet:'
+/** The key of a control under a picture: the key of the graph it is under, and what it does. */
+const controlKeyOf = (key: string, does: string): string => `${CONTROL}${key}:${does}`
+
+/** A graph's picture on a surface that draws vectors, and under it what was left out of the graph, where anything was, and its controls, in a row. */
+const pictureTreeOf = (elements: Pick<Elements[Vectored], 'Box' | 'Text' | 'Svg'>, vector: Vector, graph: Graph, controls: RenderElement[]) => {
+  const { Box, Text, Svg } = elements
+  const note = leftOut(graph.unread)[0]
+  return (
+    <Box flexDirection="column" gap="sm">
+      {[
+        <Svg source={vector.source} alt={vector.alt} isInteractive />,
+        ...(note === undefined ? [] : [<Text dimColor>{note}</Text>]),
+        ...(controls.length === 0 ? [] : [<Box flexDirection="row" flexWrap="wrap" gap="sm">{controls}</Box>]),
+      ]}
+    </Box>
+  )
 }
 
 /** Puts a graph on the clipboard as plain text, as `textOf` draws it, and says whether it went. */
@@ -209,8 +241,29 @@ const copyGraph = async ($: EngineInterface, graph: Graph, room: Room, surface?:
 const BULLET_COLUMNS = 2
 /** How wide a reply is taken to be on a surface that has not said. */
 const REPLY_COLUMNS = 80
-/** The key of the Client that draws the graph at `index` among a reply block's graphs. */
-const keyOf = (index: number): string => `graph:${index}`
+/** The key of the graph at `index` among a reply block's graphs: of the Client that draws it, and of the place it keeps. */
+const keyOf = (index: number): string => `${GRAPH}:${index}`
+/** What the web page of a reply block's graph is named: for the block's request, and the graph's place among its graphs. */
+const pageNameOf = (requestId: string, key: string): string => `reply-${requestId.replace(/[^A-Za-z0-9]/g, '').slice(-8)}-${key.slice(`${GRAPH}:`.length)}`
+
+/**
+ * A reply block's graph on a surface that draws vectors: its picture, with
+ * nothing selected, and, except on the mobile app, a control under it that
+ * opens it as a web page, kept in its place among the block's; or where the
+ * picture is too large for the surface, its still picture as plain text,
+ * fenced as code, as large as its share of what the block may draw.
+ */
+const vectorReplyOf = (elements: Pick<Elements[Vectored], 'Box' | 'Text' | 'Svg' | 'Button' | 'Markdown'>, surface: Vectored, kept: Map<string, Place>, graph: Graph, index: number, room: Room, share: number) => {
+  const { Button, Markdown } = elements
+  const vector = still.vector(graph, null, room)
+  if (vector === undefined) return <Markdown text={fencedOf(bounded(pictureOf(still, graph, room), share))} />
+  const key = keyOf(index)
+  const place = kept.get(key) ?? placeOf()
+  kept.set(key, place)
+  place.pictured = { ...graph, direction: still.direction(graph, room) }
+  const controls = surface === 'mobile' ? [] : [<Button key={controlKeyOf(key, 'page')} label="Open in browser" plain dimColor onPress={NOTHING} />]
+  return pictureTreeOf(elements, vector, graph, controls)
+}
 
 const isPan = (value: unknown): value is Pan =>
   typeof value === 'object' &&
@@ -230,6 +283,13 @@ type Acts = {
   scroll: (by: Pan) => Promise<void>
   open: (node: string) => Promise<void>
   key: (key: string, selected: string | null) => Promise<void>
+}
+
+/** What a control under a picture is, by its key: the key of the graph it is under, and what it does; none for a key graphlet gave no control. */
+const controlOf = (element: string): { key: string; does: string } | undefined => {
+  if (!element.startsWith(CONTROL)) return undefined
+  const [key, does] = [element.slice(CONTROL.length, element.lastIndexOf(':')), element.slice(element.lastIndexOf(':') + 1)]
+  return { key, does }
 }
 
 export const register: Register = (on, options) => {
@@ -334,7 +394,8 @@ export const register: Register = (on, options) => {
     const share = Math.max(0, MOST_TREE_CHARS - words) / parts.filter(part => 'graph' in part).length
     const graphs = parts.flatMap(part => ('graph' in part ? [readGraph(part.graph)] : []))
     const shown = parts.map((part, at) => ('text' in part ? part : { graph: graphs[parts.slice(0, at).filter(one => 'graph' in one).length] as Graph }))
-    if (e.surface !== 'terminal') {
+    const isPictured = e.surface === 'terminal' || VECTORED.has(e.surface)
+    if (!isPictured) {
       const text = shown.map(part => ('text' in part ? part.text : fencedOf(bounded(pictureOf(still, part.graph, room), share)))).join('\n\n')
       return next({ ...e, props: { ...e.props, text } })
     }
@@ -342,10 +403,19 @@ export const register: Register = (on, options) => {
     replies.delete(e.requestId)
     replies.set(e.requestId, kept)
     for (const old of [...replies.keys()].slice(0, Math.max(0, replies.size - KEPT_REPLIES))) replies.delete(old)
-    const { Box, Text, Markdown, Client } = $.ui.resolve(e)
     const [first, ...rest] = shown
     const lead = first !== undefined && 'text' in first ? [await next({ ...e, props: { ...e.props, text: first.text } })] : []
     const following = lead.length > 0 ? rest : shown
+    if (e.surface !== 'terminal') {
+      const elements = $.ui.resolve(e)
+      const { Box, Markdown } = elements
+      return (
+        <Box flexDirection="column" gap="md">
+          {[...lead, ...following.map(part => ('text' in part ? <Markdown text={part.text} /> : vectorReplyOf(elements, e.surface, kept, part.graph, graphs.indexOf(part.graph), room, share)))]}
+        </Box>
+      )
+    }
+    const { Box, Text, Markdown, Client } = $.ui.resolve(e)
     /**
      * The graph at `index` among the block's graphs: in the fullscreen layout,
      * which alone reports the mouse, to click and move through, as the person
@@ -397,6 +467,16 @@ export const register: Register = (on, options) => {
   on('ui.fault', async ($, e, next) => {
     faulted.add(faultOf(e.requestId, e.element))
     $.ui.log(`graphlet: a graph could not be drawn to click (${e.reason}), so it is drawn still.`, { to: 'debug' })
+    return next(e)
+  })
+
+  /** A press on a control under a reply's picture on a surface that draws vectors: a web page of the graph as it was pictured, or where graphlet keeps it no longer, a toast that says so. */
+  on('ui.press', { plugin: 'graphlet' }, async ($, e, next) => {
+    const control = controlOf(e.element)
+    if (control === undefined || e.component !== 'AssistantMessage') return next(e)
+    const pictured = replies.get(e.requestId)?.get(control.key)?.pictured
+    if (pictured === undefined) $.ui.toast('graphlet: that graph is no longer kept; scroll it out of view and back to draw it again.')
+    else if (control.does === 'page') await openPage($, pageNameOf(e.requestId, control.key), 'reply', pictured, pictured.direction)
     return next(e)
   })
 
@@ -477,8 +557,7 @@ export const register: Register = (on, options) => {
       const isFitting = isReply && still.measure(graph, at.room.columns).columns <= at.room.columns
       await copyGraph($, graph, isFitting ? at.room : SHEET, e.surface)
     } else if (page === true) {
-      const name = isReply ? `reply-${site.replace(/[^A-Za-z0-9]/g, '').slice(-8)}-${e.element.slice('graph:'.length)}` : site
-      await openPage($, name, isReply ? 'reply' : site, at.whole, at.view.direction(at.whole, at.room))
+      await openPage($, isReply ? pageNameOf(site, e.element) : site, isReply ? 'reply' : site, at.whole, at.view.direction(at.whole, at.room))
     } else if (query !== undefined && key === 'backspace' && query === '') {
       place.finding = undefined
       redraw()

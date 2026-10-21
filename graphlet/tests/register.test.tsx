@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 import type { Engine, Plugin } from 'claude-code/testing'
 import type { On, RenderPropsOf, RenderSurface } from 'claude-code'
 
-import { LOOK, SHOP, cellsOf, graphOf, graphRows, picture, undirected } from './fixture'
+import { LOOK, SHOP, busy, cellsOf, graphOf, graphRows, picture, undirected } from './fixture'
 import type { Drawing, Hit } from '../hooks/draw'
 import { readGraph } from '../hooks/layers'
 import { GUIDE, graphOf as graphLines, pictureOf } from '../hooks/reply'
@@ -274,7 +274,7 @@ const rowsOf = async (pane: Pick<Pane, 'drawn'>, key = 'graph'): Promise<string[
 
 /** What the host wrote over the drawing. */
 const said = async (
-  pane: Pane,
+  pane: Pick<Pane, 'find'>,
 ): Promise<{ size: { columns: number; rows: number }; shown: { rows: number; selected: string | null }; heard: string[] }> =>
   JSON.parse(((await pane.find({ type: 'Text', text: /^host / }))?.text ?? 'host {}').slice('host '.length))
 
@@ -752,6 +752,15 @@ test('a pane graphlet was told nothing of is left as it is; on every surface but
   }
 })
 
+/** The words of each control under a picture, by its key, in order: a Button's label, and a Select's label and options with the picked one marked. */
+const controlsOf = async (drawn: Pick<Pane, 'findAll'>): Promise<string[]> => [
+  ...(await drawn.findAll({ type: 'Select' })).map(one => {
+    const { key, label, value, options = [] } = one.props as { key: string; label: string; value?: string; options?: Array<{ value: string; label: string }> }
+    return `${key} ${label}: ${options.map(option => (option.value === value ? `[${option.label}]` : option.label)).join(' | ')}`
+  }),
+  ...(await drawn.findAll({ type: 'Button' })).map(one => `${String(one.props.key)} ${String(one.props.label)}`),
+]
+
 test('graphs are drawn as the person\'s settings say', { ...WITH_HOST, options: { scroll: 'sheet', labels: 'clip', links: 'merged' } }, async ($, on) => {
   world(on)
   const pane = await mount($, 'free', NARROW)
@@ -1138,24 +1147,40 @@ test('a reply with no graph in its blocks, a block still being written, and a su
   await summary.unmount()
 })
 
-test('on every other surface, a graph block becomes its picture as plain text, fenced as code', async ($, on) => {
+test('on the desktop app, VS Code, and the mobile app, a graph block is a picture in SVG in its place, with nothing selected, between the engine\'s own drawing of the text before it and the text after, and, except on the mobile app, over a control that opens it as a web page', async ($, on) => {
+  const seen = world(on)
   replies(on)
   for (const surface of ['desktop', 'vscode', 'mobile'] as const) {
     const reply = await say($, surface, REPLY)
-    expect(screenOf(await reply.drawn())).toEqual([
-      '● Here is how a request flows:',
-      '',
-      '```text',
-      ...FLOW,
-      '```',
-      '',
-      'The dashed line is the retry.',
-    ])
+    const drawn = (await reply.drawn()) as { type: string; children: Array<{ type: string; props: Record<string, unknown>; children?: Array<{ type: string; props: Record<string, unknown> }> }> }
+    expect(drawn.children.map(child => child.type)).toEqual(['Text', 'Box', 'Markdown'])
+    expect(textOf(drawn.children[0])).toBe('● Here is how a request flows:')
+    expect(drawn.children[2]?.props.text).toBe('The dashed line is the retry.')
+    const svg = await reply.find({ type: 'Svg' })
+    expect(svg?.props).toMatchObject({ isInteractive: true, alt: 'A graph of 6 nodes and 6 links: Start → Read the request; Read the request → Valid?; Valid? → Save it; Save it → Done; Valid? → Ask for a correction; Ask for a correction → Read the request.' })
+    expect(String(svg?.props.source)).toMatch(/<g class="node warn n\d+"[^>]*>(?:(?!<\/g>).)*>Ask for a correction</)
+    expect(String(svg?.props.source)).not.toMatch(/class="(node|link) [^"]*(selected|near|lit)/)
+    expect(await controlsOf(reply)).toEqual(surface === 'mobile' ? [] : ['graphlet:graph:0:page Open in browser'])
+    if (surface === 'desktop') await reply.press({ key: 'graphlet:graph:0:page' })
     await reply.unmount()
   }
+  expect(seen.written.map(file => file.path)).toEqual([expect.stringMatching(/^\/var\/tmp\/graphlet-reply-[A-Za-z0-9]*-0\.html$/)])
+  expect(seen.written[0]?.text).toContain('<title>reply</title>')
+  expect(seen.written[0]?.text).toContain('>Ask for a correction</tspan>')
 })
 
-test('a graph in a reply draws its links as the setting says where it can be clicked, to tell merged links apart, and keeps them separate where it is still: on the main screen and every other surface', { options: { links: 'merged' } }, async ($, on) => {
+test('a graph block too large for a picture a surface takes is its still picture as plain text there, fenced as code', async ($, on) => {
+  replies(on)
+  const huge = busy(400, 800)
+  const labelOf = (id: string): string => huge.nodes.find(node => node.id === id)?.label ?? id
+  const lines = huge.links.map(link => `${labelOf(link.from)} -> ${labelOf(link.to)}`)
+  const reply = await say($, 'desktop', ['```graphlet', ...lines, '```'].join('\n'))
+  expect(await reply.find({ type: 'Svg' })).toBeUndefined()
+  expect(String((await reply.find({ type: 'Markdown' }))?.props.text)).toStartWith('```text\n')
+  await reply.unmount()
+})
+
+test('a graph in a reply draws its links as the setting says where it can be clicked, to tell merged links apart, and keeps them separate on the main screen, where it is still', { options: { links: 'merged' } }, async ($, on) => {
   replies(on)
   const block = ['A -> C', 'B -> C', 'B -> D']
   const graph = readGraph(graphLines(block))
@@ -1168,9 +1193,6 @@ test('a graph in a reply draws its links as the setting says where it can be cli
   const still = await say($, 'terminal', text, {}, false)
   expect(screenOf(await still.drawn())).toEqual(['', ...drawnAs('separate').map(line => `  ${line}`)])
   await still.unmount()
-  const desktop = await say($, 'desktop', text)
-  expect(screenOf(await desktop.drawn())).toEqual(['● ```text', ...drawnAs('separate'), '```'])
-  await desktop.unmount()
 })
 
 /** Stands in for the engine's own hint line under the prompt: its line, and the tail a hook adds after it. */

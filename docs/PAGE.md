@@ -1,6 +1,6 @@
 # The Web Page
 
-A click on `html ↗`, in the corner of a drawing's [foot](DRAWING.md#the-foot), in a mod's site or in a reply, opens the graph as a web page. Making the page is `graphlet/hooks/page.ts`, and writing it out and opening it is `openPage` in `graphlet/hooks/register.tsx`.
+A click on `html ↗`, in the corner of a drawing's [foot](DRAWING.md#the-foot), in a mod's site or in a reply, opens the graph as a web page, and so does `Open in browser` under its picture on the desktop app and VS Code. Making the page is `graphlet/hooks/page.ts`, and writing it out and opening it is `openPage` in `graphlet/hooks/register.tsx`.
 
 ## The Page
 
@@ -15,5 +15,7 @@ A graph with no nodes gives a page that says there is nothing to draw.
 ## Opening It
 
 `openPage` writes the page into the system's temporary folder, `TMPDIR` or `TEMP` where either is set and `/tmp` where neither is, as `graphlet-<site>.html`, and so over the page it last wrote for that site, or for a graph in a reply as `graphlet-reply-<block>-<n>.html`, named for the reply block and the graph's place in it. It then runs the system's own opener on the file, trying each of `OPENERS` in turn, Linux's `xdg-open`, macOS's `open`, and Windows's `start` through `cmd`, each for at most `OPEN_TIMEOUT_MS`, until one exits with 0. A toast says the page was opened, or, where nothing opened it, where the file is.
+
+The opener runs on the machine the session runs on, which the mobile app is not, so no control under a picture there opens the page.
 
 The page is headed with the site's id, or `reply`. It is a picture of the graph as it was when it was asked for, and does not follow the site after that.
