@@ -112,7 +112,7 @@ The still picture is `stillOf`: the graph drawn in the reply's width as tall as 
 
 ## On Other Surfaces
 
-On the desktop app, the VS Code extension, and the mobile app, graphlet draws no picture of its own. The hook rewrites the block's `text` instead: each graph block becomes its picture as plain text, in a fenced code block marked `text`, and the engine draws the reply as it draws any other. The picture is made as on the terminal, to the width the surface measured, and has no color. `fencedOf` fences it with more backticks than any run of them inside it, so that no label closes the fence early. A block `lint -> test -> build -> deploy` reaches the engine there as:
+On the desktop app and the mobile app, graphlet draws no picture of its own. The hook rewrites the block's `text` instead: each graph block becomes its picture as plain text, in a fenced code block marked `text`, and the engine draws the reply as it draws any other. The picture is made as on the terminal, to the width the surface measured, and has no color. `fencedOf` fences it with more backticks than any run of them inside it, so that no label closes the fence early. A block `lint -> test -> build -> deploy` reaches the engine there as:
 
 ````
 ```text
@@ -121,6 +121,8 @@ On the desktop app, the VS Code extension, and the mobile app, graphlet draws no
 └──────┘  └──────┘  └───────┘  └────────┘
 ```
 ````
+
+The VS Code extension draws nothing a mod draws yet. A session there draws nowhere, so the model is not told of graph blocks, and no hook is asked to draw one.
 
 ## Why A Block, And Not A Tool
 
