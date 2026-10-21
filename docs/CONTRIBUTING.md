@@ -1,6 +1,6 @@
 # Contributing
 
-graphlet has no build and nothing to install. Claude Code loads `graphlet/` as it is and runs the TypeScript in `graphlet/hooks/` itself, so a change is tried by loading the folder. [AGENTS.md](../AGENTS.md) says how code, tests, and docs are written here, and [CLAUDE.md](../CLAUDE.md) what the engine expects of a hooks module and refuses to load.
+graphlet has no build and nothing to install. Claude Code loads `graphlet/` as it is and runs the TypeScript in `graphlet/hooks/` itself, so a change is tried by loading the folder. This file says where things are, what the engine expects of a hooks module, and how code, tests, docs, and commits are written here.
 
 ## Commands
 
@@ -14,6 +14,8 @@ claude --plugin-dir ./graphlet --plugin-dir ../my-mod    # beside a mod that use
 ```
 
 ## Where Things Are
+
+The repository is a plugin marketplace with one plugin in it: `.claude-plugin/marketplace.json` lists the plugin, and `graphlet/` is the plugin.
 
 | File | What it is | Doc |
 | :- | :- | :- |
@@ -41,10 +43,58 @@ claude --plugin-dir ./graphlet --plugin-dir ../my-mod    # beside a mod that use
 
 There is no `package.json` and no dependency. Each time Claude Code loads the mod from this folder, it writes its own API types into `graphlet/.claude-plugin/types/`, for the version that loaded it. That folder is ignored by git and never edited. `graphlet/tsconfig.json` includes it, so once the mod has been loaded, an editor or `tsc -p graphlet` checks the mod against the engine it runs on, and `graphlet/.claude-plugin/types/claude-code/index.d.ts` is the reference for the engine's API.
 
+## What The Engine Expects
+
+The engine reads a hooks module's source before it loads it, and refuses what it cannot follow.
+
+- A noun is added to `$` in an `engine.create` hook, and its types are the plugin's contract: one `.d.ts` that imports nothing, exports types whose names start with the noun's, and declares the noun on `EngineInterface`.
+- What a noun's method takes and answers crosses between mods as plain data. A tree of elements does not cross that way: `$.ui.resolve` takes a `ui.render` argument, and a `Client` is stamped with the plugin whose render hook drew it. So the drawing reaches another mod's site through the `ui.render` chain, as what its `next(e)` resolves to.
+- A mod runs before the mods it lists under `dependencies`. Its hooks are the outer ones: its `ui.render` hook reaches graphlet's through `next(e)`, and its hook on `graphlet.select` hears a call graphlet's own hooks make.
+- A noun's method has no `$` of its own. It calls the engine through the `$` its `engine.create` hook was handed back, and those calls run in the hook that called the method.
+- A `Client` is the only element that receives pointer events and arrow keys, and it receives keys only after a click on it, until Escape gives them back. It may be drawn in any render, a reply's included, and the terminal reports the mouse only in the fullscreen layout. Its posts reach the hooks of the plugin that drew it, and no other's, and answering one with `{ props }` redraws that instance alone. One that fails is heard in `ui.fault`, and the engine then draws its site again, for the hook to leave it out.
+- An event matcher, an environment variable's name, and a `Client`'s `module` path are literals in the source. A call on a plugin's noun is refused from a module whose source does not spell it, which is why a test raises `graphlet.select` through a hook of an inline plugin and not from its own body.
+- In the test kit, an inline plugin's `register` closes over nothing of the test file, and its `tier` says where it loads: `prepend` puts a mod that uses graphlet outside it, as a dependent is.
+- A `ui.render` hook on `AssistantMessage` answers for one block of a reply, its bullet and the room above it included. `next(e)` with a rewritten `text` is the engine's own drawing of that text, so the text before a graph keeps the reply's bullet that way. The stored message is never changed.
+- A `ui.render` hook on `PromptHint` sets `tail` to add to the hint line under the prompt, which only the terminal draws, dim, cut where the row ends. `turn.complete` hears each turn end, the main loop's and every subagent's (`e.agentId`), and `$.config.list()` reads the `/config` rows, Claude Code's `tips` among them.
+- A `prompt.compose` hook adds to the system prompt, and its `e.surfaces` is empty in a run that draws nowhere. Where an organization manages Claude Code, the engine runs it only for a plugin the organization lists in managed settings.
+
+The API's types are the reference for everything else.
+
+## Writing Code
+
+### Comments
+
+- Comments say what a thing is, not why it came to be; a rationale for a larger decision belongs in `docs/`.
+- Comment sparingly: never restate the code, and almost never comment inside a function body.
+- No comment or doc names a person, conversation, past attempt, issue number, or commit hash.
+- No comment or doc names a mod that uses graphlet. Graphlet is written for any mod.
+
+### TypeScript
+
+- No dependencies. The mod is what Claude Code loads from the folder, with no build step and no `package.json`.
+- A boolean is named for the question it answers: `isUp`, `hasHead`.
+- A constant that shapes behavior has a name and a comment that says what it bounds.
+- Whatever another mod hands over is read leniently and repaired where it can be. No graph makes the mod throw.
+
+### Logging
+
+- The mod keeps no log of its own. A failure the person can act on is said to them; one they cannot goes to the engine's debug log.
+
+### What Comes First
+
+- Write simple code that reads as a plain description of what it does: prefer the obvious approach over the clever one. Fewer lines is a soft priority.
+- Prefer OS-agnostic code; where a platform split is unavoidable, isolate it in one function.
+- Keep the settings few. Each is one choice a person makes about how every graph is drawn, and none is a number.
+- Prefer making illegal states unrepresentable over documenting that they are illegal.
+- The mod adds no command, registers no tool, starts no agent, and calls no model.
+- What the mod tells the model is one section of the system prompt, and the section rides on every request of every session that draws: keep it as short as it can be and still be followed. It says what a graph block is and when to write one, and nothing else.
+
 ## The Tests
 
 `claude plugin test ./graphlet` runs every `*.test.ts` and `*.test.tsx` under `graphlet/`, each file in a child of the `claude` binary, in an environment like the one the hooks run in. A test file imports `test`, `describe`, and `expect` from `claude-code/testing`. No session starts, and no model is called.
 
+- Test names are sentences describing the claim: `a link that closes a loop runs back up dashed`, not `test loops 2`.
+- Keep the set small and keep it hard. A test that is a tautology by the way the code is constructed should not exist; a test that would catch a subtle regression should.
 - `graphlet/tests/` has a file for each file of `graphlet/hooks/` it tests, beside `fixture.ts`, which holds what several share: `LOOK`, the settings' defaults; `graphOf`, a graph from ids and pairs of them; `undirected`; `numbers`, a seeded source of numbers, so that a test that draws many graphs draws the same ones every run; `picture` and `graphRows`, a drawing as the text of its rows; `cellsOf`, a row as a terminal's cells; and `SHOP`, a graph of a shop's files.
 - A drawing is tested as the whole picture it makes, compared line for line.
 - Some tests draw many graphs from `numbers` and check what must hold of every one. In `view.test.ts`, any graph in any room under any settings is drawn inside its room, with no two boxes on one cell. In `paint.test.ts`, `readOff` reads a picture back as a person reads it, from its characters alone, and the picture must say every link its graph has, in every channel the link crosses, and no link it does not have, with each label beside a link it is true of.
@@ -78,4 +128,15 @@ test('probe', () => {
 
 The tests cover the layout, the drawing, the engine's side with a stand-in for a mod that uses graphlet, and the engine's own drawing of a reply. To see a graph in a reply, load graphlet alone with `claude --plugin-dir ./graphlet` and ask Claude for a graph. To see one in a pane, load graphlet beside a mod that depends on it, with a `--plugin-dir` each. A pane's graph is clicked only in Claude Code's fullscreen layout, and takes keys once clicked.
 
-A change to the code changes the doc of its part in the same commit.
+## Docs
+
+- All documentation belongs inside `docs/`. The only exceptions are the root `README.md` and `graphlet/README.md`, the few lines an installed copy of the plugin carries to point back here.
+- Each part of the mod has one file in `docs/`, named for the part.
+- To get oriented, start from `README.md`, which covers the whole mod, then `docs/`.
+- Every markdown file is a factual description of the repository as it is, written so that a newcomer can read it and relate it directly to the code. If a sentence would not be true of the code as it stands, it does not belong.
+- A change to the code changes the doc of its part in the same commit.
+- Do not write counts, ranges, or limits into documentation unless the code enforces them. A number that is merely what happens to be true today reads as a rule to the next reader.
+
+## Commits
+
+- Every commit has a brief description in its body.
