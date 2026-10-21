@@ -1,17 +1,17 @@
 {
   "name": "claude-code-graphlet",
   "owner": {
-    "name": "Neal",
+    "name": "Neal Sodhi",
     "url": "https://github.com/nsodhi-cmu"
   },
   "metadata": {
-    "description": "graphlet: graphs of nodes and links, drawn inside Claude Code."
+    "description": "graphlet: draw customizable graphs natively inside Claude Code."
   },
   "plugins": [
     {
       "name": "graphlet",
       "source": "./graphlet",
-      "description": "Draws graphs of nodes and links inside Claude Code: in Claude's replies, and for other mods to build on",
+      "description": "Enable Claude Code to draw graphs directly in Claude's replies, or for other mods to build on",
       "category": "development"
     }
   ]
