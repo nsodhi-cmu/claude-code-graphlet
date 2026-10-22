@@ -1,6 +1,6 @@
 # The Picture In SVG
 
-A graph drawn in SVG is what the [web page](PAGE.md) shows, and what the desktop app, VS Code, and the mobile app show in place of the terminal's picture, in a [reply](REPLIES.md#on-other-surfaces) and in a [mod's site](API.md#on-other-surfaces). Drawing it is `svgOf` in `graphlet/hooks/svg.ts`; a view's `vector`, in `graphlet/hooks/view.ts`, lays a graph out for a surface's room and draws it there.
+A graph drawn in SVG is what the [web page](PAGE.md) shows, and, where the person turns on the experimental `pictures` setting, what the desktop app, VS Code, and the mobile app show in place of the terminal's picture, in a [reply](REPLIES.md#pictures) and in a [mod's site](API.md#on-other-surfaces). Drawing it is `svgOf` in `graphlet/hooks/svg.ts`; a view's `vector`, in `graphlet/hooks/view.ts`, lays a graph out for a surface's room and draws it there.
 
 ## The Drawing
 

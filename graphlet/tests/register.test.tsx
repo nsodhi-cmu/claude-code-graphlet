@@ -202,6 +202,8 @@ const HOST: Plugin = {
 }
 
 const WITH_HOST = { plugins: [HOST] }
+/** A host, with graphs drawn as pictures on the desktop app, VS Code, and the mobile app, as the person's `pictures` setting says. */
+const PICTURING = { ...WITH_HOST, options: { pictures: 'on' } }
 
 const PANE: RenderPropsOf['Pane'] = {
   title: 'Host',
@@ -670,7 +672,7 @@ test('the band is drawn only on a render where its owner says what it holds: onc
   await band.unmount()
 })
 
-test('the band drawn on two surfaces at once is drawn with the graph on the terminal and as a picture on the desktop app, as each surface\'s render names it', WITH_HOST, async ($, on) => {
+test('the band drawn on two surfaces at once is drawn with the graph on the terminal and as a picture on the desktop app, as each surface\'s render names it', PICTURING, async ($, on) => {
   world(on)
   const desk = await $.ui.mount({ plugin: 'graphlet', surface: 'desktop', component: 'AbovePrompt', requestId: 'band', props: BAND })
   const term = await $.ui.mount({ plugin: 'graphlet', surface: 'terminal', component: 'AbovePrompt', requestId: 'band', props: BAND })
@@ -733,6 +735,38 @@ test('a pane graphlet was told nothing of is left as it is', WITH_HOST, async ($
   await other.unmount()
 })
 
+test('with pictures in apps off, as they are unless the person turns them on, a site\'s graph on every surface but the terminal is plain text, as it runs and with its groups as they are there, with nothing to click', WITH_HOST, async ($, on) => {
+  world(on)
+  for (const surface of ['desktop', 'vscode', 'mobile'] as const) {
+    const drawn = await $.ui.mount({ plugin: 'graphlet', surface, component: 'Pane', requestId: 'grouped', props: NARROW })
+    expect(String((await drawn.find({ type: 'Code' }))?.props.source).split('\n')).toEqual([
+      '         ┌─────┐',
+      '         │ web │',
+      '         └──┬──┘',
+      '            │',
+      '╭─ Backend ─│─────╮',
+      '│           ▼     │',
+      '│        ┌─────┐  │',
+      '│        │ api │  │',
+      '│        └──┬──┘  │',
+      '│           │     │',
+      '│           ▼     │',
+      '│       ┌──────┐  │',
+      '│       │ auth │  │',
+      '│       └───┬──┘  │',
+      '╰───────────│─────╯',
+      '            │',
+      '            ▼',
+      '      ╭───────────╮',
+      '      │ ▸ Data  1 │',
+      '      ╰───────────╯',
+    ])
+    expect(await drawn.find({ type: 'Client' })).toBeUndefined()
+    expect(await drawn.find({ type: 'Svg' })).toBeUndefined()
+    await drawn.unmount()
+  }
+})
+
 /** The words of each control under a picture, by its key, in order: a Button's label, and a Select's label and options with the picked one marked. */
 const controlsOf = async (drawn: Pick<Pane, 'findAll'>): Promise<string[]> => [
   ...(await drawn.findAll({ type: 'Select' })).map(one => {
@@ -742,7 +776,7 @@ const controlsOf = async (drawn: Pick<Pane, 'findAll'>): Promise<string[]> => [
   ...(await drawn.findAll({ type: 'Button' })).map(one => `${String(one.props.key)} ${String(one.props.label)}`),
 ]
 
-test('on the desktop app, VS Code, and the mobile app, a site\'s graph is a picture in SVG, running as it runs on the terminal, with its groups as they are there and its selected node selected, over controls that pick, open, and fold its nodes, and, except on the mobile app, open it as a web page', WITH_HOST, async ($, on) => {
+test('with pictures in apps on, on the desktop app, VS Code, and the mobile app, a site\'s graph is a picture in SVG, running as it runs on the terminal, with its groups as they are there and its selected node selected, over controls that pick, open, and fold its nodes, and, except on the mobile app, open it as a web page', PICTURING, async ($, on) => {
   world(on)
   for (const surface of ['desktop', 'vscode', 'mobile'] as const) {
     const drawn = await $.ui.mount({ plugin: 'graphlet', surface, component: 'Pane', requestId: 'grouped', props: NARROW })
@@ -763,7 +797,7 @@ test('on the desktop app, VS Code, and the mobile app, a site\'s graph is a pict
   }
 })
 
-test('under a site\'s picture, a pick from the list selects a node, the group control collapses the selected node\'s group and opens it again, open opens a node, and each is heard by the owner', WITH_HOST, async ($, on) => {
+test('under a site\'s picture, a pick from the list selects a node, the group control collapses the selected node\'s group and opens it again, open opens a node, and each is heard by the owner', PICTURING, async ($, on) => {
   const seen = world(on)
   const pane = await $.ui.mount({ plugin: 'graphlet', surface: 'desktop', component: 'Pane', requestId: 'grouped', props: NARROW })
   await pane.select({ key: 'graphlet:graph:node', value: 'auth' })
@@ -781,7 +815,7 @@ test('under a site\'s picture, a pick from the list selects a node, the group co
   await pane.unmount()
 })
 
-test('on the mobile app, the controls under a site\'s picture step through its nodes in the order the picture is read, round from the last to the first', WITH_HOST, async ($, on) => {
+test('on the mobile app, the controls under a site\'s picture step through its nodes in the order the picture is read, round from the last to the first', PICTURING, async ($, on) => {
   world(on)
   const pane = await $.ui.mount({ plugin: 'graphlet', surface: 'mobile', component: 'Pane', requestId: 'grouped', props: NARROW })
   await pane.press({ key: 'graphlet:graph:previous' })
@@ -791,7 +825,7 @@ test('on the mobile app, the controls under a site\'s picture step through its n
   await pane.unmount()
 })
 
-test('under the picture of a large graph, a control draws it in focus on the selected node and its nearest, and all of it again', WITH_HOST, async ($, on) => {
+test('under the picture of a large graph, a control draws it in focus on the selected node and its nearest, and all of it again', PICTURING, async ($, on) => {
   world(on)
   const pane = await $.ui.mount({ plugin: 'graphlet', surface: 'vscode', component: 'Pane', requestId: 'big', props: PANE })
   const nodes = async (): Promise<number> => String((await pane.find({ type: 'Svg' }))?.props.source).match(/<g class="node /g)?.length ?? 0
@@ -805,7 +839,7 @@ test('under the picture of a large graph, a control draws it in focus on the sel
   await pane.unmount()
 })
 
-test('a graph too large for a picture a surface takes is plain text there, as it runs and with its groups as they are there', WITH_HOST, async ($, on) => {
+test('a graph too large for a picture a surface takes is plain text there, as it runs and with its groups as they are there', PICTURING, async ($, on) => {
   world(on)
   const pane = await $.ui.mount({ plugin: 'graphlet', surface: 'desktop', component: 'Pane', requestId: 'huge', props: PANE })
   expect(await pane.find({ type: 'Svg' })).toBeUndefined()
@@ -1199,7 +1233,24 @@ test('a reply with no graph in its blocks, a block still being written, and a su
   await summary.unmount()
 })
 
-test('on the desktop app, VS Code, and the mobile app, a graph block is a picture in SVG in its place, with nothing selected, between the engine\'s own drawing of the text before it and the text after, and, except on the mobile app, over a control that opens it as a web page', async ($, on) => {
+test('with pictures in apps off, on every surface but the terminal, a graph block becomes its still picture as plain text, fenced as code', async ($, on) => {
+  replies(on)
+  for (const surface of ['desktop', 'vscode', 'mobile'] as const) {
+    const reply = await say($, surface, REPLY)
+    expect(screenOf(await reply.drawn())).toEqual([
+      '● Here is how a request flows:',
+      '',
+      '```text',
+      ...FLOW,
+      '```',
+      '',
+      'The dashed line is the retry.',
+    ])
+    await reply.unmount()
+  }
+})
+
+test('with pictures in apps on, on the desktop app, VS Code, and the mobile app, a graph block is a picture in SVG in its place, with nothing selected, between the engine\'s own drawing of the text before it and the text after, and, except on the mobile app, over a control that opens it as a web page', { options: { pictures: 'on' } }, async ($, on) => {
   const seen = world(on)
   replies(on)
   for (const surface of ['desktop', 'vscode', 'mobile'] as const) {
@@ -1221,7 +1272,7 @@ test('on the desktop app, VS Code, and the mobile app, a graph block is a pictur
   expect(seen.written[0]?.text).toContain('>Ask for a correction</tspan>')
 })
 
-test('a graph block too large for a picture a surface takes is its still picture as plain text there, fenced as code', async ($, on) => {
+test('a graph block too large for a picture a surface takes is its still picture as plain text there, fenced as code', { options: { pictures: 'on' } }, async ($, on) => {
   replies(on)
   const huge = busy(400, 800)
   const labelOf = (id: string): string => huge.nodes.find(node => node.id === id)?.label ?? id
@@ -1232,7 +1283,7 @@ test('a graph block too large for a picture a surface takes is its still picture
   await reply.unmount()
 })
 
-test('a graph in a reply draws its links as the setting says where it can be clicked, to tell merged links apart, and keeps them separate on the main screen, where it is still', { options: { links: 'merged' } }, async ($, on) => {
+test('a graph in a reply draws its links as the setting says where it can be clicked, to tell merged links apart, and keeps them separate where it is still: on the main screen, and as plain text on the other surfaces', { options: { links: 'merged' } }, async ($, on) => {
   replies(on)
   const block = ['A -> C', 'B -> C', 'B -> D']
   const graph = readGraph(graphLines(block))
@@ -1245,6 +1296,9 @@ test('a graph in a reply draws its links as the setting says where it can be cli
   const still = await say($, 'terminal', text, {}, false)
   expect(screenOf(await still.drawn())).toEqual(['', ...drawnAs('separate').map(line => `  ${line}`)])
   await still.unmount()
+  const desktop = await say($, 'desktop', text)
+  expect(screenOf(await desktop.drawn())).toEqual(['● ```text', ...drawnAs('separate'), '```'])
+  await desktop.unmount()
 })
 
 /** Stands in for the engine's own hint line under the prompt: its line, and the tail a hook adds after it. */

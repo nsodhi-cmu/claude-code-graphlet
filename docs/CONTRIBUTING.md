@@ -13,7 +13,7 @@ claude --plugin-dir ./graphlet                # a session that draws graphs in r
 claude --plugin-dir ./graphlet --plugin-dir ../my-mod    # beside a mod that uses it
 ```
 
-A graph is clicked only in Claude Code's fullscreen layout, and takes keys once clicked. The desktop app takes no flag: it loads the folder named in `CLAUDE_CODE_PLUGIN_DIRS`, set in the `env` of `~/.claude/settings.json`. There a graph is drawn as a picture.
+A graph is clicked only in Claude Code's fullscreen layout, and takes keys once clicked. The desktop app takes no flag: it loads the folder named in `CLAUDE_CODE_PLUGIN_DIRS`, set in the `env` of `~/.claude/settings.json`. There, with the `pictures` setting on, a graph is drawn as a picture.
 
 ## Where Things Are
 

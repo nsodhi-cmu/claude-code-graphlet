@@ -1,6 +1,6 @@
 # The Web Page
 
-A click on `html ↗`, in the corner of a drawing's [foot](DRAWING.md#the-foot), in a mod's site or in a reply, opens the graph as a web page, and so does `Open in browser` under its picture on the desktop app and VS Code. Making the page is `graphlet/hooks/page.ts`, and writing it out and opening it is `openPage` in `graphlet/hooks/register.tsx`.
+A click on `html ↗`, in the corner of a drawing's [foot](DRAWING.md#the-foot), in a mod's site or in a reply, opens the graph as a web page, and so does `Open in browser` under its picture on the desktop app and VS Code, where the `pictures` setting draws one. Making the page is `graphlet/hooks/page.ts`, and writing it out and opening it is `openPage` in `graphlet/hooks/register.tsx`.
 
 ## The Page
 

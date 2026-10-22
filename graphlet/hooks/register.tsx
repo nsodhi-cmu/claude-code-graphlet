@@ -238,7 +238,8 @@ const siteTreeOf = (elements: Pick<Elements['terminal'], 'Box' | 'Text' | 'Clien
 
 /** The surfaces that draw a picture in SVG, an `Svg`: the desktop app, VS Code, and the mobile app. */
 type Vectored = 'desktop' | 'vscode' | 'mobile'
-const VECTORED: ReadonlySet<string> = new Set<Vectored>(['desktop', 'vscode', 'mobile'])
+/** The surfaces graphlet draws its graphs on as pictures in SVG: all that draw one, where the person's `pictures` setting is on, and else none. */
+let vectored: ReadonlySet<string> = new Set()
 
 /** The components a mod's site is drawn in. */
 type SiteComponent = 'Pane' | 'AbovePrompt' | 'ToolResult' | 'CommandOutput'
@@ -323,14 +324,14 @@ const vectorSiteOf = ($: EngineInterface, e: VectorSite, place: Place, at: Held)
 
 /**
  * A site's graph as its surface draws it: on the terminal, to click and move
- * through; on a surface that draws vectors, as a picture with controls under
- * it; and on any other, as plain text, drawn still, running the way it runs
+ * through; on a surface graphlet draws pictures on, as a picture with
+ * controls under it; and on any other, as plain text, drawn still, running the way it runs
  * on the terminal, with its groups as they are there, folded into the site's
  * columns and as tall as it needs.
  */
 const siteDrawingOf = ($: EngineInterface, e: RenderInput<SiteComponent>, place: Place, at: Held) => {
   if (e.surface === 'terminal') return siteTreeOf($.ui.resolve(e), e.requestId, e.viewport, at)
-  if (VECTORED.has(e.surface)) return vectorSiteOf($, e, place, at)
+  if (vectored.has(e.surface)) return vectorSiteOf($, e, place, at)
   const { Code } = $.ui.resolve(e)
   return <Code source={plainOf(at)} wrap="truncate-end" />
 }
@@ -452,6 +453,7 @@ export const register: Register = (on, options) => {
   folded = inReply(viewOf(look, true))
   still = viewOf({ ...look, links: 'separate' }, true, false)
   const isDrawingReplies = options.replies !== 'off'
+  vectored = new Set<Vectored>(options.pictures === 'on' ? ['desktop', 'vscode', 'mobile'] : [])
 
   on('engine.create', async ($, e, next) => {
     const built = await next(e)
@@ -528,7 +530,7 @@ export const register: Register = (on, options) => {
     const share = Math.max(0, MOST_TREE_CHARS - words) / parts.filter(part => 'graph' in part).length
     const graphs = parts.flatMap(part => ('graph' in part ? [readGraph(part.graph)] : []))
     const shown = parts.map((part, at) => ('text' in part ? part : { graph: graphs[parts.slice(0, at).filter(one => 'graph' in one).length] as Graph }))
-    const isPictured = e.surface === 'terminal' || VECTORED.has(e.surface)
+    const isPictured = e.surface === 'terminal' || vectored.has(e.surface)
     if (!isPictured) {
       const text = shown.map(part => ('text' in part ? part.text : fencedOf(bounded(pictureOf(still, part.graph, room), share)))).join('\n\n')
       return next({ ...e, props: { ...e.props, text } })

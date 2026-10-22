@@ -67,6 +67,16 @@
         "off"
       ],
       "default": "on"
+    },
+    "pictures": {
+      "type": "string",
+      "title": "Pictures in apps (experimental)",
+      "description": "Whether graphs in the desktop app, VS Code, and the mobile app are drawn as pictures: off draws the terminal's picture there as text in a code block; on, an experiment, draws each graph as a picture in SVG, with controls under a mod's graph in place of clicks and keys.",
+      "options": [
+        "off",
+        "on"
+      ],
+      "default": "off"
     }
   }
 }

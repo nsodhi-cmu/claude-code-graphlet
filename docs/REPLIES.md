@@ -112,17 +112,7 @@ The still picture is `stillOf`: the graph drawn in the reply's width as tall as 
 
 ## On Other Surfaces
 
-On the desktop app, VS Code, and the mobile app, each graph is drawn as a [picture in SVG](SVG.md), an `Svg`. The hook answers with a column, as on the terminal: the text before the first graph, drawn by the engine itself, and then each graph and each later run of text, a `Markdown`, a gap apart. A graph's picture is laid out as on the terminal, folded into the reply's width, with nothing selected and every group open, and runs the way it runs there. It is an interactive `Svg`, drawn in a frame that runs no script, and where it is short enough, it lights a node and its links as the pointer passes over it; the whole label of a box whose label is cut short is the box's title. Under it, a dim line says what was left out of the graph, where anything was, and on the desktop app and VS Code, a `Button`, `Open in browser`, opens the graph as a [web page](PAGE.md#opening-it). Its `alt` says what the graph holds, for a reader who cannot see it.
-
-````
-```graphlet
-lint -> test -> build -> deploy
-```
-````
-
-reaches the desktop app as a picture of four boxes in a row, `lint`, `test`, `build`, and `deploy`, with an arrow from each to the next, and under it `Open in browser`. The picture's colors follow the person's light or dark setting, and its size is its own, or smaller where the reply is narrower. graphlet keeps the graph each control opens for the blocks it keeps the places of, `KEPT_REPLIES`, and a press under an older one says in a toast that it is no longer kept.
-
-Where a graph's picture would be longer than an `Svg` may be, `MOST_SVG_CHARS`, the graph is its still picture as plain text instead, in a fenced code block marked `text`, drawn by a `Markdown`. On any other surface, a graph block becomes that still picture in the block's `text`, and the engine draws the reply as it draws any other. The picture is made as on the terminal, to the width the surface measured, and has no color. `fencedOf` fences it with more backticks than any run of them inside it, so that no label closes the fence early:
+On the desktop app, VS Code, and the mobile app, graphlet draws no picture of its own unless the person turns on the `pictures` setting, an experiment. The hook rewrites the block's `text` instead: each graph block becomes its still picture as plain text, in a fenced code block marked `text`, and the engine draws the reply as it draws any other. The picture is made as on the terminal, to the width the surface measured, and has no color. `fencedOf` fences it with more backticks than any run of them inside it, so that no label closes the fence early. A block `lint -> test -> build -> deploy` reaches the engine there as:
 
 ````
 ```text
@@ -131,6 +121,14 @@ Where a graph's picture would be longer than an `Svg` may be, `MOST_SVG_CHARS`, 
 └──────┘  └──────┘  └───────┘  └────────┘
 ```
 ````
+
+Any other surface but the terminal is drawn the same way.
+
+### Pictures
+
+With the `pictures` setting `on`, each graph on the desktop app, VS Code, and the mobile app is drawn as a [picture in SVG](SVG.md), an `Svg`. The hook answers with a column, as on the terminal: the text before the first graph, drawn by the engine itself, and then each graph and each later run of text, a `Markdown`, a gap apart. A graph's picture is laid out as on the terminal, folded into the reply's width, with nothing selected and every group open, and runs the way it runs there. It is an interactive `Svg`, which a surface may draw in a frame that runs no script, and where it is short enough, it lights a node and its links as the pointer passes over it; the whole label of a box whose label is cut short is the box's title. Under it, a dim line says what was left out of the graph, where anything was, and on the desktop app and VS Code, a `Button`, `Open in browser`, opens the graph as a [web page](PAGE.md#opening-it). Its `alt` says what the graph holds, for a reader who cannot see it. Its colors follow the person's light or dark setting, and its size is its own, or smaller where the reply is narrower.
+
+graphlet keeps the graph each control opens for the blocks it keeps the places of, `KEPT_REPLIES`, and a press under an older one says in a toast that it is no longer kept. Where a graph's picture would be longer than an `Svg` may be, `MOST_SVG_CHARS`, the graph is its still picture as plain text instead, fenced as code, drawn by a `Markdown`.
 
 ## Why A Block, And Not A Tool
 
