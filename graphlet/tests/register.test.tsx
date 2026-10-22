@@ -749,7 +749,7 @@ test('on the desktop app, VS Code, and the mobile app, a site\'s graph is a pict
     const svg = await drawn.find({ type: 'Svg' })
     const source = String(svg?.props.source)
     expect(svg?.props).toMatchObject({ isInteractive: true, alt: 'A graph of 4 nodes and 3 links: web → api; api → auth; auth → Data.' })
-    expect(source).toStartWith('<svg xmlns="http://www.w3.org/2000/svg" ')
+    expect(source).toStartWith(`<svg xmlns="http://www.w3.org/2000/svg" width="${String(svg?.props.width)}" `)
     expect(source).toMatch(/<g class="node plain selected n0"[^>]*>(?:(?!<\/g>).)*>web</)
     expect(source).toContain('>Backend</text>')
     expect(source).toMatch(/<g class="node plain n3"[^>]*>(?:(?!<\/g>).)*>▸<\/tspan><tspan[^>]*>Data<\/tspan><tspan class="badge"[^>]*>1</)

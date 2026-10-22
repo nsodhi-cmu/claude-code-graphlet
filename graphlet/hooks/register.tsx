@@ -255,14 +255,14 @@ const controlKeyOf = (key: string, does: string): string => `${CONTROL}${key}:${
 /** The most characters a value of a `Select`'s option may take: a node whose id is longer is not listed. */
 const MOST_VALUE_CHARS = 10_000
 
-/** A graph's picture on a surface that draws vectors, and under it what was left out of the graph, where anything was, and its controls, in a row. */
+/** A graph's picture on a surface that draws vectors, at its own width, or narrower where the room is, and under it what was left out of the graph, where anything was, and its controls, in a row. */
 const pictureTreeOf = (elements: Pick<Elements[Vectored], 'Box' | 'Text' | 'Svg'>, vector: Vector, graph: Graph, controls: RenderElement[]) => {
   const { Box, Text, Svg } = elements
   const note = leftOut(graph.unread)[0]
   return (
     <Box flexDirection="column" gap="sm">
       {[
-        <Svg source={vector.source} alt={vector.alt} isInteractive />,
+        <Svg source={vector.source} alt={vector.alt} width={vector.width} isInteractive />,
         ...(note === undefined ? [] : [<Text dimColor>{note}</Text>]),
         ...(controls.length === 0 ? [] : [<Box flexDirection="row" flexWrap="wrap" gap="sm">{controls}</Box>]),
       ]}

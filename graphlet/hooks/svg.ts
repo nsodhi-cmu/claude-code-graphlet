@@ -414,6 +414,9 @@ function labelsAt(drawn: ReadonlyArray<{ link: Link; arrow: Arrow }>): Map<Link,
   return written
 }
 
+/** A graph drawn in SVG: the document, and its width in pixels, which it is drawn at where its room is wide enough. */
+export type Drawn = { source: string; width: number }
+
 /** What a drawing shows besides its graph: the node selected, whose links are lit, and whether they move; and whether a node is lit as the pointer passes over it. */
 export type Seen = { selected: string | null; isFlowing: boolean; isLighting: boolean }
 
@@ -432,7 +435,7 @@ export type Seen = { selected: string | null; isFlowing: boolean; isLighting: bo
  * are lit: one that runs one way, with no link back, flows, and any other
  * pulses. The document is as large as what it draws and the room around it.
  */
-export function svgOf(graph: Graph, layout: Layout, cell: number, seen: Seen): string {
+export function svgOf(graph: Graph, layout: Layout, cell: number, seen: Seen): Drawn {
   const turning = turningOf(layout.direction)
   const { spots, hulls } = spotsOf(layout, cell)
   const places = new Map<string, { index: number; spot: Spot }>()
@@ -480,7 +483,7 @@ export function svgOf(graph: Graph, layout: Layout, cell: number, seen: Seen): s
   const style = `<style>${PALETTE}${SHAPES}${seen.isLighting ? `\n${lightsOf(graph)}` : ''}\n</style>`
   const back = `<rect class="sheet" x="${sheet.x}" y="${sheet.y}" width="${sheet.width}" height="${sheet.height}" rx="${BOX_RADIUS}"/>`
   const size = `width="${Math.ceil(sheet.width)}" height="${Math.ceil(sheet.height)}" viewBox="${sheet.x} ${sheet.y} ${sheet.width} ${sheet.height}"`
-  return `<svg xmlns="http://www.w3.org/2000/svg" ${size} class="${seen.isFlowing ? 'flowing' : 'still'}">\n${style}\n${[back, ...frames, ...links, ...nodes].join('\n')}\n</svg>`
+  return { source: `<svg xmlns="http://www.w3.org/2000/svg" ${size} class="${seen.isFlowing ? 'flowing' : 'still'}">\n${style}\n${[back, ...frames, ...links, ...nodes].join('\n')}\n</svg>`, width: Math.ceil(sheet.width) }
 }
 
 /**

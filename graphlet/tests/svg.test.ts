@@ -11,7 +11,7 @@ const ROOM = { columns: 80, rows: 1000 }
 const NOTHING: Seen = { selected: null, isFlowing: false, isLighting: false }
 
 /** A graph drawn as a surface draws it, laid out folded into an 80 columns' room, eight pixels a column. */
-const drawn = (graph: Graph, seen: Partial<Seen> = {}): string => svgOf(graph, layoutOf(graph, ROOM, LOOK, true, graph.direction ?? 'down'), 8, { ...NOTHING, ...seen })
+const drawn = (graph: Graph, seen: Partial<Seen> = {}): string => svgOf(graph, layoutOf(graph, ROOM, LOOK, true, graph.direction ?? 'down'), 8, { ...NOTHING, ...seen }).source
 
 const numbers = (text: string): number[] => (text.match(/-?[\d.]+/g) ?? []).map(Number)
 /** The classes of each element of a kind, `node` or `link`, in the order drawn. */
@@ -59,11 +59,12 @@ describe('what a picture shows as the pointer passes over it', () => {
 })
 
 describe('a picture as a document', () => {
-  test('it is a document of its own, on a sheet as large as the document, which is as large as what it draws and the room around it', () => {
-    const svg = drawn(SHOP)
+  test('it is a document of its own, on a sheet as large as the document, which is as large as what it draws and the room around it, and says how wide it is', () => {
+    const { source: svg, width: wide } = svgOf(SHOP, layoutOf(SHOP, ROOM, LOOK, true, 'down'), 8, NOTHING)
     expect(svg).toStartWith('<svg xmlns="http://www.w3.org/2000/svg" ')
     const [x = NaN, y = NaN, width = NaN, height = NaN] = numbers(/viewBox="([^"]*)"/.exec(svg)?.[1] ?? '')
     expect(numbers(/ width="([^"]*)" height="([^"]*)"/.exec(svg)?.slice(1).join(' ') ?? '')).toEqual([Math.ceil(width), Math.ceil(height)])
+    expect(wide).toBe(Math.ceil(width))
     expect(numbers(/<rect class="sheet" ([^>]*)>/.exec(svg)?.[1] ?? '')).toEqual([x, y, width, height, 8])
     const boxes = [...svg.matchAll(/<rect class="box" x="([\d.-]+)" y="([\d.-]+)"/g)].map(([, left = '', top = '']) => [Number(left), Number(top)])
     expect(Math.min(...boxes.map(([left = NaN]) => left)) - x).toBe(12)
@@ -76,7 +77,7 @@ describe('a picture as a document', () => {
     const svg = drawn(graph)
     expect(svg).toContain(`<title>${long}</title>`)
     expect(svg.match(/<title>/g)).toHaveLength(1)
-    const clipped = svgOf(graph, layoutOf(graph, ROOM, { ...LOOK, labels: 'clip' }, true, 'down'), 8, NOTHING)
+    const clipped = svgOf(graph, layoutOf(graph, ROOM, { ...LOOK, labels: 'clip' }, true, 'down'), 8, NOTHING).source
     expect(clipped.match(/<title>[^<]*<\/title>/g)).toEqual([`<title>${long}</title>`, '<title>src/a/long/path/to/a/file.component.ts</title>'])
   })
 })

@@ -97,7 +97,7 @@ export function pageOf(graph: Graph, title: string, direction: Direction = 'down
   const body =
     graph.nodes.length === 0
       ? '<p>Nothing to draw: the graph has no nodes.</p>'
-      : `<main>\n${svgOf(graph, layoutOf(graph, WIDE, SHEET, false, direction), CELL[direction], { selected: null, isFlowing: false, isLighting: true })}\n</main>\n<script>${SCRIPT}</script>`
+      : `<main>\n${svgOf(graph, layoutOf(graph, WIDE, SHEET, false, direction), CELL[direction], { selected: null, isFlowing: false, isLighting: true }).source}\n</main>\n<script>${SCRIPT}</script>`
   return `<!doctype html>
 <html>
 <head>

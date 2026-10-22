@@ -8,6 +8,7 @@ import type { Direction, Layout, Look } from './layout'
 import { paint } from './paint'
 import type { Finding } from './paint'
 import { MOST_SVG_CHARS, altOf, svgOf } from './svg'
+import type { Drawn } from './svg'
 import { orderOf, scrollIn, showIn, sightOf, stepIn } from './window'
 
 // A graph as a person looks at it: laid out for a room, seen through a
@@ -130,8 +131,8 @@ function isRighter(down: Layout, right: Layout, room: Room): boolean {
   return isFitting && FEWER_ROWS * right.columns <= down.rows
 }
 
-/** A graph drawn for a surface that draws vectors: its SVG document, and what it says for a reader who cannot see it. */
-export type Vector = { source: string; alt: string }
+/** A graph drawn for a surface that draws vectors: its SVG document, its width in pixels, and what it says for a reader who cannot see it. */
+export type Vector = Drawn & { alt: string }
 
 /** What a view does with a graph, drawing it as it was made to. */
 export type View = {
@@ -200,10 +201,10 @@ export function viewOf(look: Look, fold = false, hasCorner = true): View {
     vector: (graph, selected, room) => {
       if (graph.nodes.length === 0) return undefined
       const layout = laid(graph, room)
-      const drawn = (isLighting: boolean): string => svgOf(graph, layout, SURFACE_CELL[layout.direction], { selected, isFlowing: look.motion === 'flowing', isLighting })
+      const drawn = (isLighting: boolean): Drawn => svgOf(graph, layout, SURFACE_CELL[layout.direction], { selected, isFlowing: look.motion === 'flowing', isLighting })
       const lit = drawn(true)
-      const source = lit.length <= MOST_SVG_CHARS ? lit : drawn(false)
-      return source.length > MOST_SVG_CHARS ? undefined : { source, alt: altOf(graph) }
+      const picture = lit.source.length <= MOST_SVG_CHARS ? lit : drawn(false)
+      return picture.source.length > MOST_SVG_CHARS ? undefined : { ...picture, alt: altOf(graph) }
     },
     order: (graph, room) => orderOf(laid(graph, room)),
     show: (graph, selected, room, from) => showIn(laid(graph, room), selected, room, from),
