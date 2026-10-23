@@ -5,13 +5,13 @@
     "url": "https://github.com/nsodhi-cmu"
   },
   "metadata": {
-    "description": "graphlet: draw customizable graphs natively inside Claude Code."
+    "description": "Draw graphs inside Claude Code."
   },
   "plugins": [
     {
       "name": "graphlet",
       "source": "./graphlet",
-      "description": "Enable Claude Code to draw graphs directly in Claude's replies, or for other mods to build on",
+      "description": "Draw graphs inside Claude Code.",
       "category": "development"
     }
   ]

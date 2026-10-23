@@ -1,7 +1,7 @@
 {
   "name": "graphlet",
   "version": "0.1.0",
-  "description": "graphlet: draw customizable graphs natively inside Claude Code.",
+  "description": "Draw graphs inside Claude Code.",
   "author": {
     "name": "Neal Sodhi",
     "url": "https://github.com/nsodhi-cmu"
