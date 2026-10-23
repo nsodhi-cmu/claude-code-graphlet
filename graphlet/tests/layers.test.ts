@@ -142,6 +142,12 @@ describe('reading a graph', () => {
 })
 
 describe('layers', () => {
+  test('a layer starts in the order its graph gives, where it gives one, and keeps it where no other crosses less', () => {
+    const fan = graphOf(['a', 'b', 'c', 'd'], [['a', 'b'], ['a', 'c'], ['a', 'd']])
+    expect(layers(fan)).toEqual([['a'], ['b', 'c', 'd']])
+    expect(layers({ ...fan, order: ['d', 'a', 'b'] })).toEqual([['a'], ['d', 'b', 'c']])
+  })
+
   test('a node stands one layer under the lowest node with an edge to it', () => {
     expect(layers(graphOf(['a', 'b', 'c', 'd'], [['a', 'b'], ['b', 'c'], ['a', 'd'], ['d', 'c']]))).toEqual([['a'], ['b', 'd'], ['c']])
   })

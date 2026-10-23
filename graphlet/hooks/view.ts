@@ -9,7 +9,7 @@ import { paint } from './paint'
 import type { Finding } from './paint'
 import { MOST_SVG_CHARS, altOf, svgOf } from './svg'
 import type { Drawn } from './svg'
-import { keepIn, orderOf, scrollIn, showIn, sightOf, spotIn, stepIn } from './window'
+import { acrossOf, keepIn, orderOf, scrollIn, showIn, sightOf, spotIn, stepIn } from './window'
 
 // A graph as a person looks at it: laid out for a room, seen through a
 // window, with one node selected.
@@ -73,10 +73,13 @@ const COLLAPSED = '▸'
  * and how many nodes it holds as its badge; put foremost where any of them
  * is, and of the highest priority any of them has. An edge to or from any of
  * them is to or from the box, given once for each label and tone however
- * many of them it joins it to; an edge between two of them is not drawn. A graph with nothing shut is
- * as it is.
+ * many of them it joins it to; an edge between two of them is not drawn.
+ * Given the `order` its nodes stand in across a picture of the graph with
+ * every group open, its layers start in that order, each box where the first
+ * of its nodes stands, so that what a collapse leaves stands as it stood. A graph with
+ * nothing shut is as it is.
  */
-export function collapsedOf(graph: Graph, shut: Set<string>): Graph {
+export function collapsedOf(graph: Graph, shut: Set<string>, order?: string[]): Graph {
   const groups = graph.groups.filter(group => shut.has(group.id))
   if (groups.length === 0) return graph
   const into = new Map(graph.nodes.flatMap(node => (node.group !== undefined && shut.has(node.group) ? [[node.id, node.group] as const] : [])))
@@ -98,7 +101,8 @@ export function collapsedOf(graph: Graph, shut: Set<string>): Graph {
     kept.add(key)
     return [{ ...edge, from, to }]
   })
-  return { ...graph, nodes, edges, groups: graph.groups.filter(group => !shut.has(group.id)) }
+  const collapsed = { ...graph, nodes, edges, groups: graph.groups.filter(group => !shut.has(group.id)) }
+  return order === undefined ? collapsed : { ...collapsed, order: [...new Set(order.map(id => into.get(id) ?? id))] }
 }
 
 /** Which of a graph's groups it starts with collapsed: none, every group of more than one node, or under `auto`, one or the other as the graph and its room are. */
@@ -164,6 +168,8 @@ export type View = {
   vector: (graph: Graph, selected: string | null, room: Room) => Vector | undefined
   /** The graph's nodes in the order its picture, laid out as for `room`, is read. */
   order: (graph: Graph, room: Room) => string[]
+  /** The graph's nodes in the order they stand across its picture, laid out as for `room`, whatever layer each is in. */
+  across: (graph: Graph, room: Room) => string[]
   /** Where the window stands to show the selected node: as near `from` as it can. */
   show: (graph: Graph, selected: string | null, room: Room, from: Pan) => Pan
   /** Whether all of a graph is seen in a room, nothing of it out of view. */
@@ -231,6 +237,7 @@ export function viewOf(look: Look, fold = false, hasCorner = true): View {
       return picture.source.length > MOST_SVG_CHARS ? undefined : { ...picture, alt: altOf(graph) }
     },
     order: (graph, room) => orderOf(laid(graph, room)),
+    across: (graph, room) => acrossOf(laid(graph, room)),
     show: (graph, selected, room, from) => showIn(laid(graph, room), selected, room, from),
     fits: (graph, room) => sightOf(laid(graph, room), room).isWhole,
     scroll: (graph, room, from, by) => scrollIn(laid(graph, room), room, from, by),

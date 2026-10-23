@@ -154,6 +154,13 @@ export function stepIn(
 export const orderOf = (layout: Layout): string[] =>
   layout.shelves.flatMap(shelf => shelf.places.toSorted((a, b) => a.x - b.x).flatMap(place => ('node' in place.slot ? [place.slot.node.id] : [])))
 
+/** The nodes in the order they stand across a layout, by their middles, whatever shelf each is on. */
+export const acrossOf = (layout: Layout): string[] =>
+  layout.shelves
+    .flatMap(shelf => shelf.places.flatMap(place => ('node' in place.slot ? [{ id: place.slot.node.id, at: place.x + place.width / 2 }] : [])))
+    .sort((a, b) => a.at - b.at)
+    .map(one => one.id)
+
 /** The node a step along `order` lands on from the selected one, `way` a step on or back, round from the last to the first; from none selected, the first or the last. */
 export function stepThrough(order: readonly string[], selected: string | null, way: 1 | -1): string | undefined {
   const at = order.indexOf(selected ?? '')

@@ -57,7 +57,7 @@ An edge between two nodes of one layer is no stretch. Those are kept apart, by l
 
 ## The Order Within A Layer
 
-A layer starts in the order the graph names its nodes in, with its lanes after them. While any two stretches cross, the layers are ordered against their neighbors: on the way down each layer by the layer above it, and on the way back up each by the layer below, a slot going to the middle of the places of what it is joined to there. That is done `SWEEPS` times over, or until nothing crosses, and the ordering whose stretches cross least is the one kept, its crossings counted by `crossingsOf` as Barth, Jünger and Mutzel count them.
+A layer starts in the order the graph names its nodes in, with its lanes after them; a graph with a group collapsed starts each layer in the order its nodes stand across its picture with every group open, the group's box where the first of its nodes stands, so that what a collapse leaves stands as it stood. While any two stretches cross, the layers are ordered against their neighbors: on the way down each layer by the layer above it, and on the way back up each by the layer below, a slot going to the middle of the places of what it is joined to there. That is done `SWEEPS` times over, or until nothing crosses, and the ordering whose stretches cross least is the one kept, its crossings counted by `crossingsOf` as Barth, Jünger and Mutzel count them.
 
 With nothing crossing, nothing is reordered, so the nodes of a layer stay in the order the graph names them in, but for keeping each group's together. The order never depends on what is selected or where the window stands.
 

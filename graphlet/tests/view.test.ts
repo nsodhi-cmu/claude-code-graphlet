@@ -7,6 +7,8 @@ import { ranksOf, readGraph } from '../hooks/layers'
 import type { Graph } from '../hooks/layers'
 import type { Look } from '../hooks/layout'
 import { FOCUS_NODES, MOVES, collapsedOf, focusOf, openingOf, viewOf } from '../hooks/view'
+import { layoutOf } from '../hooks/layout'
+import { acrossOf } from '../hooks/window'
 
 const LABELS = ['a', 'node', 'src/some/long/path/to/file.component.ts', 'Validate the incoming request', 'x-y_z.w', '', '数据库连接池', '✅ 完成']
 const LOOKS: Look[] = (['pinned', 'sheet'] as const).flatMap(scroll =>
@@ -191,4 +193,19 @@ test('expanded starts every group open, and collapsed every group of more than o
     expect(openingOf(view, graph, room, 'expanded')).toEqual(new Set())
     expect(openingOf(view, graph, room, 'collapsed')).toEqual(new Set(['g0', 'g2', 'g3']))
   }
+})
+
+test('collapsed from the order its nodes stand in across the open picture, a group leaves the nodes it does not hold in the order they stood on their shelves', () => {
+  const edges = [['n0', 'n1'], ['n1', 'n2'], ['n0', 'n3'], ['n1', 'n3'], ['n1', 'n4'], ['n4', 'n5'], ['n3', 'n5'], ['n2', 'n6']]
+  const graph = readGraph({
+    nodes: ['n0', 'n1', 'n2', 'n3', 'n4', 'n5', 'n6'].map(id => ({ id, label: id, ...(['n3', 'n4'].includes(id) ? {} : { group: 'g' }) })),
+    edges: edges.map(([from = '', to = '']) => ({ from, to })),
+    direction: 'down',
+  })
+  const room = { columns: 80, rows: 1000 }
+  const open = layoutOf(graph, room, LOOK)
+  /** Whether n3 stands left of n4 in a layout. */
+  const isInOrder = (shown: Graph): boolean => acrossOf(layoutOf(shown, room, LOOK)).indexOf('n3') < acrossOf(layoutOf(shown, room, LOOK)).indexOf('n4')
+  expect(isInOrder(graph)).toBe(acrossOf(open).indexOf('n3') < acrossOf(open).indexOf('n4'))
+  expect(isInOrder(collapsedOf(graph, new Set(['g']), acrossOf(open)))).toBe(isInOrder(graph))
 })

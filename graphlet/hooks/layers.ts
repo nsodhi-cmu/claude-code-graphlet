@@ -23,9 +23,10 @@ export type Group = { id: string; label: string; tone?: GraphletTone; isCollapse
  * A graph as it is drawn: every node once, every edge once, between two of
  * its nodes, the groups that hold any of its nodes, how many nodes and edges
  * it was given past the most that are read, which are left out, and which way
- * it runs, where it says.
+ * it runs, where it says; and where it has one, the `order` the nodes of each
+ * layer start in, by their ids, those it leaves out after them.
  */
-export type Graph = { nodes: Node[]; edges: Edge[]; groups: Group[]; unread: { nodes: number; edges: number }; direction?: GraphletDirection }
+export type Graph = { nodes: Node[]; edges: Edge[]; groups: Group[]; unread: { nodes: number; edges: number }; direction?: GraphletDirection; order?: string[] }
 
 /** How many times the layers are ordered against their neighbors, down and back up, before the best ordering is kept. */
 const SWEEPS = 4
@@ -643,7 +644,8 @@ export function layersOf(graph: Graph, fold?: Fold): Layers {
   const count = Math.max(-1, ...ranks.values()) + 1
   const slotOf = new Map<string, Slot>(graph.nodes.map(node => [node.id, { node }]))
   const slots: Slot[][] = Array.from({ length: count }, () => [])
-  for (const node of graph.nodes) slots[ranks.get(node.id) ?? 0]?.push(slotOf.get(node.id) ?? { node })
+  const at = new Map((graph.order ?? []).map((id, index) => [id, index]))
+  for (const node of graph.nodes.toSorted((a, b) => (at.get(a.id) ?? at.size) - (at.get(b.id) ?? at.size))) slots[ranks.get(node.id) ?? 0]?.push(slotOf.get(node.id) ?? { node })
   const pieces: Piece[][] = Array.from({ length: Math.max(0, count - 1) }, () => [])
   const flats: Edge[][] = Array.from({ length: count }, () => [])
   const lanes = new Map<string, Slot & { lane: Edge[] }>()

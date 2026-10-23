@@ -101,7 +101,8 @@ const foundIn = (graph: Graph, query: string): string[] =>
 /**
  * Draws a graph in a place as the person left it there, and keeps what was
  * drawn: its groups collapsed as last asked there, or as the graph says, or
- * as they started there; the
+ * as they started there, its layers starting in the order its nodes stand
+ * across a picture of it with every group open; the
  * node `asked` selected, or else the one last picked there, or the box of the
  * collapsed group either is in, or else the node `fallback` names; in focus
  * where the place is; with what is being found marked; through a window where
@@ -110,7 +111,7 @@ const foundIn = (graph: Graph, query: string): string[] =>
  */
 const drawIn = (place: Place, given: Graph, room: Room, most: number, view: View, asked: string | undefined, fallback: (graph: Graph) => string | null): Held => {
   const shut = new Set(given.groups.filter(group => place.shut.get(group.id) ?? (group.isCollapsed === true || place.starts?.has(group.id) === true)).map(group => group.id))
-  const whole = collapsedOf(given, shut)
+  const whole = collapsedOf(given, shut, shut.size === 0 ? undefined : view.across(given, room))
   const wanted = asked ?? place.picked
   const group = given.nodes.find(node => node.id === wanted)?.group
   const standing = group !== undefined && shut.has(group) ? group : wanted
