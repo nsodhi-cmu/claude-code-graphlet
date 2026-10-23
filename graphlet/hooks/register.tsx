@@ -188,7 +188,7 @@ let view = viewOf({ scroll: 'pinned', labels: 'wrap', edges: 'merged' })
 let folded = inReply(viewOf({ scroll: 'pinned', labels: 'wrap', edges: 'merged' }, true))
 let still = viewOf({ scroll: 'pinned', labels: 'wrap', edges: 'separate' }, true, false)
 /** Which groups a reply's graph to click starts with collapsed: the person's setting. */
-let opening: Opening = 'fit'
+let opening: Opening = 'auto'
 
 /** The programs that open a file as the person's system would, each tried in turn: Linux's, macOS's, and Windows's. */
 const OPENERS: ReadonlyArray<(path: string) => string[]> = [
@@ -474,7 +474,7 @@ export const register: Register = (on, options) => {
   view = viewOf(look)
   folded = inReply(viewOf(look, true))
   still = viewOf({ ...look, edges: 'separate' }, true, false)
-  opening = options.groups === 'expanded' || options.groups === 'collapsed' ? options.groups : 'fit'
+  opening = options.groups === 'expanded' || options.groups === 'collapsed' ? options.groups : 'auto'
   const isDrawingReplies = options.replies !== 'off'
   vectored = new Set<Vectored>(options.pictures === 'on' ? ['desktop', 'vscode', 'mobile'] : [])
 

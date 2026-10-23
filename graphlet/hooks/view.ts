@@ -101,34 +101,22 @@ export function collapsedOf(graph: Graph, shut: Set<string>): Graph {
   return { ...graph, nodes, edges, groups: graph.groups.filter(group => !shut.has(group.id)) }
 }
 
-/** Which of a graph's groups it starts with collapsed: none, as `fit` finds, or every group of more than one node. */
-export type Opening = 'expanded' | 'fit' | 'collapsed'
+/** Which of a graph's groups it starts with collapsed: none, every group of more than one node, or under `auto`, one or the other as the graph and its room are. */
+export type Opening = 'expanded' | 'auto' | 'collapsed'
+
+/** How many nodes a graph may have and still start with every group open under `auto`, whatever its room. */
+const AUTO_NODES = 25
 
 /**
- * The groups a graph starts with collapsed in a room, as `opening` says.
- * `fit`: a graph of more than `FOCUS_NODES` nodes that is not seen whole
- * with every group open has its groups collapsed, the largest first, until
- * no more than `FOCUS_NODES` boxes show; of groups as large, the one the
- * graph names last first, and a group that holds a node put foremost, or the
- * node the graph is selected on when nothing else is, after every other. A
- * group of one node is never collapsed, since its box would only trade the
- * node's label for the group's.
+ * The groups a graph starts with collapsed in a room, as `opening` says:
+ * none, or every group of more than one node, since a box for a group of
+ * one would only trade the node's label for the group's. `auto` collapses
+ * them in a graph of more than `AUTO_NODES` nodes that is not seen whole in
+ * its room with every group open.
  */
 export function openingOf(view: View, graph: Graph, room: Room, opening: Opening): Set<string> {
-  const sizes = new Map(graph.groups.map(group => [group.id, graph.nodes.filter(node => node.group === group.id).length]))
-  const collapsible = graph.groups.filter(group => (sizes.get(group.id) ?? 0) > 1)
-  if (opening === 'collapsed') return new Set(collapsible.map(group => group.id))
-  const shut = new Set<string>()
-  if (opening === 'expanded' || graph.nodes.length <= FOCUS_NODES || view.fits(graph, room)) return shut
-  const lead = leadOf(graph)
-  const isKept = (id: string): boolean => graph.nodes.some(node => node.group === id && (node.isForemost || node.id === lead))
-  let shown = graph.nodes.length
-  for (const group of collapsible.toReversed().sort((a, b) => Number(isKept(a.id)) - Number(isKept(b.id)) || (sizes.get(b.id) ?? 0) - (sizes.get(a.id) ?? 0))) {
-    if (shown <= FOCUS_NODES) break
-    shut.add(group.id)
-    shown -= (sizes.get(group.id) ?? 0) - 1
-  }
-  return shut
+  const isShut = opening === 'collapsed' || (opening === 'auto' && graph.nodes.length > AUTO_NODES && !view.fits(graph, room))
+  return new Set(isShut ? graph.groups.filter(group => graph.nodes.filter(node => node.group === group.id).length > 1).map(group => group.id) : [])
 }
 
 /** The node a graph is drawn with selected when nothing else is: the first it names of those of the highest priority; null in a graph with no nodes. */

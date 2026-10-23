@@ -51,13 +51,13 @@
     "groups": {
       "type": "string",
       "title": "Groups",
-      "description": "fit starts a graph of more than two dozen nodes that is too large for the screen with its largest groups collapsed, until two dozen boxes or fewer show; expanded starts every group open; collapsed starts every group collapsed.",
+      "description": "auto starts a large graph that does not fit the screen with its groups collapsed; expanded starts every group open; collapsed starts every group collapsed.",
       "options": [
         "expanded",
-        "fit",
+        "auto",
         "collapsed"
       ],
-      "default": "fit"
+      "default": "auto"
     },
     "replies": {
       "type": "string",

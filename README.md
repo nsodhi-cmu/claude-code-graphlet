@@ -114,7 +114,7 @@ In `/config`, or `/plugin configure graphlet@claude-code-graphlet`. The first ch
 | **Scrolling** | `pinned` keeps the layers that fit in view while longer ones slide; `sheet` moves the whole graph. |
 | **Long labels** | `wrap` breaks a long label onto more lines; `clip` cuts it to one. |
 | **Edges** | `merged` lets a node's edges share lines, which is shorter; `separate` gives each node's edges lines of their own. |
-| **Groups** | `fit` starts a graph of more than two dozen nodes that is too large for the screen with its largest groups collapsed, until two dozen boxes or fewer show; `expanded` starts every group open; `collapsed` starts every group collapsed. |
+| **Groups** | `auto` starts a large graph that does not fit the screen with its groups collapsed; `expanded` starts every group open; `collapsed` starts every group collapsed. |
 | **Graphs in replies** | `on` lets Claude draw graphs in its normal replies; `off` keeps graphlet out of Claude's replies and the system prompt, leaving it only for mods that use it. |
 | **Pictures in apps (experimental)** | `off` draws a graph on the desktop app, VS Code extension, and the mobile app as text in a code block; `on` draws it as a picture, with controls under a mod's graph. |
 

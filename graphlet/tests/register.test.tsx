@@ -1184,7 +1184,7 @@ test('a group collapsed or opened stays on the rows where it stood in the window
   await reply.unmount()
 })
 
-/** A map of a system too large for the screen: five tiers, the largest of nine services. */
+/** A map of a system too large for the screen: five tiers, of 26 nodes. */
 const SERVICES = [
   ...['Web app', 'iOS app', 'Android app', 'Admin console'].map(client => `${client} -> CDN`),
   'CDN -> WAF -> Load balancer -> API gateway',
@@ -1198,12 +1198,13 @@ const SERVICES = [
   'Ops:', ...['Prometheus', 'Grafana', 'Sentry', 'PagerDuty'].map(node => `  ${node}`),
 ]
 
-test('fit, a reply\'s graph too large for the screen starts with its largest group collapsed, and on the main screen with every group open', async ($, on) => {
+test('auto, a reply\'s graph too large for the screen starts with every group collapsed, and on the main screen with every group open', async ($, on) => {
   replies(on)
   const text = ['```graphlet', ...SERVICES, '```'].join('\n')
   const clicked = await say($, 'terminal', text)
   const [{ key = '' } = {}] = await clientsOf(clicked)
-  expect((await rowsOf(clicked, key)).join('\n')).toContain('▸ Services  9')
+  const rows = (await rowsOf(clicked, key)).join('\n')
+  for (const group of ['▸ Clients  4', '▸ Edge  4', '▸ Services  9', '▸ Data  5', '▸ Ops  4']) expect(rows).toContain(group)
   await clicked.unmount()
   const still = await say($, 'terminal', text, {}, false)
   expect(screenOf(await still.drawn()).join('\n')).not.toContain('▸')

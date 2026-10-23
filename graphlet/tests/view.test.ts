@@ -176,18 +176,12 @@ const chainsOf = (sizes: number[], foremost = ''): Graph => {
   })
 }
 
-test('fit leaves alone a graph of a couple dozen nodes or fewer, however far it runs past its room, and a larger one seen whole', () => {
-  const view = viewOf(LOOK, true)
-  expect(openingOf(view, chainsOf([12, 12]), { columns: 40, rows: 10 }, 'fit')).toEqual(new Set())
-  expect(openingOf(view, chainsOf([12, 13]), { columns: 1000, rows: 1000 }, 'fit')).toEqual(new Set())
-})
-
-test('fit collapses a larger graph\'s groups that it does not see whole, the largest first, until no more than a couple dozen boxes show, keeping the group of the node put foremost, or with none of the first node, open longest', () => {
+test('auto collapses every group of more than one node in a graph of more than 25 nodes that its room does not show whole, and none in any other', () => {
   const view = viewOf(LOOK, true)
   const tiny = { columns: 40, rows: 10 }
-  expect(openingOf(view, chainsOf([12, 1, 8, 6], 'g0 n3'), tiny, 'fit')).toEqual(new Set(['g2']))
-  expect(openingOf(view, chainsOf([20, 1, 5, 5]), tiny, 'fit')).toEqual(new Set(['g3', 'g2']))
-  expect(openingOf(view, chainsOf([20, 1, 5, 5]), { columns: 80, rows: 120 }, 'fit')).toEqual(openingOf(view, chainsOf([20, 1, 5, 5]), tiny, 'fit'))
+  expect(openingOf(view, chainsOf([12, 1, 8, 6]), tiny, 'auto')).toEqual(new Set(['g0', 'g2', 'g3']))
+  expect(openingOf(view, chainsOf([12, 1, 8, 6]), { columns: 1000, rows: 1000 }, 'auto')).toEqual(new Set())
+  expect(openingOf(view, chainsOf([12, 13]), tiny, 'auto')).toEqual(new Set())
 })
 
 test('expanded starts every group open, and collapsed every group of more than one node, in any room', () => {
