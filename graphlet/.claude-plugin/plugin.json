@@ -1,9 +1,9 @@
 {
   "name": "graphlet",
   "version": "0.1.0",
-  "description": "Draws graphs of nodes and links inside Claude Code: in Claude's replies, and for other mods to build on",
+  "description": "graphlet: draw customizable graphs natively inside Claude Code.",
   "author": {
-    "name": "Neal",
+    "name": "Neal Sodhi",
     "url": "https://github.com/nsodhi-cmu"
   },
   "homepage": "https://github.com/nsodhi-cmu/claude-code-graphlet",
@@ -21,7 +21,7 @@
     "scroll": {
       "type": "string",
       "title": "Scrolling",
-      "description": "How a graph wider than its room scrolls: pinned keeps the layers that fit in view and slides the long ones together; sheet lays every layer on one wide sheet and moves it whole.",
+      "description": "pinned keeps the layers that fit in view while longer ones slide; sheet moves the whole graph.",
       "options": [
         "pinned",
         "sheet"
@@ -31,7 +31,7 @@
     "labels": {
       "type": "string",
       "title": "Long labels",
-      "description": "What becomes of a label too long for one line of its box: wrap breaks it onto more lines; clip keeps it to one line, cut in the middle.",
+      "description": "wrap breaks a long label onto more lines; clip cuts it to one.",
       "options": [
         "wrap",
         "clip"
@@ -41,7 +41,7 @@
     "links": {
       "type": "string",
       "title": "Links",
-      "description": "How the links between two layers share the rows there: separate gives each box's links a row of their own wherever they would run into another's; merged runs those of one kind along one row, which is shorter.",
+      "description": "separate gives each node's links lines of their own; merged lets them share, which is shorter.",
       "options": [
         "separate",
         "merged"
@@ -51,7 +51,7 @@
     "motion": {
       "type": "string",
       "title": "Motion",
-      "description": "Whether the selected node's links move: still lights them as lines; flowing runs beads along each link that runs one way, toward the node it reaches, and pulses the links that run no way or both ways.",
+      "description": "still lights the selected node's links; flowing also sets them moving.",
       "options": [
         "still",
         "flowing"
@@ -61,7 +61,7 @@
     "replies": {
       "type": "string",
       "title": "Graphs in replies",
-      "description": "Whether Claude draws graphs in its replies: on tells Claude it can, in a few lines of the system prompt, and draws each graph it writes; off adds nothing to the system prompt and leaves replies as Claude writes them, for graphlet as a library for other mods alone.",
+      "description": "on lets Claude draw graphs in its normal replies; off keeps graphlet out of Claude's replies and the system prompt, leaving it only for mods that use it.",
       "options": [
         "on",
         "off"
@@ -71,7 +71,7 @@
     "pictures": {
       "type": "string",
       "title": "Pictures in apps (experimental)",
-      "description": "Whether graphs in the desktop app, VS Code, and the mobile app are drawn as pictures: off draws the terminal's picture there as text in a code block; on, an experiment, draws each graph as a picture in SVG, with controls under a mod's graph in place of clicks and keys.",
+      "description": "off draws a graph on the desktop app, VS Code extension, and the mobile app as text in a code block; on draws it as a picture, with controls under a mod's graph.",
       "options": [
         "off",
         "on"
