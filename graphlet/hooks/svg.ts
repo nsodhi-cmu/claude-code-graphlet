@@ -1,6 +1,6 @@
 import type { GraphletNode, GraphletTone } from '../types'
 import { countOf, sizeOf } from './draw'
-import type { Graph, Link, Node, Slot } from './layers'
+import type { Edge, Graph, Node, Slot } from './layers'
 import { labelOf, linesOf } from './layout'
 import type { Direction, Frame, Layout } from './layout'
 
@@ -29,7 +29,7 @@ const BOX_RADIUS = 8
 const RING_INSET = 3
 /** The room between a mark and its label, and between a label and its badge. */
 const WORD_GAP = 6
-/** The width of the strip a link takes in a layer it passes through. */
+/** The width of the strip an edge takes in a layer it passes through. */
 const LANE_WIDTH = 8
 /** The room between two layers. */
 const LAYER_GAP = 72
@@ -37,28 +37,28 @@ const LAYER_GAP = 72
 const MARGIN = 40
 /** The room around everything drawn, inside the edge of its sheet. */
 const PAD = 12
-/** How far from a box's middle the port of the links that run back up is. */
+/** How far from a box's middle the port of the edges that run back up is. */
 const PORT_STEP = 12
-/** How far beside the first of them each further link between the same two boxes, running the same way down or up the page, runs. */
+/** How far beside the first of them each further edge between the same two boxes, running the same way down or up the page, runs. */
 const TWIN_STEP = 10
-/** How far apart two links' labels stand, one under the other, where they would stand over each other. */
+/** How far apart two edges' labels stand, one under the other, where they would stand over each other. */
 const LABEL_STEP = BADGE_SIZE + 4
 /** The length of an arrowhead, and its width. */
 const HEAD = { length: 9, width: 8 }
-/** The dashes of a link that runs back up: the length of a dash, and of the gap after it. */
+/** The dashes of an edge that runs back up: the length of a dash, and of the gap after it. */
 const DASHES = '5 4'
-/** How far under its layer the arc of a link between two of the layer's nodes is pulled. */
+/** How far under its layer the arc of an edge between two of the layer's nodes is pulled. */
 const ARC_DEPTH = 40
-/** How far out of its box's side a node's link to itself is pulled, and how far apart its two ends are. */
+/** How far out of its box's side a node's edge to itself is pulled, and how far apart its two ends are. */
 const LOOP = { reach: 30, span: 16 }
 /** How far a group's frame stands out from its first and last layers, and how far from what it holds across them. */
 const FRAME_PAD = { along: 26, across: 12 }
-/** The most characters of what a picture says for a reader who cannot see it; the links past them are counted. */
+/** The most characters of what a picture says for a reader who cannot see it; the edges past them are counted. */
 const MOST_ALT_CHARS = 1000
 /** The most characters of an SVG document a surface takes. */
 export const MOST_SVG_CHARS = 131_072
 
-/** The tones a node, a link, or a frame may be drawn in, each a class of the drawing's style. One the drawing does not know is drawn plain. */
+/** The tones a node, an edge, or a frame may be drawn in, each a class of the drawing's style. One the drawing does not know is drawn plain. */
 const TONES: readonly GraphletTone[] = ['plain', 'dim', 'note', 'good', 'warn', 'bad']
 
 /** The drawing's colors, once for a light scheme and once for a dark one, picked by the person's own setting. */
@@ -98,8 +98,8 @@ export const PALETTE = `
 /**
  * How each shape is drawn, by its class: a node's box in its tone, heavier
  * where it is put foremost or selected, a selected box with a second border
- * inside it, in the accent, and the boxes at the other ends of its links in
- * the accent too; a link's line and arrowhead in the color of lines, and its
+ * inside it, in the accent, and the boxes at the other ends of its edges in
+ * the accent too; an edge's line and arrowhead in the color of lines, and its
  * label in the soft color of words, or all of them in its tone's, or lit in
  * the accent; and a group's frame and its title.
  */
@@ -107,7 +107,7 @@ const SHAPES = `
 svg { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: ${FONT_SIZE}px; }
 text { text-anchor: middle; fill: var(--ink); }
 .sheet { fill: var(--page); stroke: var(--dim); stroke-width: 1; }
-.node, .link { transition: opacity 0.15s; }
+.node, .edge { transition: opacity 0.15s; }
 .node { outline: none; }
 .plain { --tone: var(--plain); }
 .dim { --tone: var(--dim); }
@@ -126,14 +126,14 @@ text { text-anchor: middle; fill: var(--ink); }
 .mark { fill: var(--tone); }
 .dim text, .badge { fill: var(--soft); }
 .badge { font-size: ${BADGE_SIZE}px; }
-.link { color: var(--line); }
-.link.toned { color: var(--tone); }
-.link path { fill: none; stroke: currentColor; stroke-width: 1.25; }
-.link polygon { fill: currentColor; }
-.link text { font-size: ${BADGE_SIZE}px; fill: var(--label, var(--soft)); paint-order: stroke; stroke: var(--page); stroke-width: 4px; }
-.link.toned, .link.lit { --label: currentColor; }
-.link.lit { color: var(--accent); }
-.link.lit path { stroke-width: 1.75; }
+.edge { color: var(--line); }
+.edge.toned { color: var(--tone); }
+.edge path { fill: none; stroke: currentColor; stroke-width: 1.25; }
+.edge polygon { fill: currentColor; }
+.edge text { font-size: ${BADGE_SIZE}px; fill: var(--label, var(--soft)); paint-order: stroke; stroke: var(--page); stroke-width: 4px; }
+.edge.toned, .edge.lit { --label: currentColor; }
+.edge.lit { color: var(--accent); }
+.edge.lit path { stroke-width: 1.75; }
 .hull { fill: none; stroke: var(--tone); stroke-width: 1.25; }
 .title { text-anchor: start; font-size: ${BADGE_SIZE}px; font-weight: 600; fill: var(--soft); paint-order: stroke; stroke: var(--page); stroke-width: 6px; }
 .frame.dim .title { fill: var(--soft); }
@@ -158,12 +158,12 @@ type At = { across: number; along: number }
 /**
  * A slot where it stands in the drawing: its layer, the rectangle it takes
  * there, across and along, and for a node the lines of its label. A node's
- * rectangle is its box, and a lane's is the strip its link runs along.
+ * rectangle is its box, and a lane's is the strip its edge runs along.
  */
 type Spot = { slot: Slot; layer: number; across: number; along: number; wide: number; long: number; lines: string[] }
 
 /**
- * A link as it is drawn: the path of its shaft, the point where it reaches
+ * An edge as it is drawn: the path of its shaft, the point where it reaches
  * its box and the way it is going there, a step of one across, down, or up,
  * the middle of its first stretch, where its label is written, and whether it
  * runs back up.
@@ -191,7 +191,7 @@ type Hull = { frame: Frame; across: number; along: number; wide: number; long: n
 
 /**
  * Every slot where it stands, and every group's frame: each slot across its
- * layer where the layout has it, its middle on the column its links there
+ * layer where the layout has it, its middle on the column its edges there
  * leave and reach it by, a cell of the layout `cell` pixels of the drawing
  * and the first of them at the margin; and the layers one after another
  * along, each as long as its longest box, a gap apart. Running down, a
@@ -256,7 +256,7 @@ function headOf(tip: Point, way: Point): string {
 }
 
 /**
- * A link between two layers: a curve across each gap between two layers, and
+ * An edge between two layers: a curve across each gap between two layers, and
  * straight along each lane it has in the layers it passes, stopping `short`
  * of its box. Along the page it leaves the far side of a box and reaches the
  * near side of one, by their middles; back it does the reverse, by the ports
@@ -283,7 +283,7 @@ function runOf(turning: Turning, from: Spot, lanes: Spot[], to: Spot, isUp: bool
   return { path, tip: turning.pointOf(tip), way: turning.pointOf({ across: 0, along: way }), middle, isUp }
 }
 
-/** A link between two nodes of one layer: an arc past the layer, `aside` deeper, out of the middle of the first box's far side and back into the port beside the second's, stopping `short` of it. */
+/** An edge between two nodes of one layer: an arc past the layer, `aside` deeper, out of the middle of the first box's far side and back into the port beside the second's, stopping `short` of it. */
 function arcOf(turning: Turning, from: Spot, to: Spot, short: number, aside: number): Arrow {
   const [along, depth] = [from.along + from.long, ARC_DEPTH + aside]
   const [out, into] = [middleOf(from), middleOf(to) + PORT_STEP]
@@ -294,7 +294,7 @@ function arcOf(turning: Turning, from: Spot, to: Spot, short: number, aside: num
   return { path, tip: turning.pointOf({ across: into, along }), way: turning.pointOf({ across: 0, along: -1 }), middle, isUp: false }
 }
 
-/** A link from a node to itself: a loop out of the far side of its box across its layer, reaching `aside` farther, and back into it, stopping `short` of it. */
+/** An edge from a node to itself: a loop out of the far side of its box across its layer, reaching `aside` farther, and back into it, stopping `short` of it. */
 function loopOf(turning: Turning, spot: Spot, short: number, aside: number): Arrow {
   const [across, reach] = [spot.across + spot.wide, LOOP.reach + aside]
   const [out, into] = [spot.along + (spot.long - LOOP.span) / 2, spot.along + (spot.long + LOOP.span) / 2]
@@ -306,19 +306,19 @@ function loopOf(turning: Turning, spot: Spot, short: number, aside: number): Arr
 }
 
 /**
- * A link as it is drawn between the boxes of its two ends: a loop, an arc, or
+ * An edge as it is drawn between the boxes of its two ends: a loop, an arc, or
  * a run through its lanes in the order it passes them, `aside` from where it
- * would run. A link that runs one way stops short of its box by the length
+ * would run. An edge that runs one way stops short of its box by the length
  * of an arrowhead; one that runs no way reaches the box, and runs along the
  * page whichever way round it names its ends.
  */
-function arrowOf(turning: Turning, link: Link, from: Spot, to: Spot, spots: Spot[], aside: number): Arrow {
-  const { isDirected } = link
+function arrowOf(turning: Turning, edge: Edge, from: Spot, to: Spot, spots: Spot[], aside: number): Arrow {
+  const { isDirected } = edge
   const short = isDirected ? HEAD.length : 0
   if (from === to) return loopOf(turning, from, short, aside)
   if (from.layer === to.layer) return arcOf(turning, from, to, short, aside)
   const isUp = from.layer > to.layer
-  const lanes = spots.filter(spot => 'lane' in spot.slot && spot.slot.lane.includes(link))
+  const lanes = spots.filter(spot => 'lane' in spot.slot && spot.slot.lane.includes(edge))
   if (isUp && !isDirected) return runOf(turning, to, lanes, from, false, short, aside)
   return runOf(turning, from, isUp ? lanes.toReversed() : lanes, to, isUp, short, aside)
 }
@@ -345,7 +345,7 @@ const pointsOf = (path: string): Rect[] => [...path.matchAll(/(-?[\d.]+),(-?[\d.
  * its badge; where it is selected, a second border inside its box, and where
  * its label is cut short, the whole of it as its title. It is marked by its
  * place in the graph, `n` and the place, and as `selected`, or as `near`
- * where a link joins it to the node that is.
+ * where an edge joins it to the node that is.
  */
 function boxOf(turning: Turning, node: Node, spot: Spot, index: number, state?: 'selected' | 'near'): string {
   const tone = TONES.find(one => one === node.tone) ?? 'plain'
@@ -368,15 +368,15 @@ function boxOf(turning: Turning, node: Node, spot: Spot, index: number, state?: 
 
 /**
  * The rules that light the node the pointer is over, or else the one with
- * the keyboard's focus, a rule for each node: its links lit in the accent,
- * and every node not at the end of one of them, and every other link,
+ * the keyboard's focus, a rule for each node: its edges lit in the accent,
+ * and every node not at the end of one of them, and every other edge,
  * quieted.
  */
 function lightsOf(graph: Graph): string {
   const near = new Map<number, Set<number>>(graph.nodes.map((_, index) => [index, new Set([index])]))
   const placeOf = new Map(graph.nodes.map((node, index) => [node.id, index]))
-  for (const link of graph.links) {
-    const [from, to] = [placeOf.get(link.from), placeOf.get(link.to)]
+  for (const edge of graph.edges) {
+    const [from, to] = [placeOf.get(edge.from), placeOf.get(edge.to)]
     if (from === undefined || to === undefined) continue
     near.get(from)?.add(to)
     near.get(to)?.add(from)
@@ -384,24 +384,24 @@ function lightsOf(graph: Graph): string {
   return [...near].map(([index, nodes]) => {
     const lit = `svg:has(.n${index}:hover), svg:not(:has(.node:hover)):has(.n${index}:focus)`
     const others = [...nodes].map(one => `.n${one}`).join(',')
-    return `:is(${lit}) :is(.node:not(${others}), .link:not(.e${index})) { opacity: 0.25; }\n:is(${lit}) .link.e${index} { color: var(--accent); --label: currentColor; }`
+    return `:is(${lit}) :is(.node:not(${others}), .edge:not(.e${index})) { opacity: 0.25; }\n:is(${lit}) .edge.e${index} { color: var(--accent); --label: currentColor; }`
   }).join('\n')
 }
 
 /**
- * Where each link's label is written, and how wide it is: at the middle of
- * the link's first stretch, or where that would stand over a label written
+ * Where each edge's label is written, and how wide it is: at the middle of
+ * the edge's first stretch, or where that would stand over a label written
  * before it, moved down a line at a time until it does not, the labels
- * written from the top of the drawing down. A link from a node to itself has
+ * written from the top of the drawing down. An edge from a node to itself has
  * none.
  */
-function labelsAt(drawn: ReadonlyArray<{ link: Link; arrow: Arrow }>): Map<Link, Point & { width: number }> {
-  const written = new Map<Link, Point & { width: number }>()
-  for (const { link, arrow } of drawn.filter(one => one.link.from !== one.link.to && labelOf(one.link) !== '').sort((a, b) => a.arrow.middle.y - b.arrow.middle.y || a.arrow.middle.x - b.arrow.middle.x)) {
-    const width = widthOf(labelOf(link)) * (BADGE_SIZE / FONT_SIZE)
+function labelsAt(drawn: ReadonlyArray<{ edge: Edge; arrow: Arrow }>): Map<Edge, Point & { width: number }> {
+  const written = new Map<Edge, Point & { width: number }>()
+  for (const { edge, arrow } of drawn.filter(one => one.edge.from !== one.edge.to && labelOf(one.edge) !== '').sort((a, b) => a.arrow.middle.y - b.arrow.middle.y || a.arrow.middle.x - b.arrow.middle.x)) {
+    const width = widthOf(labelOf(edge)) * (BADGE_SIZE / FONT_SIZE)
     let { x, y } = arrow.middle
     while ([...written.values()].some(one => Math.abs(one.x - x) < (one.width + width) / 2 && Math.abs(one.y - y) < LABEL_STEP)) y += LABEL_STEP
-    written.set(link, { x, y, width })
+    written.set(edge, { x, y, width })
   }
   return written
 }
@@ -409,21 +409,21 @@ function labelsAt(drawn: ReadonlyArray<{ link: Link; arrow: Arrow }>): Map<Link,
 /** A graph drawn in SVG: the document, and its width in pixels, which it is drawn at where its room is wide enough. */
 export type Drawn = { source: string; width: number }
 
-/** What a drawing shows besides its graph: the node selected, whose links are lit; and whether a node is lit as the pointer passes over it. */
+/** What a drawing shows besides its graph: the node selected, whose edges are lit; and whether a node is lit as the pointer passes over it. */
 export type Seen = { selected: string | null; isLighting: boolean }
 
 /**
  * A graph drawn in SVG, as one document: its colors and how its shapes are
- * drawn, a sheet under all of it, every group's frame, every link, each
+ * drawn, a sheet under all of it, every group's frame, every edge, each
  * marked `e` and the place in the graph of each of its two ends, in its tone
  * where it has one, with an arrowhead where it runs one way, its label, cut
  * as the terminal cuts it, written on its first stretch, and moved down past
  * any label written there before it; and over them every node, in the
  * graph's order. Each node is laid out where `layout` has it, a cell of the
- * layout `cell` pixels across its layer. A link between the same two boxes
+ * layout `cell` pixels across its layer. An edge between the same two boxes
  * as one before it, running the same way, along the page or back, runs
- * `TWIN_STEP` farther aside for each. A link from a node to itself has no
- * label written, as in the terminal. The links that touch the selected node
+ * `TWIN_STEP` farther aside for each. An edge from a node to itself has no
+ * label written, as in the terminal. The edges that touch the selected node
  * are lit. The document is as large as what it draws and the room around it.
  */
 export function svgOf(graph: Graph, layout: Layout, cell: number, seen: Seen): Drawn {
@@ -435,26 +435,26 @@ export function svgOf(graph: Graph, layout: Layout, cell: number, seen: Seen): D
     if (spot !== undefined) places.set(node.id, { index, spot })
   })
   const twins = new Map<string, number>()
-  const drawn = graph.links.flatMap(link => {
-    const [from, to] = [places.get(link.from), places.get(link.to)]
-    const isUp = link.isDirected && (from?.spot.layer ?? 0) > (to?.spot.layer ?? 0)
-    const pair = JSON.stringify([isUp, ...[link.from, link.to].sort()])
+  const drawn = graph.edges.flatMap(edge => {
+    const [from, to] = [places.get(edge.from), places.get(edge.to)]
+    const isUp = edge.isDirected && (from?.spot.layer ?? 0) > (to?.spot.layer ?? 0)
+    const pair = JSON.stringify([isUp, ...[edge.from, edge.to].sort()])
     const twin = twins.get(pair) ?? 0
     twins.set(pair, twin + 1)
-    return from === undefined || to === undefined ? [] : [{ link, from, to, arrow: arrowOf(turning, link, from.spot, to.spot, spots, twin * TWIN_STEP) }]
+    return from === undefined || to === undefined ? [] : [{ edge, from, to, arrow: arrowOf(turning, edge, from.spot, to.spot, spots, twin * TWIN_STEP) }]
   })
   const writtenAt = labelsAt(drawn)
-  const isLit = (link: Link): boolean => seen.selected !== null && (link.from === seen.selected || link.to === seen.selected)
-  const links = drawn.map(({ link, from, to, arrow }) => {
+  const isLit = (edge: Edge): boolean => seen.selected !== null && (edge.from === seen.selected || edge.to === seen.selected)
+  const edges = drawn.map(({ edge, from, to, arrow }) => {
     const dashes = arrow.isUp ? ` stroke-dasharray="${DASHES}"` : ''
-    const head = link.isDirected ? `<polygon points="${headOf(arrow.tip, arrow.way)}"/>` : ''
-    const at = writtenAt.get(link)
-    const label = at === undefined ? '' : `<text x="${at.x}" y="${at.y + BASELINE}">${escaped(labelOf(link))}</text>`
-    const tone = TONES.find(one => one === link.tone)
-    const classes = ['link', ...(tone === undefined ? [] : ['toned', tone]), ...(isLit(link) ? ['lit'] : []), `e${from.index}`, `e${to.index}`].join(' ')
+    const head = edge.isDirected ? `<polygon points="${headOf(arrow.tip, arrow.way)}"/>` : ''
+    const at = writtenAt.get(edge)
+    const label = at === undefined ? '' : `<text x="${at.x}" y="${at.y + BASELINE}">${escaped(labelOf(edge))}</text>`
+    const tone = TONES.find(one => one === edge.tone)
+    const classes = ['edge', ...(tone === undefined ? [] : ['toned', tone]), ...(isLit(edge) ? ['lit'] : []), `e${from.index}`, `e${to.index}`].join(' ')
     return `<g class="${classes}"><path${dashes} d="${arrow.path}"/>${head}${label}</g>`
   })
-  const nearby = new Set(graph.links.filter(isLit).flatMap(link => [link.from, link.to]))
+  const nearby = new Set(graph.edges.filter(isLit).flatMap(edge => [edge.from, edge.to]))
   const nodes = graph.nodes.flatMap(node => {
     const place = places.get(node.id)
     const state = node.id === seen.selected ? 'selected' : nearby.has(node.id) ? 'near' : undefined
@@ -472,26 +472,26 @@ export function svgOf(graph: Graph, layout: Layout, cell: number, seen: Seen): D
   const style = `<style>${PALETTE}${SHAPES}${seen.isLighting ? `\n${lightsOf(graph)}` : ''}\n</style>`
   const back = `<rect class="sheet" x="${sheet.x}" y="${sheet.y}" width="${sheet.width}" height="${sheet.height}" rx="${BOX_RADIUS}"/>`
   const size = `width="${Math.ceil(sheet.width)}" height="${Math.ceil(sheet.height)}" viewBox="${sheet.x} ${sheet.y} ${sheet.width} ${sheet.height}"`
-  return { source: `<svg xmlns="http://www.w3.org/2000/svg" ${size}>\n${style}\n${[back, ...frames, ...links, ...nodes].join('\n')}\n</svg>`, width: Math.ceil(sheet.width) }
+  return { source: `<svg xmlns="http://www.w3.org/2000/svg" ${size}>\n${style}\n${[back, ...frames, ...edges, ...nodes].join('\n')}\n</svg>`, width: Math.ceil(sheet.width) }
 }
 
 /**
  * What a picture of a graph says for a reader who cannot see it: how many
- * nodes and links it has, then each link, by the labels of its two ends,
+ * nodes and edges it has, then each edge, by the labels of its two ends,
  * with an arrow where it runs one way and a dash where it runs no way, and
- * its label after it; and each node no link joins. What would run past
+ * its label after it; and each node no edge joins. What would run past
  * `MOST_ALT_CHARS` is counted instead.
  */
 export function altOf(graph: Graph): string {
   const labelOfNode = new Map(graph.nodes.map(node => [node.id, node.label]))
   const said = [
-    ...graph.links.map(link => {
-      const [from, to] = [labelOfNode.get(link.from) ?? link.from, labelOfNode.get(link.to) ?? link.to]
-      return `${from} ${link.isDirected ? '→' : '—'} ${to}${link.label === undefined ? '' : ` (${link.label})`}`
+    ...graph.edges.map(edge => {
+      const [from, to] = [labelOfNode.get(edge.from) ?? edge.from, labelOfNode.get(edge.to) ?? edge.to]
+      return `${from} ${edge.isDirected ? '→' : '—'} ${to}${edge.label === undefined ? '' : ` (${edge.label})`}`
     }),
-    ...graph.nodes.filter(node => !graph.links.some(link => link.from === node.id || link.to === node.id)).map(node => node.label),
+    ...graph.nodes.filter(node => !graph.edges.some(edge => edge.from === node.id || edge.to === node.id)).map(node => node.label),
   ]
-  const head = `A graph of ${countOf(graph.nodes.length, 'node')} and ${countOf(graph.links.length, 'link')}`
+  const head = `A graph of ${countOf(graph.nodes.length, 'node')} and ${countOf(graph.edges.length, 'edge')}`
   const kept: string[] = []
   for (const one of said) {
     if ([head, ...kept, one].join('; ').length > MOST_ALT_CHARS) break

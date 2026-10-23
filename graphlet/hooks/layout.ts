@@ -1,19 +1,19 @@
-import type { GraphletDirection, GraphletLink, GraphletNode } from '../types'
+import type { GraphletDirection, GraphletEdge, GraphletNode } from '../types'
 import { charactersOf, clipMiddle, fitting, sizeOf } from './draw'
 import type { Room } from './draw'
 import { layersOf, priorityOf, slotGroups } from './layers'
-import type { Graph, Group, Link, Piece, Slot } from './layers'
+import type { Edge, Graph, Group, Piece, Slot } from './layers'
 
 // The layout: a box a node, the boxes of a layer side by side on a shelf with
-// the lanes of the links that pass through it, and between two shelves a
-// channel the links cross in. It is worked out once for a room's width, in an
+// the lanes of the edges that pass through it, and between two shelves a
+// channel the edges cross in. It is worked out once for a room's width, in an
 // order that never changes, whatever window it is then seen through.
 
 /**
  * How a graph wider than its room scrolls. `pinned`: a shelf that fits the
  * room stays in view, and the shelves longer than it lie on one sheet as wide
  * as the longest, which slides under the window. `sheet`: every shelf lies on
- * that sheet, each box by what it is linked to, and the sheet moves whole.
+ * that sheet, each box by what it is joined to, and the sheet moves whole.
  */
 export type Scroll = 'pinned' | 'sheet'
 
@@ -21,15 +21,15 @@ export type Scroll = 'pinned' | 'sheet'
 export type Labels = 'wrap' | 'clip'
 
 /**
- * How the links that cross between two shelves share the rows there.
- * `separate`: one box's links turn on a row of their own wherever they would
+ * How the edges that cross between two shelves share the rows there.
+ * `separate`: one box's edges turn on a row of their own wherever they would
  * run into another's. `merged`: those of one kind turn on one row, which is
  * shorter, and are told apart by selecting a node.
  */
-export type Links = 'separate' | 'merged'
+export type Edges = 'separate' | 'merged'
 
 /** How graphs are drawn: the person's settings. */
-export type Look = { scroll: Scroll; labels: Labels; links: Links }
+export type Look = { scroll: Scroll; labels: Labels; edges: Edges }
 
 /**
  * Which way a graph runs: `down`, its layers one under another, each a row
@@ -43,7 +43,7 @@ export type Direction = GraphletDirection
 /**
  * What a direction makes of a layout: the room between two neighbors of a
  * shelf; how far apart two ports of one face stand, so that a column or a
- * row between two is free to step a link aside at; and whether a link's
+ * row between two is free to step an edge aside at; and whether an edge's
  * label lies across the face it leaves, beside its port, as it does running
  * down, or along its line, as it does running right.
  */
@@ -61,8 +61,8 @@ const WORD_COLUMNS = 32
 const LABEL_ROWS = 3
 /** The most cells of a label that is cut to one line. */
 const CLIP_CELLS = 32
-/** The most cells a link's label takes: a longer one is cut in its middle. */
-const LINK_LABEL_CELLS = 16
+/** The most cells an edge's label takes: a longer one is cut in its middle. */
+const EDGE_LABEL_CELLS = 16
 /** What a box adds to its widest line: a space and a border on each side. */
 const BOX_PADDING = 4
 /** The narrowest box: one whose two ports stand apart. A shorter label is set in its middle. */
@@ -75,22 +75,22 @@ export const LEAST_COLUMNS = 40
 const LEAST_ROWS = 1
 /** How many times a folded layout that its boxes' ports still make wider than its room is folded again, narrower by as much as it overflowed. */
 const REFOLDS = 2
-/** The most nodes, and the most links, a graph is folded into its room for: folding more takes long, and makes a picture longer than a reply can hold. */
+/** The most nodes, and the most edges, a graph is folded into its room for: folding more takes long, and makes a picture longer than a reply can hold. */
 const FOLDED_NODES = 60
-const FOLDED_LINKS = 120
+const FOLDED_EDGES = 120
 /** How many times the shelves are seated again, after they are first seated, each time down, back up, and against both neighbors at once; each seating tried lays every track again. */
 const RESEATS = 1
-/** How much more a lane's wire weighs than a box's where a shelf is balanced, so that a link through lanes keeps straight before a box sits square. */
+/** How much more a lane's wire weighs than a box's where a shelf is balanced, so that an edge through lanes keeps straight before a box sits square. */
 const LANE_WEIGHT = 2
-/** How many bent links a row of height is worth, where seatings are weighed against each other. */
+/** How many bent edges a row of height is worth, where seatings are weighed against each other. */
 const ROW_BENDS = 2
-/** How much more a wire with the flow weighs than one against it, where a shelf is balanced and where seatings are weighed, so that a link that closes a loop bends before the links it runs back past. */
+/** How much more a wire with the flow weighs than one against it, where a shelf is balanced and where seatings are weighed, so that an edge that closes a loop bends before the edges it runs back past. */
 const FLOW_WEIGHT = 2
-/** How much less a bend in a wire to or from a lane weighs than one between two boxes, where seatings are weighed, so that a link through lanes bends before the links between neighbors do. */
+/** How much less a bend in a wire to or from a lane weighs than one between two boxes, where seatings are weighed, so that an edge through lanes bends before the edges between neighbors do. */
 const LANE_BEND = 2
 /** The characters a long word may be broken after with nothing lost. */
 const BREAKS = '/-_.'
-/** The sign in the box of a node that links to itself. */
+/** The sign in the box of a node with an edge to itself. */
 const LOOP = '↺'
 /** How far a group's frame stands out from what it holds across a shelf: its border, and a blank inside it. */
 const FRAME_MARGIN = 2
@@ -141,18 +141,18 @@ export function linesOf(label: string): string[] {
   return wrap(label, LABEL_COLUMNS, LABEL_ROWS, WORD_COLUMNS)
 }
 
-/** What is written on a link, cut to the cells a link's label may take; nothing where it has no label. */
-export const labelOf = (link: GraphletLink): string => (link.label === undefined ? '' : clipMiddle(link.label, LINK_LABEL_CELLS))
+/** What is written on an edge, cut to the cells an edge's label may take; nothing where it has no label. */
+export const labelOf = (edge: GraphletEdge): string => (edge.label === undefined ? '' : clipMiddle(edge.label, EDGE_LABEL_CELLS))
 
-/** Whether a link keeps to lines of links that say what it says: one with a label or a tone, which is then true of every link of the line. */
-export const isApart = (link: GraphletLink): boolean => labelOf(link) !== '' || link.tone !== undefined
+/** Whether an edge keeps to lines of edges that say what it says: one with a label or a tone, which is then true of every edge of the line. */
+export const isApart = (edge: GraphletEdge): boolean => labelOf(edge) !== '' || edge.tone !== undefined
 
 /** What a box says: its node's mark, the lines of its label, and what follows the last of them, dim. */
 export type Words = { mark: string; lines: string[]; badge: string }
 
-/** What a node's box says. A node that links to itself carries the sign of a loop before its badge. */
+/** What a node's box says. A node with an edge to itself carries the sign of a loop before its badge. */
 export function wordsOf(graph: Graph, node: GraphletNode, labels: Labels): Words {
-  const isLooped = graph.links.some(link => link.from === node.id && link.to === node.id)
+  const isLooped = graph.edges.some(edge => edge.from === node.id && edge.to === node.id)
   const after = [...(isLooped ? [LOOP] : []), ...(node.badge === undefined ? [] : [node.badge])].join(' ')
   return {
     mark: node.mark === undefined ? '' : `${node.mark} `,
@@ -192,9 +192,9 @@ export type Shelf = { places: Place[]; width: number; across: number; top: numbe
 export type End = { place: Place; isAbove: boolean; at: number }
 
 /**
- * A link's stretch across one channel, from the place it leaves to the place
- * it reaches, with an arrowhead there where that place is the link's own end
- * and the link runs one way. One that `isUp` runs against the flow. Where it
+ * An edge's stretch across one channel, from the place it leaves to the place
+ * it reaches, with an arrowhead there where that place is the edge's own end
+ * and the edge runs one way. One that `isUp` runs against the flow. Where it
  * does not go straight across, it turns on the row of the channel that is its
  * `track`, and where its bundle runs on two tracks, steps across to the
  * other at its `jog`. It keeps `clearOf` the other ports of the face it
@@ -203,7 +203,7 @@ export type End = { place: Place; isAbove: boolean; at: number }
  * or arrowhead.
  */
 export type Wire = {
-  link: Link
+  edge: Edge
   from: End
   to: End
   hasHead: boolean
@@ -218,9 +218,9 @@ export type Wire = {
 
 /**
  * The rows between two shelves, or under the last: its `topRows`, for the
- * arrowheads that point up and the labels of the links that leave the shelf
+ * arrowheads that point up and the labels of the edges that leave the shelf
  * above, when there are any, then a row a track, then its `bottomRows`, for
- * the arrowheads that point down and the labels of the links that leave the
+ * the arrowheads that point down and the labels of the edges that leave the
  * shelf below, when there are any. Running down, a label lies across a row,
  * so either is one row; running right, a label lies along its line, so
  * either is as many as the longest label, and one more. Its wires turn in
@@ -279,13 +279,13 @@ export function routeOf(wire: Wire, xOf: (place: Place) => number): { out: numbe
   const x = xOf(place)
   const into = xOf(wire.to.place) + wire.to.at
   const own = x + wire.from.at
-  if ('lane' in place.slot || wire.from.isAbove === wire.to.isAbove || labelOf(wire.link) !== '') return { out: own, into }
+  if ('lane' in place.slot || wire.from.isAbove === wire.to.isAbove || labelOf(wire.edge) !== '') return { out: own, into }
   const isOver = into > x + 1 && into < x + place.width - 2 && !wire.clearOf.includes(into - x)
   return { out: isOver ? into : own, into }
 }
 
-/** The wires of the channel under a shelf: the stretches that cross it, and the links between two nodes of that shelf. */
-function wiresOf(pieces: Piece[], flats: Link[], shelf: Shelf, placeOf: Map<Slot, Place>): Wire[] {
+/** The wires of the channel under a shelf: the stretches that cross it, and the edges between two nodes of that shelf. */
+function wiresOf(pieces: Piece[], flats: Edge[], shelf: Shelf, placeOf: Map<Slot, Place>): Wire[] {
   const wires: Wire[] = []
   const rest = { bundle: 0, track: 0, jog: null, clearOf: [] }
   for (const piece of pieces) {
@@ -294,18 +294,18 @@ function wiresOf(pieces: Piece[], flats: Link[], shelf: Shelf, placeOf: Map<Slot
     const above: End = { place: upper, isAbove: true, at: 0 }
     const below: End = { place: lower, isAbove: false, at: 0 }
     const [from, to] = piece.isUp ? [below, above] : [above, below]
-    wires.push({ link: piece.link, from, to, hasHead: piece.link.isDirected && 'node' in to.place.slot, isUp: piece.isUp, ...rest })
+    wires.push({ edge: piece.edge, from, to, hasHead: piece.edge.isDirected && 'node' in to.place.slot, isUp: piece.isUp, ...rest })
   }
   const find = (id: string): Place | undefined =>
     shelf.places.find(place => 'node' in place.slot && place.slot.node.id === id)
-  for (const link of flats) {
-    const [from, to] = [find(link.from), find(link.to)]
+  for (const edge of flats) {
+    const [from, to] = [find(edge.from), find(edge.to)]
     if (from === undefined || to === undefined) continue
     wires.push({
-      link,
+      edge,
       from: { place: from, isAbove: true, at: 0 },
       to: { place: to, isAbove: true, at: 0 },
-      hasHead: link.isDirected,
+      hasHead: edge.isDirected,
       isUp: false,
       ...rest,
     })
@@ -317,8 +317,8 @@ function wiresOf(pieces: Piece[], flats: Link[], shelf: Shelf, placeOf: Map<Slot
  * A channel's wires in bundles, the wires that turn on one track. Kept
  * apart, a bundle is the wires that leave one face of a place, a fan, with
  * the fans of every other place whose wires reach the very same faces, so
- * that run together they say nothing false. Links of the two kinds are never
- * of one bundle. A link with no direction, whose line has no arrowhead to
+ * that run together they say nothing false. Edges of the two kinds are never
+ * of one bundle. An edge with no direction, whose line has no arrowhead to
  * tell its two ends apart, between two nodes of the shelf is a bundle alone,
  * and merged too where it has a label or a tone. Merged, a bundle is every
  * wire of one kind with neither that runs the one way, with the flow or
@@ -329,23 +329,23 @@ function wiresOf(pieces: Piece[], flats: Link[], shelf: Shelf, placeOf: Map<Slot
  * bundles with either keep tracks of their own, apart from the one the rest
  * share. Kept apart, a wire that leaves a box for a
  * lane that wires from elsewhere reach too is a fan of its own, so that it meets the lane's
- * others there without joining them to the box's other links.
+ * others there without joining them to the box's other edges.
  */
-function bundlesOf(wires: Wire[], links: Links): Wire[][] {
+function bundlesOf(wires: Wire[], edges: Edges): Wire[][] {
   const ids = new Map<Place, number>()
   const faceOf = (end: End): string => {
     if (!ids.has(end.place)) ids.set(end.place, ids.size)
     return `${ids.get(end.place)}${end.isAbove ? 'v' : '^'}`
   }
-  const isAlone = (wire: Wire): boolean => !wire.link.isDirected && wire.from.isAbove === wire.to.isAbove && (links === 'separate' || isApart(wire.link))
+  const isAlone = (wire: Wire): boolean => !wire.edge.isDirected && wire.from.isAbove === wire.to.isAbove && (edges === 'separate' || isApart(wire.edge))
   const reaching = new Map<Place, Set<Place>>()
   for (const wire of wires) if ('lane' in wire.to.place.slot) reaching.set(wire.to.place, new Set([...(reaching.get(wire.to.place) ?? []), wire.from.place]))
   /** Whether a wire leaves a box for a lane that wires from elsewhere reach too, which it must reach on a line of its own. */
   const isJoining = (wire: Wire): boolean => 'node' in wire.from.place.slot && (reaching.get(wire.to.place)?.size ?? 0) > 1
   const fans = new Map<string, { way: string; isMerged: boolean; wires: Wire[] }>()
   for (const wire of wires.filter(wire => !isAlone(wire))) {
-    const way = JSON.stringify([wire.isUp, wire.link.isDirected, wire.link.label ?? '', wire.link.tone ?? ''])
-    const isMerged = links === 'merged' && !isApart(wire.link)
+    const way = JSON.stringify([wire.isUp, wire.edge.isDirected, wire.edge.label ?? '', wire.edge.tone ?? ''])
+    const isMerged = edges === 'merged' && !isApart(wire.edge)
     const key = isMerged ? way : `${way} ${faceOf(wire.from)}${isJoining(wire) ? ` into ${faceOf(wire.to)}` : ''}`
     fans.set(key, { way, isMerged, wires: [...(fans.get(key)?.wires ?? []), wire] })
   }
@@ -370,7 +370,7 @@ function bundlesOf(wires: Wire[], links: Links): Wire[][] {
  * places at the wires' other ends
  * stand, so that wires from the left arrive on the left; of two that lead to
  * a place in common, the one with the flow is first, wherever their other
- * wires lead, so that the links two boxes have each way stand in the same
+ * wires lead, so that the edges two boxes have each way stand in the same
  * order on both. A wire that leaves straight keeps clear of the face's other
  * ports and the columns beside them, and of their labels.
  */
@@ -388,7 +388,7 @@ function dealPorts(shelves: Shelf[], channels: Channel[], direction: Direction):
     const face = faces.get(first.place) ?? { top: [], bottom: [] }
     faces.set(first.place, face)
     const heading = far.reduce((sum, end) => sum + alongOf(end.place), 0) / far.length
-    const label = leaving[0] === undefined ? '' : labelOf(leaving[0].link)
+    const label = leaving[0] === undefined ? '' : labelOf(leaving[0].edge)
     ;(first.isAbove ? face.bottom : face.top).push({ ends, leaving, heading, isUp, far: new Set(far.map(end => end.place)), label })
   }
   /** A face's groups by their heading, each against the flow moved past every group with the flow that leads to a place it does. */
@@ -455,7 +455,7 @@ function dealPorts(shelves: Shelf[], channels: Channel[], direction: Direction):
  * over or under the ports of the boxes it is joined to, or with none, of the
  * lanes; the boxes are pushed apart where they would overlap, and slid back
  * together toward where they wanted to be. A lane then goes to the very
- * column of the port it is joined to, so that a link runs straight through
+ * column of the port it is joined to, so that an edge runs straight through
  * the shelves it passes, and pushes aside the boxes in its way. Last, the
  * shelf moves a column either way where that stands more of it exactly over
  * or under what it is joined to. With nothing beside it to sit by, the shelf
@@ -615,13 +615,13 @@ function balance(shelf: Shelf, columns: number, beside: Place[], wires: Wire[], 
   }
 }
 
-/** How much a wire's bend weighs: one for a link with the flow between two boxes, less by `FLOW_WEIGHT` against the flow, and less again by `LANE_BEND` to or from a lane. */
+/** How much a wire's bend weighs: one for an edge with the flow between two boxes, less by `FLOW_WEIGHT` against the flow, and less again by `LANE_BEND` to or from a lane. */
 const bendOf = (wire: Wire): number => (wire.isUp ? 1 / FLOW_WEIGHT : 1) / ('lane' in wire.from.place.slot || 'lane' in wire.to.place.slot ? LANE_BEND : 1)
 
 /**
- * What a seating weighs: its channels' rows and bent links, all told, a row
- * as much as `ROW_BENDS` bent links, each weighing as `bendOf` says; the
- * bent links of each rank but the lowest, the highest first; and how far its
+ * What a seating weighs: its channels' rows and bent edges, all told, a row
+ * as much as `ROW_BENDS` bent edges, each weighing as `bendOf` says; the
+ * bent edges of each rank but the lowest, the highest first; and how far its
  * wires run sideways, each cell weighing as its wire's bend does.
  */
 export type Cost = { weight: number; ranked: number[]; sideways: number }
@@ -654,12 +654,12 @@ const isLess = (a: number[], b: number[]): boolean => {
  * then against both, where they are laid out across the same columns. Of the
  * first seating and the seating after each pass, the one kept is the one
  * that weighs least, as `costOf` weighs it; of those that weigh the same,
- * the one whose bent links of each rank but the lowest weigh least, the
+ * the one whose bent edges of each rank but the lowest weigh least, the
  * highest rank first; and of those, the one whose wires run least sideways.
  * Where `rankOf` gives the wires more than one rank, the passes are then
  * made again from the seating kept, balanced by the wires of the highest
  * rank, and a seating they make is kept instead only where it weighs no
- * more and its links of higher rank bend less. A layout whose shelves are
+ * more and its edges of higher rank bend less. A layout whose shelves are
  * all laid out across its columns is then set in their middle.
  */
 function reseat(shelves: Shelf[], channels: Channel[], columns: number, rankOf: (wire: Wire) => number, gap: number): void {
@@ -914,13 +914,13 @@ export function layTracks(channel: Channel, xOf: (place: Place) => number, under
  * a node and a column and the room beside it a lane; where the boxes' ports
  * then make a shelf wider than the room after all, it is folded again into
  * less room, as long as that makes it narrower. A graph of more than
- * `FOLDED_NODES` nodes or `FOLDED_LINKS` links is laid out unfolded. Every
+ * `FOLDED_NODES` nodes or `FOLDED_EDGES` edges is laid out unfolded. Every
  * face of every box is dealt its ports. The longest shelf is seated first, in
  * the middle of what it is laid out across, then each other shelf against the
  * one nearer it where the two are laid out across the same columns. Pinned,
  * that is the room's for every shelf that fits it, and the longest's for
  * every shelf longer than the room. The shelves are then seated again, as
- * `reseat` says, a wire ranked by the higher priority of its link's two
+ * `reseat` says, a wire ranked by the higher priority of its edge's two
  * nodes, and the channels given the rows their wires need.
  *
  * Running right, the room across is the room's rows less the foot's, and a
@@ -931,7 +931,7 @@ export function layTracks(channel: Channel, xOf: (place: Place) => number, under
 export function layoutOf(graph: Graph, room: Room, look: Look, fold = false, direction: Direction = 'down'): Layout {
   if (direction === 'right') return laidOut(graph, Math.max(room.rows - 1, LEAST_ROWS), look, undefined, direction)
   const columns = Math.max(room.columns, LEAST_COLUMNS)
-  if (!fold || graph.nodes.length > FOLDED_NODES || graph.links.length > FOLDED_LINKS) return laidOut(graph, columns, look)
+  if (!fold || graph.nodes.length > FOLDED_NODES || graph.edges.length > FOLDED_EDGES) return laidOut(graph, columns, look)
   let [into, layout] = [columns, laidOut(graph, columns, look, columns)]
   for (let tries = 0; tries < REFOLDS && breadthOf(layout) > columns; tries += 1) {
     into -= breadthOf(layout) - columns
@@ -945,9 +945,9 @@ export function layoutOf(graph: Graph, room: Room, look: Look, fold = false, dir
 /** A graph laid out across `room` running down, or across as much of it as it takes running right, its layers first folded `into` so many columns where they are to be. */
 function laidOut(graph: Graph, room: number, look: Look, into?: number, direction: Direction = 'down'): Layout {
   const { gap } = GRAINS[direction]
-  /** How wide a node's box is at least for the labels of the links it may leave by, each beside a port of its own, with a gap after all but the last. */
+  /** How wide a node's box is at least for the labels of the edges it may leave by, each beside a port of its own, with a gap after all but the last. */
   const writtenOf = (node: GraphletNode): number => {
-    const leaving = graph.links.filter(link => link.from !== link.to && (link.from === node.id || (!link.isDirected && link.to === node.id)))
+    const leaving = graph.edges.filter(edge => edge.from !== edge.to && (edge.from === node.id || (!edge.isDirected && edge.to === node.id)))
     const labels = [...new Set(leaving.map(labelOf).filter(text => text !== ''))]
     return labels.length === 0 ? 0 : labels.reduce((sum, text) => sum + sizeOf(text) + 2, 0) + 1
   }
@@ -977,8 +977,8 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
     return { places, width: 0, across: room, top: 0, rows }
   })
   /** What a wire has written where it leaves its box: its label; nothing where it leaves a lane. */
-  const saidOf = (wire: Wire): string => ('node' in wire.from.place.slot ? labelOf(wire.link) : '')
-  /** The rows a channel keeps on one side of its tracks for the arrowheads that point to that side's shelf and the labels of the links that leave it: one running down, and running right as many as the longest label takes, and one more. */
+  const saidOf = (wire: Wire): string => ('node' in wire.from.place.slot ? labelOf(wire.edge) : '')
+  /** The rows a channel keeps on one side of its tracks for the arrowheads that point to that side's shelf and the labels of the edges that leave it: one running down, and running right as many as the longest label takes, and one more. */
   const bandOf = (wires: Wire[], isAbove: boolean): number => {
     const labels = wires.filter(wire => wire.from.isAbove === isAbove).map(saidOf).filter(label => label !== '')
     const hasHeads = wires.some(wire => wire.hasHead && wire.to.isAbove === isAbove)
@@ -987,7 +987,7 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
   }
   const channels: Channel[] = shelves.map((shelf, index) => {
     const wires = wiresOf(layers.pieces[index] ?? [], layers.flats[index] ?? [], shelf, placeOf)
-    return { top: 0, rows: 0, wires, bundles: bundlesOf(wires, look.links), isLoose: false, topRows: bandOf(wires, true), bottomRows: bandOf(wires, false), frameBottom: 0, frameTop: 0, walls: [] }
+    return { top: 0, rows: 0, wires, bundles: bundlesOf(wires, look.edges), isLoose: false, topRows: bandOf(wires, true), bottomRows: bandOf(wires, false), frameBottom: 0, frameTop: 0, walls: [] }
   })
   dealPorts(shelves, channels, direction)
 
@@ -1008,9 +1008,9 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
   channels.forEach((channel, index) => {
     const [shelf, next] = [shelves[index], shelves[index + 1]]
     channel.isLoose = shelf !== undefined && next !== undefined && next.across !== shelf.across
-    if (look.links === 'merged') {
-      const apart = channel.bundles.filter(bundle => bundle[0] !== undefined && isApart(bundle[0].link))
-      const shared = [true, false].map(isDirected => channel.wires.filter(wire => !isApart(wire.link) && wire.link.isDirected === isDirected))
+    if (look.edges === 'merged') {
+      const apart = channel.bundles.filter(bundle => bundle[0] !== undefined && isApart(bundle[0].edge))
+      const shared = [true, false].map(isDirected => channel.wires.filter(wire => !isApart(wire.edge) && wire.edge.isDirected === isDirected))
       channel.bundles = [...shared.filter(bundle => bundle.length > 0), ...apart]
     }
     channel.bundles.forEach((bundle, at) => {
@@ -1018,7 +1018,7 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
     })
   })
   const priority = new Map(graph.nodes.map(node => [node.id, priorityOf(node)]))
-  reseat(shelves, channels, columns, wire => Math.max(priority.get(wire.link.from) ?? 0, priority.get(wire.link.to) ?? 0), gap)
+  reseat(shelves, channels, columns, wire => Math.max(priority.get(wire.edge.from) ?? 0, priority.get(wire.edge.to) ?? 0), gap)
 
   const frames = framesOf(graph, shelves, channels, direction === 'down' ? columns : room, gap, direction)
   shelves.forEach((shelf, index) => {

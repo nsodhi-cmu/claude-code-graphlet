@@ -38,15 +38,15 @@
       ],
       "default": "wrap"
     },
-    "links": {
+    "edges": {
       "type": "string",
-      "title": "Links",
-      "description": "separate gives each node's links lines of their own; merged lets them share, which is shorter.",
+      "title": "Edges",
+      "description": "merged lets a node's edges share lines, which is shorter; separate gives each node's edges lines of their own.",
       "options": [
-        "separate",
-        "merged"
+        "merged",
+        "separate"
       ],
-      "default": "separate"
+      "default": "merged"
     },
     "replies": {
       "type": "string",

@@ -6,14 +6,16 @@ import type { Graph } from '../hooks/layers'
 import type { Look } from '../hooks/layout'
 
 /** How graphs are drawn unless a person's settings say otherwise. */
-export const LOOK: Look = { scroll: 'pinned', labels: 'wrap', links: 'separate' }
+export const LOOK: Look = { scroll: 'pinned', labels: 'wrap', edges: 'merged' }
+/** How graphs are drawn with their edges kept separate: as still pictures are, and as the tests of how edges find their way are. */
+export const SEPARATE: Look = { ...LOOK, edges: 'separate' }
 
-/** A graph of nodes labelled by their ids, with a link for each pair, that runs down. */
-export const graphOf = (ids: string[], links: Array<[from: string, to: string]>, rest: Partial<GraphletNode> = {}): Graph =>
-  readGraph({ nodes: ids.map(id => ({ id, label: id, ...rest })), links: links.map(([from, to]) => ({ from, to })), direction: 'down' })
+/** A graph of nodes labelled by their ids, with an edge for each pair, that runs down. */
+export const graphOf = (ids: string[], edges: Array<[from: string, to: string]>, rest: Partial<GraphletNode> = {}): Graph =>
+  readGraph({ nodes: ids.map(id => ({ id, label: id, ...rest })), edges: edges.map(([from, to]) => ({ from, to })), direction: 'down' })
 
-/** A graph read again with its links undirected. */
-export const undirected = (graph: Graph): Graph => readGraph({ ...graph, links: graph.links.map(link => ({ ...link, isDirected: false })) })
+/** A graph read again with its edges undirected. */
+export const undirected = (graph: Graph): Graph => readGraph({ ...graph, edges: graph.edges.map(edge => ({ ...edge, isDirected: false })) })
 
 /** A source of numbers from 0 up to 1 that gives the same ones every run. */
 export const numbers = (seed: number): (() => number) => {
@@ -57,7 +59,7 @@ export const SHOP_GRAPH: GraphletGraph = {
     file('src/pages/invoice.ts', 'pages/invoice.ts', 0),
     file('src/money.ts', 'money.ts', 3, { mark: '→', tone: 'dim', badge: '2' }),
   ],
-  links: [
+  edges: [
     { from: 'src/cart.ts', to: 'src/price.ts' },
     { from: 'src/invoice.ts', to: 'src/price.ts' },
     { from: 'src/ui.ts', to: 'src/price.ts' },
@@ -70,8 +72,8 @@ export const SHOP_GRAPH: GraphletGraph = {
 
 export const SHOP = readGraph(SHOP_GRAPH)
 
-/** A graph of `count` nodes and `links` links, each node linked to nodes all over the graph: as busy as a graph is drawn. */
-export const busy = (count: number, links: number): GraphletGraph => ({
+/** A graph of `count` nodes and `edges` edges, each node joined to nodes all over the graph: as busy as a graph is drawn. */
+export const busy = (count: number, edges: number): GraphletGraph => ({
   nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: `node number ${index}` })),
-  links: Array.from({ length: links }, (_, index) => ({ from: `n${index % count}`, to: `n${(index * 7 + 1) % count}` })),
+  edges: Array.from({ length: edges }, (_, index) => ({ from: `n${index % count}`, to: `n${(index * 7 + 1) % count}` })),
 })

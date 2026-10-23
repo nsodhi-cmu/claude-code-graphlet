@@ -87,11 +87,11 @@ The engine reads a hooks module's source before it loads it, and refuses what it
 
 `claude plugin test ./graphlet` runs every `*.test.ts` and `*.test.tsx` under `graphlet/`, each file in a child of the `claude` binary, in an environment like the one the hooks run in. A test file imports `test`, `describe`, and `expect` from `claude-code/testing`. No session starts, and no model is called.
 
-- Test names are sentences describing the claim: `a link that closes a loop runs back up dashed`, not `test loops 2`.
+- Test names are sentences describing the claim: `an edge that closes a loop runs back up dashed`, not `test loops 2`.
 - Keep the set small and keep it hard. A test that is a tautology by the way the code is constructed should not exist; a test that would catch a subtle regression should.
 - `graphlet/tests/` has a file for each file of `graphlet/hooks/` it tests, beside `fixture.ts`, which holds what several tests share.
 - A drawing is tested as the whole picture it makes, compared line for line.
-- `view.test.ts` and `paint.test.ts` draw many seeded random graphs and check what must hold of every one: each is drawn inside its room, and its picture says every link the graph has and no other.
+- `view.test.ts` and `paint.test.ts` draw many seeded random graphs and check what must hold of every one: each is drawn inside its room, and its picture says every edge the graph has and no other.
 - The engine's side is tested in `register.test.tsx` through the kit, with `HOST` standing in for a mod that uses graphlet.
 
 ## Probing A Picture
@@ -106,7 +106,7 @@ import { graphOf, pictureOf } from '../hooks/reply'
 import { viewOf } from '../hooks/view'
 
 test('probe', () => {
-  const still = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate' }, true, false)
+  const still = viewOf({ scroll: 'pinned', labels: 'wrap', edges: 'separate' }, true, false)
   const graph = readGraph(graphOf(['Start -> Valid?', 'Valid? ->|yes| Save', 'Valid? ->|no| Retry', 'Retry -> Start']))
   expect(picture(pictureOf(still, graph, { columns: 78, rows: 1000 }))).toEqual([])
 })

@@ -16,16 +16,16 @@ export type GraphletNode = {
   /**
    * The layer the node stands in, counted from the first, at the top, or at
    * the left of a graph that runs right. Left out on
-   * any node of a graph, graphlet works the layers out from the links.
+   * any node of a graph, graphlet works the layers out from the edges.
    */
   layer?: number
   /**
    * A whole number for how much the graph is about the node; 0 when left
    * out. A priority matters as it compares with the other nodes' and with 0.
    * The nodes of the highest priority, where it is above 0 and above another
-   * node's, are drawn with heavy borders; and the layout keeps the links of
+   * node's, are drawn with heavy borders; and the layout keeps the edges of
    * nodes of higher priority straighter where that leaves it weighing no
-   * more in rows and bent links.
+   * more in rows and bent edges.
    */
   priority?: number
   /** The id of the group the node is drawn in, framed with the group's other nodes. Left out, it is in none. */
@@ -52,21 +52,21 @@ export type GraphletGroup = {
   isCollapsed?: boolean
 }
 
-/** A link between two nodes, by their ids: from one to the other, where it runs one way. */
-export type GraphletLink = {
+/** An edge between two nodes, by their ids: from one to the other, where it runs one way. */
+export type GraphletEdge = {
   from: string
   to: string
-  /** A few words written on the link, where it leaves the node it is drawn from. */
+  /** A few words written on the edge, where it leaves the node it is drawn from. */
   label?: string
   /**
-   * How the link's line, its arrowhead, and its label are painted where it
-   * is not lit, as a node's tone paints the node: a link that fails `bad`, a
+   * How the edge's line, its arrowhead, and its label are painted where it
+   * is not lit, as a node's tone paints the node: an edge that fails `bad`, a
    * path a mod would have followed `note`. Left out, or `plain`, the line is
-   * dim. A link of one tone never shares a line with a link of another.
+   * dim. An edge of one tone never shares a line with an edge of another.
    */
   tone?: GraphletTone
   /**
-   * Whether the link runs from one node to the other, drawn with an arrowhead.
+   * Whether the edge runs from one node to the other, drawn with an arrowhead.
    * `false`, it only joins its two nodes, whichever it names first. Left out,
    * it is as its graph says.
    */
@@ -79,10 +79,10 @@ export type GraphletLink = {
  */
 export type GraphletDirection = 'down' | 'right'
 
-/** A graph. Its links may run in a loop. */
+/** A graph. Its edges may run in a loop. */
 export type GraphletGraph = {
   nodes: GraphletNode[]
-  links: GraphletLink[]
+  edges: GraphletEdge[]
   /** The groups its nodes are drawn in. A node may name a group not listed here, which is then labelled by its id. */
   groups?: GraphletGroup[]
   /**
@@ -92,8 +92,8 @@ export type GraphletGraph = {
    */
   direction?: GraphletDirection
   /**
-   * Whether a link that does not say runs from one node to the other. Left
-   * out, it does. `false`, such a link only joins its two nodes.
+   * Whether an edge that does not say runs from one node to the other. Left
+   * out, it does. `false`, such an edge only joins its two nodes.
    */
   isDirected?: boolean
 }
@@ -152,7 +152,7 @@ export type Graphlet = {
   measure(input: { graph: GraphletGraph; columns: number }): Promise<GraphletSize>
   /**
    * The graph as plain text: its still picture, drawn with nothing selected
-   * and its links kept separate, folded into a room `columns` wide, a line
+   * and its edges kept separate, folded into a room `columns` wide, a line
    * a row with no blanks at its end. For what a tool hands back to the
    * model, or a file.
    */

@@ -39,7 +39,7 @@ const HOST: Plugin = {
         node('src/pages/invoice.ts', 'pages/invoice.ts', 0),
         node('src/money.ts', 'money.ts', 3, { mark: '→', tone: 'dim' as const, badge: '2' }),
       ],
-      links: [
+      edges: [
         { from: 'src/cart.ts', to: 'src/price.ts' },
         { from: 'src/invoice.ts', to: 'src/price.ts' },
         { from: 'src/ui.ts', to: 'src/price.ts' },
@@ -79,11 +79,11 @@ const HOST: Plugin = {
     })
     const HUB = {
       nodes: [{ id: 'hub', label: 'hub' }, ...Array.from({ length: 40 }, (_, index) => ({ id: `leaf${index}`, label: `leaf${index}` }))],
-      links: Array.from({ length: 40 }, (_, index) => ({ from: 'hub', to: `leaf${index}` })),
+      edges: Array.from({ length: 40 }, (_, index) => ({ from: 'hub', to: `leaf${index}` })),
     }
     const DENSE = {
       nodes: Array.from({ length: 60 }, (_, index) => ({ id: `d${index}`, label: `node number ${index}`, ...(index % 5 === 0 ? { tone: 'bad' as const } : {}) })),
-      links: Array.from({ length: 180 }, (_, index) => ({ from: `d${index < 30 ? 0 : (index * 7) % 60}`, to: `d${(index * 13 + 5) % 60}` })),
+      edges: Array.from({ length: 180 }, (_, index) => ({ from: `d${index < 30 ? 0 : (index * 7) % 60}`, to: `d${(index * 13 + 5) % 60}` })),
     }
     on('ui.render', { component: 'Pane', requestId: 'dense' }, async ($, e, next) => {
       await $.graphlet.show({ site: 'dense', graph: DENSE, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
@@ -96,7 +96,7 @@ const HOST: Plugin = {
         { id: 'cache', label: 'cache', priority: 2 },
         { id: 'database', label: 'database', priority: 1 },
       ],
-      links: [
+      edges: [
         { from: 'request', to: 'router' },
         { from: 'router', to: 'cache' },
         { from: 'router', to: 'database' },
@@ -120,7 +120,7 @@ const HOST: Plugin = {
         { id: 'auth', label: 'auth', group: 'back' },
         { id: 'db', label: 'db', group: 'data' },
       ],
-      links: [
+      edges: [
         { from: 'web', to: 'api' },
         { from: 'api', to: 'auth' },
         { from: 'auth', to: 'db' },
@@ -164,7 +164,7 @@ const HOST: Plugin = {
     })
     const HUGE = {
       nodes: Array.from({ length: 400 }, (_, index) => ({ id: `n${index}`, label: `node number ${index}` })),
-      links: Array.from({ length: 800 }, (_, index) => ({ from: `n${index % 400}`, to: `n${(index * 7 + 1) % 400}` })),
+      edges: Array.from({ length: 800 }, (_, index) => ({ from: `n${index % 400}`, to: `n${(index * 7 + 1) % 400}` })),
     }
     on('ui.render', { component: 'Pane', requestId: 'huge' }, async ($, e, next) => {
       await $.graphlet.show({ site: 'huge', graph: HUGE, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
@@ -544,7 +544,7 @@ test('/ finds a node by its label as it is typed: the selection goes to the firs
   await pane.unmount()
 })
 
-test('f draws the graph in focus on the selected node and its nearest, each saying how many of its links lead out of focus, and f again draws it all', WITH_HOST, async ($, on) => {
+test('f draws the graph in focus on the selected node and its nearest, each saying how many of its edges lead out of focus, and f again draws it all', WITH_HOST, async ($, on) => {
   world(on)
   const pane = await mount($, 'big')
   await pane.pointer({ type: 'down', x: 0, y: 0, button: 'left', in: 'graph' })
@@ -552,7 +552,7 @@ test('f draws the graph in focus on the selected node and its nearest, each sayi
   await pane.redraw()
   const focused = (await rowsOf(pane)).join('\n')
   expect(focused).toContain('hub  +17')
-  expect(focused).toContain('17 nodes and 17 links left out')
+  expect(focused).toContain('17 nodes and 17 edges left out')
   await pane.key({ key: 'f', in: 'graph' })
   await pane.redraw()
   const whole = (await rowsOf(pane)).join('\n')
@@ -782,7 +782,7 @@ test('with pictures in apps on, on the desktop app, VS Code, and the mobile app,
     const drawn = await $.ui.mount({ plugin: 'graphlet', surface, component: 'Pane', requestId: 'grouped', props: NARROW })
     const svg = await drawn.find({ type: 'Svg' })
     const source = String(svg?.props.source)
-    expect(svg?.props).toMatchObject({ isInteractive: true, alt: 'A graph of 4 nodes and 3 links: web → api; api → auth; auth → Data.' })
+    expect(svg?.props).toMatchObject({ isInteractive: true, alt: 'A graph of 4 nodes and 3 edges: web → api; api → auth; auth → Data.' })
     expect(source).toStartWith(`<svg xmlns="http://www.w3.org/2000/svg" width="${String(svg?.props.width)}" `)
     expect(source).toMatch(/<g class="node plain selected n0"[^>]*>(?:(?!<\/g>).)*>web</)
     expect(source).toContain('>Backend</text>')
@@ -832,7 +832,7 @@ test('under the picture of a large graph, a control draws it in focus on the sel
   expect(await nodes()).toBe(41)
   await pane.press({ key: 'graphlet:graph:focus' })
   expect(await nodes()).toBe(24)
-  expect(await pane.find({ type: 'Text', text: '17 nodes and 17 links left out' })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: '17 nodes and 17 edges left out' })).toBeDefined()
   expect((await controlsOf(pane)).filter(control => control.startsWith('graphlet:graph:focus'))).toEqual(['graphlet:graph:focus Show all'])
   await pane.press({ key: 'graphlet:graph:focus' })
   expect(await nodes()).toBe(41)
@@ -847,17 +847,17 @@ test('a graph too large for a picture a surface takes is plain text there, as it
   await pane.unmount()
 })
 
-test('graphs are drawn as the person\'s settings say', { ...WITH_HOST, options: { scroll: 'sheet', labels: 'clip', links: 'merged' } }, async ($, on) => {
+test('graphs are drawn as the person\'s settings say', { ...WITH_HOST, options: { scroll: 'sheet', labels: 'clip', edges: 'separate' } }, async ($, on) => {
   world(on)
   const pane = await mount($, 'free', NARROW)
-  const sheet = viewOf({ scroll: 'sheet', labels: 'clip', links: 'merged' })
+  const sheet = viewOf({ scroll: 'sheet', labels: 'clip', edges: 'separate' })
   const rows = await rowsOf(pane)
   expect(rows).toEqual(picture(sheet.draw(SHOP, 'src/price.ts', { columns: 44, rows: 40 }, sheet.show(SHOP, 'src/price.ts', { columns: 44, rows: 40 }, ORIGIN))))
   expect(rows).not.toEqual(picture(view.draw(SHOP, 'src/price.ts', { columns: 44, rows: 40 }, ORIGIN)))
   await pane.unmount()
 })
 
-test('a graph too busy to draw whole in a large pane is drawn plainer, as far as the engine needs, and still drawn', WITH_HOST, async ($, on) => {
+test('a graph too busy to draw whole in a large pane is drawn plainer, as far as the engine needs, and still drawn', { ...WITH_HOST, options: { edges: 'separate' } }, async ($, on) => {
   world(on)
   const pane = await mount($, 'dense', { ...PANE, bodyColumns: 200, scroll: { offset: 0, bodyRows: 60 } })
   const rows = await rowsOf(pane)
@@ -905,7 +905,7 @@ const RING_HOST: Plugin = {
   register(on) {
     const RING = {
       nodes: ['a', 'b', 'c'].map(id => ({ id, label: id })),
-      links: [
+      edges: [
         { from: 'a', to: 'b' },
         { from: 'b', to: 'c' },
         { from: 'c', to: 'a' },
@@ -1206,9 +1206,9 @@ test('with pictures in apps on, on the desktop app, VS Code, and the mobile app,
     expect(textOf(drawn.children[0])).toBe('● Here is how a request flows:')
     expect(drawn.children[2]?.props.text).toBe('The dashed line is the retry.')
     const svg = await reply.find({ type: 'Svg' })
-    expect(svg?.props).toMatchObject({ isInteractive: true, alt: 'A graph of 6 nodes and 6 links: Start → Read the request; Read the request → Valid?; Valid? → Save it; Save it → Done; Valid? → Ask for a correction; Ask for a correction → Read the request.' })
+    expect(svg?.props).toMatchObject({ isInteractive: true, alt: 'A graph of 6 nodes and 6 edges: Start → Read the request; Read the request → Valid?; Valid? → Save it; Save it → Done; Valid? → Ask for a correction; Ask for a correction → Read the request.' })
     expect(String(svg?.props.source)).toMatch(/<g class="node warn n\d+"[^>]*>(?:(?!<\/g>).)*>Ask for a correction</)
-    expect(String(svg?.props.source)).not.toMatch(/class="(node|link) [^"]*(selected|near|lit)/)
+    expect(String(svg?.props.source)).not.toMatch(/class="(node|edge) [^"]*(selected|near|lit)/)
     expect(await controlsOf(reply)).toEqual(surface === 'mobile' ? [] : ['graphlet:graph:0:page Open in browser'])
     if (surface === 'desktop') await reply.press({ key: 'graphlet:graph:0:page' })
     await reply.unmount()
@@ -1222,18 +1222,18 @@ test('a graph block too large for a picture a surface takes is its still picture
   replies(on)
   const huge = busy(400, 800)
   const labelOf = (id: string): string => huge.nodes.find(node => node.id === id)?.label ?? id
-  const lines = huge.links.map(link => `${labelOf(link.from)} -> ${labelOf(link.to)}`)
+  const lines = huge.edges.map(edge => `${labelOf(edge.from)} -> ${labelOf(edge.to)}`)
   const reply = await say($, 'desktop', ['```graphlet', ...lines, '```'].join('\n'))
   expect(await reply.find({ type: 'Svg' })).toBeUndefined()
   expect(String((await reply.find({ type: 'Markdown' }))?.props.text)).toStartWith('```text\n')
   await reply.unmount()
 })
 
-test('a graph in a reply draws its links as the setting says where it can be clicked, to tell merged links apart, and keeps them separate where it is still: on the main screen, and as plain text on the other surfaces', { options: { links: 'merged' } }, async ($, on) => {
+test('a graph in a reply draws its edges merged where it can be clicked, to tell them apart, and keeps them separate where it is still: on the main screen, and as plain text on the other surfaces', async ($, on) => {
   replies(on)
   const block = ['A -> C', 'B -> C', 'B -> D']
   const graph = readGraph(graphLines(block))
-  const drawnAs = (links: 'separate' | 'merged'): string[] => picture(pictureOf(viewOf({ ...LOOK, links }, true, false), graph, { columns: 78, rows: 1000 }))
+  const drawnAs = (edges: 'separate' | 'merged'): string[] => picture(pictureOf(viewOf({ ...LOOK, edges }, true, false), graph, { columns: 78, rows: 1000 }))
   expect(drawnAs('separate')).not.toEqual(drawnAs('merged'))
   const text = ['```graphlet', ...block, '```'].join('\n')
   const clicked = await say($, 'terminal', text)

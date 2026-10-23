@@ -37,9 +37,9 @@ test('a reply is cut at its closed graphlet blocks, and every other fence stays 
   ].join('\n')
   expect(partsOf(reply)).toEqual([
     { text: 'Two graphs:' },
-    { graph: { nodes: [{ id: 'a', label: 'a' }, { id: 'b', label: 'b' }], links: [{ from: 'a', to: 'b' }] } },
+    { graph: { nodes: [{ id: 'a', label: 'a' }, { id: 'b', label: 'b' }], edges: [{ from: 'a', to: 'b' }] } },
     { text: '```python\nx -> y\n```\n````markdown\n```graphlet\nc -> d\n```\n````' },
-    { graph: { nodes: [{ id: 'e', label: 'e' }], links: [] } },
+    { graph: { nodes: [{ id: 'e', label: 'e' }], edges: [] } },
     { text: '```graphlet\n\n```\n```graphlet``` is code, not a fence.\n```graphlet\nf -> g' },
   ])
 })
@@ -49,7 +49,7 @@ test('the example the model is shown is a graph block that is drawn, with the to
   expect(graphs.map(graph => graph.nodes.map(node => `${node.label}${node.tone === undefined ? '' : ` [${node.tone}]`}`))).toEqual([
     ['Start', 'Read the request', 'Valid?', 'Save it', 'Done', 'Ask for a correction [warn]'],
   ])
-  expect(graphs[0]?.links).toHaveLength(6)
+  expect(graphs[0]?.edges).toHaveLength(6)
 })
 
 test('a block\'s lines are chains of arrows, a node is known by its label, and the first tone in brackets after it is its own', () => {
@@ -77,7 +77,7 @@ test('a block\'s lines are chains of arrows, a node is known by its label, and t
     { id: 'Read the request', label: 'Read the request' },
     { id: 'Not [a tone]', label: 'Not [a tone]' },
   ])
-  expect(graph.links.map(link => `${link.from} → ${link.to}`)).toEqual([
+  expect(graph.edges.map(edge => `${edge.from} → ${edge.to}`)).toEqual([
     'Parse → Check',
     'Check → Emit',
     'Emit → Parse',
@@ -102,13 +102,13 @@ test('a label in bold gives its node a priority of 1, whichever side of the bold
   ])
 })
 
-test('a block whose links are all dashes is an undirected graph; in any other, an arrow runs one way, a two-headed arrow each way, and a dash no way', () => {
+test('a block whose edges are all dashes is an undirected graph; in any other, an arrow runs one way, a two-headed arrow each way, and a dash no way', () => {
   const friends = graphOf(['Alice -- Bob -- Carol', 'Carol --- Dan', 'e-mail -- front-end'])
   expect(friends.isDirected).toBe(false)
-  expect(friends.links.map(link => `${link.from} – ${link.to}`)).toEqual(['Alice – Bob', 'Bob – Carol', 'Carol – Dan', 'e-mail – front-end'])
+  expect(friends.edges.map(edge => `${edge.from} – ${edge.to}`)).toEqual(['Alice – Bob', 'Bob – Carol', 'Carol – Dan', 'e-mail – front-end'])
   const mixed = graphOf(['A -> B', 'B -- C', 'C <-> D', 'D ↔ A', 'E <-- A', 'F ← E'])
   expect(mixed.isDirected).toBeUndefined()
-  expect(mixed.links.map(link => `${link.from} ${link.isDirected === false ? '–' : '→'} ${link.to}`)).toEqual(['A → B', 'B – C', 'C → D', 'D → C', 'D → A', 'A → D', 'A → E', 'E → F'])
+  expect(mixed.edges.map(edge => `${edge.from} ${edge.isDirected === false ? '–' : '→'} ${edge.to}`)).toEqual(['A → B', 'B – C', 'C → D', 'D → C', 'D → A', 'A → D', 'A → E', 'E → F'])
   expect(picture(pictureOf(still, readGraph(friends), { columns: 80, rows: 1000 })).join('\n')).not.toMatch(/[▲▼]/)
   expect(picture(pictureOf(still, readGraph({ ...graphOf(['Client -> API -> Database', 'API -- Cache', 'Cache -- Database']), direction: 'down' }), { columns: 60, rows: 1000 }))).toEqual([
     ' ┌────────┐',
@@ -131,9 +131,9 @@ test('a block whose links are all dashes is an undirected graph; in any other, a
   ])
 })
 
-test('the same two nodes may be linked again under another label, and a link given again under the same label is one link', () => {
+test('the same two nodes may be joined again under another label, and an edge given again under the same label is one edge', () => {
   const graph = graphOf(['Idle ->|start| Running', 'Idle ->|resume| Running', 'Idle ->|start| Running', 'Running -> Idle'])
-  expect(readGraph(graph).links.map(link => `${link.from} -> ${link.to} ${link.label ?? ''}`.trim())).toEqual(['Idle -> Running start', 'Idle -> Running resume', 'Running -> Idle'])
+  expect(readGraph(graph).edges.map(edge => `${edge.from} -> ${edge.to} ${edge.label ?? ''}`.trim())).toEqual(['Idle -> Running start', 'Idle -> Running resume', 'Running -> Idle'])
 })
 
 test('a name and a colon alone on a line opens a group for the lines indented under it, and subgraph does up to end, as Mermaid writes it; a node is in the first group it is named under', () => {
@@ -213,7 +213,7 @@ test('a group folded into a narrow reply keeps its frame within the reply, its l
 test('a graph whose frame would push a layer past the reply has its shelves packed instead, so all of it fits, frames and all', () => {
   const graph = readGraph({
     nodes: [{ id: 'a', label: 'Auth' }, { id: 'b', label: 'Validate the request' }, { id: 'db', label: '数据库', group: 'g' }, { id: 'c', label: 'Cache' }, { id: 'v', label: 'Validate the request' }],
-    links: [{ from: 'v', to: 'c' }, { from: 'db', to: 'db' }, { from: 'db', to: 'c' }],
+    edges: [{ from: 'v', to: 'c' }, { from: 'db', to: 'db' }, { from: 'db', to: 'c' }],
     groups: [{ id: 'g', label: 'the first group' }],
     direction: 'down',
   })
@@ -225,7 +225,7 @@ test('a graph whose frame would push a layer past the reply has its shelves pack
 })
 
 test('a frame wide enough for its label writes it whole, where no line crosses its border', () => {
-  const graph = readGraph({ nodes: [{ id: 'a', label: 'A', group: 'g' }], links: [], groups: [{ id: 'g', label: 'Backend services' }], direction: 'down' })
+  const graph = readGraph({ nodes: [{ id: 'a', label: 'A', group: 'g' }], edges: [], groups: [{ id: 'g', label: 'Backend services' }], direction: 'down' })
   expect(picture(pictureOf(still, graph, { columns: 60, rows: 1000 }))).toEqual([
     '╭─ Backend services ─╮',
     '│      ┌─────┐       │',
@@ -238,12 +238,12 @@ test('a frame wide enough for its label writes it whole, where no line crosses i
 test('dashes within a label, and a dash in prose, stay part of the label', () => {
   const graph = graphOf(['git commit --amend -> git push --force', 'Fetch — with retry -> Parse', 'npm run build --watch -> Done'])
   expect(graph.nodes.map(node => node.id)).toEqual(['git commit --amend', 'git push --force', 'Fetch — with retry', 'Parse', 'npm run build --watch', 'Done'])
-  expect(graph.links).toHaveLength(3)
+  expect(graph.edges).toHaveLength(3)
 })
 
-test('words in pipes right after an arrow or dashes are the link\'s label, and so are words between dashes and an arrow, as Mermaid writes them', () => {
+test('words in pipes right after an arrow or dashes are the edge\'s label, and so are words between dashes and an arrow, as Mermaid writes them', () => {
   const graph = graphOf(['Valid? ->|yes| Save it', 'Valid? -->| no | Ask again ->|retry| Read', 'A --|by train| B', 'C -- on error --> D', 'E ->| F ->| G'])
-  expect(graph.links).toEqual([
+  expect(graph.edges).toEqual([
     { from: 'Valid?', to: 'Save it', label: 'yes' },
     { from: 'Valid?', to: 'Ask again', label: 'no' },
     { from: 'Ask again', to: 'Read', label: 'retry' },
@@ -290,7 +290,7 @@ test('a graph in a reply is drawn still, as narrow as its widest layer and again
   expect(drawing.hits).toEqual([])
 })
 
-test('a graph wider than its reply folds the nodes it names last onto a row of their own, the links to them down one lane, and fits', () => {
+test('a graph wider than its reply folds the nodes it names last onto a row of their own, the edges to them down one lane, and fits', () => {
   const ids = ['root', 'one', 'two', 'three', 'four', 'five', 'six', 'seven']
   const fan = graphNamed(ids, ids.slice(1).map(id => ['root', id] as [string, string]))
   expect(picture(pictureOf(still, fan, { columns: 50, rows: 1000 }))).toEqual([

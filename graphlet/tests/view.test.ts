@@ -9,7 +9,7 @@ import { FOCUS_NODES, MOVES, collapsedOf, focusOf, viewOf } from '../hooks/view'
 
 const LABELS = ['a', 'node', 'src/some/long/path/to/file.component.ts', 'Validate the incoming request', 'x-y_z.w', '', '数据库连接池', '✅ 完成']
 const LOOKS: Look[] = (['pinned', 'sheet'] as const).flatMap(scroll =>
-  (['wrap', 'clip'] as const).flatMap(labels => (['separate', 'merged'] as const).map(links => ({ scroll, labels, links }))),
+  (['wrap', 'clip'] as const).flatMap(labels => (['separate', 'merged'] as const).map(edges => ({ scroll, labels, edges }))),
 )
 
 test('any graph, in any room, under any settings, is drawn inside its room with no two boxes on one cell, every move and scroll has an answer, and its picture in SVG holds every node once and is short enough for a surface', () => {
@@ -26,11 +26,11 @@ test('any graph, in any room, under any settings, is drawn inside its room with 
         ...(pick(4) === 0 ? { mark: '◆', badge: String(pick(30)) } : {}),
         ...(pick(3) === 0 ? { group: `g${pick(3)}` } : {}),
       })),
-      links: Array.from({ length: pick(count * 2 + 1) }, () => ({ from: `n${pick(count)}`, to: `n${pick(count)}` })),
+      edges: Array.from({ length: pick(count * 2 + 1) }, () => ({ from: `n${pick(count)}`, to: `n${pick(count)}` })),
       isDirected: run % 3 !== 1,
       ...([{}, { direction: 'down' as const }, { direction: 'right' as const }][pick(3)] ?? {}),
     })
-    const view = viewOf(LOOKS[pick(LOOKS.length)] ?? { scroll: 'pinned', labels: 'wrap', links: 'separate' })
+    const view = viewOf(LOOKS[pick(LOOKS.length)] ?? { scroll: 'pinned', labels: 'wrap', edges: 'separate' })
     const room = { columns: 40 + pick(140), rows: 2 + pick(50) }
     const selected = pick(5) === 0 ? null : `n${pick(count)}`
 
@@ -91,17 +91,17 @@ test('the letters under the arrows move as the arrows do', () => {
   expect(MOVES.t).toBeUndefined()
 })
 
-test('in focus, a graph is its selected node and those nearest it, of nodes as near the ones named first, each saying how many of its links lead out of focus', () => {
+test('in focus, a graph is its selected node and those nearest it, of nodes as near the ones named first, each saying how many of its edges lead out of focus', () => {
   const ids = Array.from({ length: 30 }, (_, index) => `n${index}`)
   const chain = readGraph({
     nodes: [...ids.map(id => ({ id, label: id })), { id: 'far', label: 'far', badge: '2' }],
-    links: [...ids.slice(1).map((id, index) => ({ from: ids[index] ?? '', to: id })), { from: 'n29', to: 'far' }],
+    edges: [...ids.slice(1).map((id, index) => ({ from: ids[index] ?? '', to: id })), { from: 'n29', to: 'far' }],
   })
   const focused = focusOf(chain, 'n10')
   expect(focused.nodes.map(node => node.id)).toEqual(ids.slice(0, FOCUS_NODES))
   expect(focused.nodes.find(node => node.id === 'n23')?.badge).toBe('+1')
   expect(focused.nodes.find(node => node.id === 'n10')?.badge).toBeUndefined()
-  expect(focused.unread).toEqual({ nodes: 31 - FOCUS_NODES, links: 30 - (FOCUS_NODES - 1) })
+  expect(focused.unread).toEqual({ nodes: 31 - FOCUS_NODES, edges: 30 - (FOCUS_NODES - 1) })
   expect(focusOf(chain, null)).toBe(chain)
   expect(focusOf(chain, 'nowhere')).toBe(chain)
 })
@@ -110,15 +110,15 @@ test('in focus, of the nodes as near the selected one, those of highest priority
   const leaves = Array.from({ length: 30 }, (_, index) => `leaf${index}`)
   const star = readGraph({
     nodes: [{ id: 'hub', label: 'hub' }, ...leaves.map(id => ({ id, label: id, ...(id === 'leaf29' ? { priority: 1 } : id === 'leaf0' ? { priority: -1 } : {}) }))],
-    links: leaves.map(id => ({ from: 'hub', to: id })),
+    edges: leaves.map(id => ({ from: 'hub', to: id })),
   })
   expect(focusOf(star, 'hub').nodes.map(node => node.id)).toEqual(['hub', ...leaves.slice(1, FOCUS_NODES - 1), 'leaf29'])
 })
 
 test('a graph that says not which way it runs runs right where that fits its room\'s columns in half the rows or fewer, or fits its room whole where running down does not, and else down', () => {
-  const view = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate' })
-  const chain = readGraph({ nodes: ['lint', 'test', 'build', 'deploy'].map(id => ({ id, label: id })), links: [['lint', 'test'], ['test', 'build'], ['build', 'deploy']].map(([from = '', to = '']) => ({ from, to })) })
-  const fan = readGraph({ nodes: ['root', 'a', 'b'].map(id => ({ id, label: id })), links: [{ from: 'root', to: 'a' }, { from: 'root', to: 'b' }] })
+  const view = viewOf({ scroll: 'pinned', labels: 'wrap', edges: 'separate' })
+  const chain = readGraph({ nodes: ['lint', 'test', 'build', 'deploy'].map(id => ({ id, label: id })), edges: [['lint', 'test'], ['test', 'build'], ['build', 'deploy']].map(([from = '', to = '']) => ({ from, to })) })
+  const fan = readGraph({ nodes: ['root', 'a', 'b'].map(id => ({ id, label: id })), edges: [{ from: 'root', to: 'a' }, { from: 'root', to: 'b' }] })
   expect(view.direction(chain, { columns: 80, rows: 40 })).toBe('right')
   expect(view.direction(chain, { columns: 30, rows: 40 })).toBe('down')
   expect(view.direction(fan, { columns: 80, rows: 40 })).toBe('down')
@@ -128,10 +128,10 @@ test('a graph that says not which way it runs runs right where that fits its roo
   expect(view.measure(chain, 80)).toEqual({ columns: 41, rows: 4 })
 })
 
-test('collapsed, a group is one box where its first node stood, saying its label and how many nodes it holds, its links those of all of them once for each label and tone, and none between two of them', () => {
+test('collapsed, a group is one box where its first node stood, saying its label and how many nodes it holds, its edges those of all of them once for each label and tone, and none between two of them', () => {
   const graph = readGraph({
     nodes: [{ id: 'in', label: 'in' }, { id: 'a', label: 'a', group: 'g' }, { id: 'out', label: 'out' }, { id: 'b', label: 'b', group: 'g', priority: 2 }],
-    links: [{ from: 'in', to: 'a' }, { from: 'in', to: 'b' }, { from: 'a', to: 'b' }, { from: 'b', to: 'out', tone: 'bad' }, { from: 'a', to: 'a' }],
+    edges: [{ from: 'in', to: 'a' }, { from: 'in', to: 'b' }, { from: 'a', to: 'b' }, { from: 'b', to: 'out', tone: 'bad' }, { from: 'a', to: 'a' }],
     groups: [{ id: 'g', label: 'Group', tone: 'note' }],
   })
   const shut = collapsedOf(graph, new Set(['g']))
@@ -140,7 +140,7 @@ test('collapsed, a group is one box where its first node stood, saying its label
     { id: 'g', label: 'Group', mark: '▸', badge: '2', holds: 2, isForemost: true, tone: 'note', priority: 2 },
     { id: 'out', label: 'out', isForemost: false },
   ])
-  expect(shut.links).toEqual([
+  expect(shut.edges).toEqual([
     { from: 'in', to: 'g', isDirected: true },
     { from: 'g', to: 'out', isDirected: true, tone: 'bad' },
   ])
@@ -148,9 +148,9 @@ test('collapsed, a group is one box where its first node stood, saying its label
   expect(collapsedOf(graph, new Set())).toBe(graph)
   const toned = readGraph({
     nodes: [{ id: 'm1', label: 'm1', group: 'g' }, { id: 'm2', label: 'm2', group: 'g' }, { id: 'x', label: 'x' }],
-    links: [{ from: 'm1', to: 'x' }, { from: 'm2', to: 'x', tone: 'bad' }],
+    edges: [{ from: 'm1', to: 'x' }, { from: 'm2', to: 'x', tone: 'bad' }],
   })
-  expect(collapsedOf(toned, new Set(['g'])).links).toEqual([
+  expect(collapsedOf(toned, new Set(['g'])).edges).toEqual([
     { from: 'g', to: 'x', isDirected: true },
     { from: 'g', to: 'x', isDirected: true, tone: 'bad' },
   ])
@@ -159,7 +159,7 @@ test('collapsed, a group is one box where its first node stood, saying its label
 test('collapsed in a graph whose nodes name their layers, a group\'s box stands in its first node\'s layer, so every other node keeps its own', () => {
   const graph = readGraph({
     nodes: [{ id: 'top', label: 'top', layer: 0 }, { id: 'a', label: 'a', layer: 2, group: 'g' }, { id: 'b', label: 'b', layer: 3, group: 'g' }, { id: 'low', label: 'low', layer: 5 }],
-    links: [{ from: 'top', to: 'a' }, { from: 'b', to: 'low' }],
+    edges: [{ from: 'top', to: 'a' }, { from: 'b', to: 'low' }],
   })
   const shut = collapsedOf(graph, new Set(['g']))
   expect(shut.nodes.map(node => `${node.id} ${node.layer}`)).toEqual(['top 0', 'g 2', 'low 5'])

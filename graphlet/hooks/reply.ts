@@ -1,4 +1,4 @@
-import type { GraphletGraph, GraphletGroup, GraphletLink, GraphletNode, GraphletTone } from '../types'
+import type { GraphletEdge, GraphletGraph, GraphletGroup, GraphletNode, GraphletTone } from '../types'
 import { CORNER_GAP, footOf, isCorner, rowText, sizeOf } from './draw'
 import type { Drawing, Room, Span } from './draw'
 import { TONES } from './layers'
@@ -39,12 +39,12 @@ const OPENING = /^\s*(`{3,}(?=[^`]*$)|~{3,})\s*(\S*)/
 /** A line that does nothing but close a fenced block. */
 const CLOSING = /^\s*(`{3,}|~{3,})\s*$/
 /**
- * What joins two nodes on a line: an arrow, `->`, `-->` or `→`, a link the way
+ * What joins two nodes on a line: an arrow, `->`, `-->` or `→`, an edge the way
  * it points, and so `<-`, `<--` or `←`; one with a head at each end, `<->` or
- * `↔`, a link each way; and two dashes or more with a blank before them and a
- * blank or a pipe after, ` -- `, a link with no direction, so that dashes within a label, as in
+ * `↔`, an edge each way; and two dashes or more with a blank before them and a
+ * blank or a pipe after, ` -- `, an edge with no direction, so that dashes within a label, as in
  * `--force`, stay part of it. Words in pipes right after it, `->|yes|`, with
- * no arrow among them, are the link's label.
+ * no arrow among them, are the edge's label.
  */
 const JOIN = /(<-+>|↔|<-+|←|-+>|→|(?<=^|\s)-{2,}(?=\s|$|\|))(?:\|((?:(?!-+>)[^|\n])*)\|)?/
 /** A label Mermaid's way, `A -- yes --> B`, which is read as `A ->|yes| B`. */
@@ -117,10 +117,10 @@ export function partsOf(reply: string): Part[] {
 
 /**
  * The graph a block's lines say. Each line is a chain of labels joined by
- * arrows or dashes, each a link, with the words in pipes after one written on
- * it; a line with neither names a node alone. An arrow is a link that runs
- * one way, a two-headed arrow a link each way, and a dash a link that runs no
- * way; a block whose links are all dashes is an undirected graph. A node is
+ * arrows or dashes, each an edge, with the words in pipes after one written on
+ * it; a line with neither names a node alone. An arrow is an edge that runs
+ * one way, a two-headed arrow an edge each way, and a dash an edge that runs no
+ * way; a block whose edges are all dashes is an undirected graph. A node is
  * known by its label, so the same label on any line is the same node, and a
  * tone in brackets after a label is its node's, the first one given. A label
  * written in bold, `**Valid?**`, gives its node a priority of 1, and its
@@ -128,14 +128,14 @@ export function partsOf(reply: string): Part[] {
  * at a label's ends are not part of it. A line that is a name and a colon
  * alone, `Backend:`, opens a group for the lines indented under it, where
  * the next is, and is a node where it is not; and so does a line `subgraph
- * Backend`, as Mermaid writes it, with no link on it, for the lines up to a
+ * Backend`, as Mermaid writes it, with no edge on it, for the lines up to a
  * line `end`;
  * a node is in the first group it is named under, wherever else it is
  * named, and blank lines are passed over.
  */
 export function graphOf(lines: readonly string[]): GraphletGraph {
   const nodes = new Map<string, GraphletNode>()
-  const joins: Array<GraphletLink & { join: string }> = []
+  const joins: Array<GraphletEdge & { join: string }> = []
   const groups = new Map<string, GraphletGroup>()
   /** The groups the line being read is under, the innermost last: each with how far its own line is indented, and whether `end` closes it. */
   let within: Array<{ id: string; indent: number; isMermaid: boolean }> = []
@@ -191,13 +191,13 @@ export function graphOf(lines: readonly string[]): GraphletGraph {
     }
   }
   const isUndirected = joins.length > 0 && joins.every(({ join }) => /^-+$/.test(join))
-  const links = joins.flatMap(({ join, ...link }) => {
-    const back = { ...link, from: link.to, to: link.from }
-    if (/^-+$/.test(join)) return [isUndirected ? link : { ...link, isDirected: false }]
-    if (/^-+>$|^→$/.test(join)) return [link]
-    return /^<-+$|^←$/.test(join) ? [back] : [link, back]
+  const edges = joins.flatMap(({ join, ...edge }) => {
+    const back = { ...edge, from: edge.to, to: edge.from }
+    if (/^-+$/.test(join)) return [isUndirected ? edge : { ...edge, isDirected: false }]
+    if (/^-+>$|^→$/.test(join)) return [edge]
+    return /^<-+$|^←$/.test(join) ? [back] : [edge, back]
   })
-  return { nodes: [...nodes.values()], links, ...(groups.size === 0 ? {} : { groups: [...groups.values()] }), ...(isUndirected ? { isDirected: false } : {}) }
+  return { nodes: [...nodes.values()], edges, ...(groups.size === 0 ? {} : { groups: [...groups.values()] }), ...(isUndirected ? { isDirected: false } : {}) }
 }
 
 /** A row less its first `count` cells. */

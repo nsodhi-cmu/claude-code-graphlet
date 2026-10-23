@@ -15,7 +15,7 @@ const MOST_ZOOM = 4
 /** How many pixels of the page a cell of the terminal's layout is across a layer, running down and running right: enough that no box of the page is wider than its box there, and the room between boxes is wider. */
 const CELL: Readonly<Record<Direction, number>> = { down: 1.5 * CHAR_WIDTH, right: 16 }
 /** How the page has a graph laid out: as the terminal lays it out on one sheet, in a room wide enough for all of it. */
-const SHEET: Look = { scroll: 'sheet', labels: 'wrap', links: 'separate' }
+const SHEET: Look = { scroll: 'sheet', labels: 'wrap', edges: 'separate' }
 const WIDE = { columns: MOST_CELLS, rows: MOST_CELLS }
 
 /** How the page around the drawing looks, in the drawing's colors: the drawing fills the window under the title, and its sheet is the page itself. */

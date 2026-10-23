@@ -1,13 +1,13 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { LOOK, graphOf, numbers } from './fixture'
+import { LOOK, SEPARATE, graphOf, numbers } from './fixture'
 import { readGraph } from '../hooks/layers'
 import type { Graph } from '../hooks/layers'
 import { costOf, layoutOf, wordsOf, wrap } from '../hooks/layout'
 import type { Layout, Wire } from '../hooks/layout'
 
 const ROOM = { columns: 80, rows: 40 }
-const laid = (graph: Graph, look = LOOK): Layout => layoutOf(graph, ROOM, look)
+const laid = (graph: Graph, look = SEPARATE): Layout => layoutOf(graph, ROOM, look)
 
 /** Where each node's box starts and how wide it is, shelf by shelf. */
 const boxes = (layout: Layout): Array<Array<[id: string, x: number, width: number]>> =>
@@ -62,14 +62,14 @@ describe('what a box says', () => {
       { id: 'a', label: 'a-file-with-a-very-long-name.component.ts', mark: '◆', badge: '3' },
       { id: 'b', label: 'b' },
     ],
-    links: [
+    edges: [
       { from: 'a', to: 'a' },
       { from: 'a', to: 'b' },
     ],
   })
   const [a, b] = graph.nodes
 
-  test('its mark, its label on as many lines as it takes, and its badge, after the sign of a loop where it links to itself', () => {
+  test('its mark, its label on as many lines as it takes, and its badge, after the sign of a loop where it has an edge to itself', () => {
     expect(a === undefined ? undefined : wordsOf(graph, a, 'wrap')).toEqual({
       mark: '◆ ',
       lines: ['a-file-with-a-very-long-', 'name.component.ts'],
@@ -100,7 +100,7 @@ describe('boxes on their shelves', () => {
     ])
   })
 
-  test('a box sits over the middle of what it links to, and under the middle of what links to it', () => {
+  test('a box sits over the middle of what its edges reach, and under the middle of what reaches it', () => {
     const graph = graphOf(['top', 'l', 'r', 'bottom'], [['top', 'l'], ['top', 'r'], ['l', 'bottom'], ['r', 'bottom']])
     const middles = boxes(laid(graph)).map(shelf => shelf.map(([, x, width]) => x + Math.floor(width / 2)))
     const between = Math.round(((middles[1]?.[0] ?? 0) + (middles[1]?.[1] ?? 0)) / 2)
@@ -108,7 +108,7 @@ describe('boxes on their shelves', () => {
     expect(middles[2]).toEqual([between])
   })
 
-  test('a link that passes several shelves keeps to one column through all of them', () => {
+  test('an edge that passes several shelves keeps to one column through all of them', () => {
     const layout = laid(graphOf(['a', 'b', 'c', 'd'], [['a', 'b'], ['b', 'c'], ['c', 'd'], ['a', 'd']]))
     expect(lanes(layout, 1)).toHaveLength(1)
     expect(lanes(layout, 1)).toEqual(lanes(layout, 2))
@@ -119,11 +119,11 @@ describe('boxes on their shelves', () => {
     const graph = graphOf(['core', ...users], users.map(user => [user, 'core']))
     const pinned = laid(graph)
     expect(pinned.shelves.map(shelf => shelf.across)).toEqual([pinned.shelves[0]?.width, 80])
-    const sheet = laid(graph, { ...LOOK, scroll: 'sheet' })
+    const sheet = laid(graph, { ...SEPARATE, scroll: 'sheet' })
     expect(sheet.shelves.map(shelf => shelf.across)).toEqual([sheet.shelves[0]?.width, sheet.shelves[0]?.width])
   })
 
-  test('a graph\'s priorities never leave its seating weighing more than with none, and where they change it, its links of higher priority bend less', () => {
+  test('a graph\'s priorities never leave its seating weighing more than with none, and where they change it, its edges of higher priority bend less', () => {
     const next = numbers(41)
     const pick = (below: number): number => Math.floor(next() * below)
     /** Whether one list of numbers comes before another, the first that differs deciding. */
@@ -135,11 +135,11 @@ describe('boxes on their shelves', () => {
     for (let run = 0; run < 300; run += 1) {
       const count = 3 + pick(12)
       const nodes = Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: `node ${index}` }))
-      const links = Array.from({ length: count + pick(2 * count) }, () => ({ from: `n${pick(count)}`, to: `n${pick(count)}` }))
-      const ranked = readGraph({ nodes: nodes.map(node => (pick(3) === 0 ? { ...node, priority: pick(4) - 1 } : node)), links })
+      const edges = Array.from({ length: count + pick(2 * count) }, () => ({ from: `n${pick(count)}`, to: `n${pick(count)}` }))
+      const ranked = readGraph({ nodes: nodes.map(node => (pick(3) === 0 ? { ...node, priority: pick(4) - 1 } : node)), edges })
       const priority = new Map(ranked.nodes.map(node => [node.id, node.priority ?? 0]))
-      const rankOf = (wire: Wire): number => Math.max(priority.get(wire.link.from) ?? 0, priority.get(wire.link.to) ?? 0)
-      const [mine, theirs] = [laid(ranked), laid(readGraph({ nodes, links }))]
+      const rankOf = (wire: Wire): number => Math.max(priority.get(wire.edge.from) ?? 0, priority.get(wire.edge.to) ?? 0)
+      const [mine, theirs] = [laid(ranked), laid(readGraph({ nodes, edges }))]
       const ranks = [...new Set(mine.channels.flatMap(channel => channel.wires.map(rankOf)))].sort((a, b) => b - a)
       const [after, before] = [costOf(mine.channels, ranks, rankOf), costOf(theirs.channels, ranks, rankOf)]
       expect(after.weight).toBeLessThanOrEqual(before.weight)
@@ -148,7 +148,7 @@ describe('boxes on their shelves', () => {
   })
 
   test('a room narrower than the narrowest a graph is laid out for is taken to be that wide', () => {
-    expect(layoutOf(graphOf(['a'], []), { columns: 10, rows: 10 }, LOOK).columns).toBe(40)
+    expect(layoutOf(graphOf(['a'], []), { columns: 10, rows: 10 }, SEPARATE).columns).toBe(40)
   })
 })
 
@@ -156,37 +156,37 @@ describe('the rows between two shelves', () => {
   const tracks = (layout: Layout, channel = 0): number => new Set(layout.channels[channel]?.wires.map(wire => wire.track)).size
   const rows = (layout: Layout): number[] => layout.channels.map(channel => channel.rows)
 
-  test('a row the links turn on and a row of arrowheads, and under the last shelf nothing', () => {
+  test('a row the edges turn on and a row of arrowheads, and under the last shelf nothing', () => {
     expect(rows(laid(graphOf(['a', 'b'], [['a', 'b']])))).toEqual([2, 0])
   })
 
-  test('two shelves with no link between them are a row apart', () => {
+  test('two shelves with no edge between them are a row apart', () => {
     const graph = readGraph({
       nodes: [
         { id: 'a', label: 'a', layer: 0 },
         { id: 'b', label: 'b', layer: 1 },
       ],
-      links: [],
+      edges: [],
     })
     expect(rows(laid(graph))).toEqual([1, 0])
   })
 
-  test('links to one node turn on one row, however many nodes they come from', () => {
+  test('edges to one node turn on one row, however many nodes they come from', () => {
     const users = ['u1', 'u2', 'u3', 'u4']
     expect(tracks(laid(graphOf([...users, 'core'], users.map(user => [user, 'core']))))).toBe(1)
   })
 
-  test('nodes that all link to the very same nodes share one row', () => {
+  test('nodes that all edge to the very same nodes share one row', () => {
     expect(tracks(laid(graphOf(['a', 'b', 'c', 'd'], [['a', 'c'], ['a', 'd'], ['b', 'c'], ['b', 'd']])))).toBe(1)
   })
 
-  /** Two nodes whose links fan out across the same nodes, the one's to one more of them, so that wherever the two stand their fans overlap. */
+  /** Two nodes whose edges fan out across the same nodes, the one's to one more of them, so that wherever the two stand their fans overlap. */
   const APART = readGraph({
     nodes: [
       ...['u0', 'u1'].map(id => ({ id, label: id, layer: 0 })),
       ...['d0', 'd1', 'd2'].map(id => ({ id, label: id, layer: 1 })),
     ],
-    links: [
+    edges: [
       { from: 'u0', to: 'd0' },
       { from: 'u0', to: 'd1' },
       { from: 'u0', to: 'd2' },
@@ -195,41 +195,41 @@ describe('the rows between two shelves', () => {
     ],
   })
 
-  test('one node\'s links turn on a row of their own where they would run into another node\'s', () => {
+  test('one node\'s edges turn on a row of their own where they would run into another node\'s', () => {
     expect(tracks(laid(APART))).toBe(2)
     expect(rows(laid(APART))[0]).toBe(3)
   })
 
-  test('merged, every link turns on the one row', () => {
-    const layout = laid(APART, { ...LOOK, links: 'merged' })
+  test('merged, every edge turns on the one row', () => {
+    const layout = laid(APART, LOOK)
     expect(tracks(layout)).toBe(1)
     expect(rows(layout)[0]).toBe(2)
   })
 
-  test('a node has a port for each bundle of links that reaches it, and a box is widened where its ports need the room', () => {
+  test('a node has a port for each bundle of edges that reaches it, and a box is widened where its ports need the room', () => {
     const sources = ['a', 'b', 'c', 'd']
     const graph = graphOf([...sources, 'T', ...sources.map(id => `${id}2`)], [...sources.map(id => [id, 'T'] as [string, string]), ...sources.map(id => [id, `${id}2`] as [string, string])])
     const layout = laid(graph)
     const into = layout.channels[0]?.wires.filter(wire => 'node' in wire.to.place.slot && wire.to.place.slot.node.id === 'T') ?? []
     expect(new Set(into.map(wire => wire.to.at)).size).toBe(4)
     expect(into[0]?.to.place.width).toBe(9)
-    const merged = laid(graph, { ...LOOK, links: 'merged' })
+    const merged = laid(graph, LOOK)
     const one = merged.channels[0]?.wires.filter(wire => 'node' in wire.to.place.slot && wire.to.place.slot.node.id === 'T') ?? []
     expect(new Set(one.map(wire => wire.to.at)).size).toBe(1)
   })
 
-  test('a link back up has a row for its arrowhead above the rows the links turn on', () => {
+  test('an edge back up has a row for its arrowhead above the rows the edges turn on', () => {
     const layout = laid(graphOf(['a', 'b'], [['a', 'b'], ['b', 'a']]))
     expect(layout.channels[0]).toMatchObject({ rows: 3, topRows: 1, bottomRows: 1 })
   })
 
-  test('links between two nodes of the last shelf run under it', () => {
+  test('edges between two nodes of the last shelf run under it', () => {
     const graph = readGraph({
       nodes: [
         { id: 'a', label: 'a', layer: 0 },
         { id: 'b', label: 'b', layer: 0 },
       ],
-      links: [{ from: 'a', to: 'b' }],
+      edges: [{ from: 'a', to: 'b' }],
     })
     expect(laid(graph).channels[0]).toMatchObject({ rows: 2, topRows: 1, bottomRows: 0 })
   })
@@ -240,6 +240,6 @@ describe('the rows between two shelves', () => {
     const loose = laid(graph)
     expect(loose.shelves[0]?.across).not.toBe(loose.shelves[1]?.across)
     expect(tracks(loose)).toBe(2)
-    expect(tracks(laid(graph, { ...LOOK, scroll: 'sheet' }))).toBe(1)
+    expect(tracks(laid(graph, { ...SEPARATE, scroll: 'sheet' }))).toBe(1)
   })
 })

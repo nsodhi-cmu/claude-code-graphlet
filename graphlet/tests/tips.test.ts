@@ -29,7 +29,7 @@ test('before any graph, only the tips that ask for one are said; with graphs in 
   expect(Object.keys(picked({ ...EVERY, isClickable: false }, 1400))).toEqual(TIPS.slice(0, 5).map(tip => tip.text))
   expect(Object.keys(picked({ ...EVERY, columns: 60 }, 1400))).toEqual([
     'Building a mod? Use graphlet as a dependency to draw graphs',
-    'Graphs can group nodes and label links, powered by graphlet',
+    'Graphs can group nodes and label edges, powered by graphlet',
     'Use /config to change how graphlet draws graphs',
     'Click copy under a graph to paste it anywhere as text',
   ])

@@ -76,7 +76,7 @@ Its render hook then hands graphlet the graph, and `next(e)` is the drawing:
 on('ui.render', { component: 'Pane', requestId: 'my-pane' }, async ($, e, next) => {
   const graph = {
     nodes: [{ id: 'a', label: 'Parse' }, { id: 'b', label: 'Check' }, { id: 'c', label: 'Emit' }],
-    links: [{ from: 'a', to: 'b' }, { from: 'b', to: 'c' }],
+    edges: [{ from: 'a', to: 'b' }, { from: 'b', to: 'c' }],
   }
   await $.graphlet.show({ site: 'my-pane', graph, columns: e.props.bodyColumns, rows: e.props.scroll.bodyRows })
   return next(e)
@@ -92,14 +92,14 @@ on('graphlet.select', async ($, e, next) => {
 
 ## Graph Features
 
-- **Directed and undirected links**, in one graph if you like.
-- **Labels** on links, like `yes` or `retry`.
-- **Tones**: color a node `good`, `warn`, `bad`, `note`, or `dim`; a mod can color links too.
+- **Directed and undirected edges**, in one graph if you like.
+- **Labels** on edges, like `yes` or `retry`.
+- **Tones**: color a node `good`, `warn`, `bad`, `note`, or `dim`; a mod can color edges too.
 - **Emphasis**: heavy frames for the nodes that matter most.
 - **Groups**, framed and named, that collapse into one box and open again.
 - **Down or right**, whichever fits better.
 - **Fitting its room**: a graph folds to a reply's width, and scrolls, following the selection, when it is too large.
-- **Selecting**: click a node to light its links, and move along them with the arrow keys. In a mod's graph, return or a double click opens a node.
+- **Selecting**: click a node to light its edges, and move along them with the arrow keys. In a mod's graph, return or a double click opens a node.
 - **Finding and focusing**: `/` finds a node as you type, and in a large graph, `f` shows just the selected node and its nearest.
 - **Copy**: `copy`, or `c`, puts the graph on your clipboard as text.
 - **The web page**: `html ↗`, or `Open in browser` under a picture, opens the graph in your browser, to zoom and pan.
@@ -113,7 +113,7 @@ In `/config`, or `/plugin configure graphlet@claude-code-graphlet`. The first ch
 | :- | :- |
 | **Scrolling** | `pinned` keeps the layers that fit in view while longer ones slide; `sheet` moves the whole graph. |
 | **Long labels** | `wrap` breaks a long label onto more lines; `clip` cuts it to one. |
-| **Links** | `separate` gives each node's links lines of their own; `merged` lets them share, which is shorter. |
+| **Edges** | `merged` lets a node's edges share lines, which is shorter; `separate` gives each node's edges lines of their own. |
 | **Graphs in replies** | `on` lets Claude draw graphs in its normal replies; `off` keeps graphlet out of Claude's replies and the system prompt, leaving it only for mods that use it. |
 | **Pictures in apps (experimental)** | `off` draws a graph on the desktop app, VS Code extension, and the mobile app as text in a code block; `on` draws it as a picture, with controls under a mod's graph. |
 
@@ -123,8 +123,8 @@ In `/config`, or `/plugin configure graphlet@claude-code-graphlet`. The first ch
 - The mouse reaches a graph only in Claude Code's fullscreen layout. On the main screen, a reply's graph is a still picture.
 - A clicked graph keeps the keys until Escape. A drag moves it rather than selecting its text, so use `copy`.
 - Where an organization manages Claude Code, Claude is told it can draw graphs only if graphlet is listed in managed settings.
-- A graph is read up to 1000 nodes and 2000 links, and the row under it says what was left out.
-- Where links are too tangled to keep apart, two may share a stretch of line.
+- A graph is read up to 1000 nodes and 2000 edges, and the row under it says what was left out.
+- Where edges are too tangled to keep apart, two may share a stretch of line.
 - A character is taken to be as wide as Unicode says. A font that draws it wider or narrower pushes its row out of line.
 
 ## Security and Privacy

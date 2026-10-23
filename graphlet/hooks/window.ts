@@ -95,7 +95,7 @@ export function scrollIn(layout: Layout, room: Room, from: Pan, by: Pan | number
 /**
  * The node a move from the selected one lands on. Left and right go along
  * its shelf, past any lanes. Up and down go to the next shelf: to the node
- * there that a link joins it to, the nearest of them in the window, or with
+ * there that an edge joins it to, the nearest of them in the window, or with
  * none joined, to the nearest. So every node can be reached by the keys. In
  * a graph that runs right, the keys are turned with it: up and down go along
  * a shelf, and left and right to the next.

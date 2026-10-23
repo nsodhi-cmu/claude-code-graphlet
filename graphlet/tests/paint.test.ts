@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { LOOK, SHOP, cellsOf, graphOf, graphRows, numbers, picture, undirected } from './fixture'
-import type { GraphletLink } from '../types'
+import { LOOK, SEPARATE, SHOP, cellsOf, graphOf, graphRows, numbers, picture, undirected } from './fixture'
+import type { GraphletEdge } from '../types'
 import { sizeOf } from '../hooks/draw'
 import type { Drawing, Hit, Span } from '../hooks/draw'
 import { readGraph, slotGroups } from '../hooks/layers'
@@ -17,7 +17,7 @@ const ORIGIN = { x: 0, y: 0 }
 const WHOLE = { columns: 90, rows: 60 }
 const SMALL = { columns: 40, rows: 60 }
 
-const drawn = (graph: Graph, selected: string | null = null, room = SMALL, look: Look = LOOK): Drawing =>
+const drawn = (graph: Graph, selected: string | null = null, room = SMALL, look: Look = SEPARATE): Drawing =>
   viewOf(look).draw(graph, selected, room, ORIGIN)
 
 /** Every span of the drawing whose text holds `text`. */
@@ -29,7 +29,7 @@ const boxes = (drawing: Drawing): Array<Hit & { node: string }> =>
   drawing.hits.filter((hit): hit is Hit & { node: string } => 'node' in hit)
 
 describe('the drawing', () => {
-  test('a box a node, in layers, each over what it links to, with the links between them', () => {
+  test('a box a node, in layers, each over what its edges reach, with the edges between them', () => {
     expect(graphRows(drawn(SHOP, null, WHOLE))).toEqual([
       '           ┌───────────────┐  ┌────────────────────┐',
       '           │ ○ checkout.ts │  │ ○ pages/invoice.ts │',
@@ -52,10 +52,10 @@ describe('the drawing', () => {
     ])
   })
 
-  test('a node the graph puts foremost has a heavy frame, and its links leave and reach it through it', () => {
+  test('a node the graph puts foremost has a heavy frame, and its edges leave and reach it through it', () => {
     const graph = readGraph({
       nodes: [{ id: 'A', label: 'A' }, { id: 'B', label: 'Build', priority: 1 }, { id: 'C', label: 'C' }],
-      links: [{ from: 'A', to: 'B' }, { from: 'B', to: 'C' }, { from: 'B', to: 'A' }, { from: 'C', to: 'B', isDirected: false }],
+      edges: [{ from: 'A', to: 'B' }, { from: 'B', to: 'C' }, { from: 'B', to: 'A' }, { from: 'C', to: 'B', isDirected: false }],
       direction: 'down',
     })
     expect(graphRows(drawn(graph))).toEqual([
@@ -77,11 +77,11 @@ describe('the drawing', () => {
     expect(spansWith(drawn(graph), 'Build')).toMatchObject([{ isBold: true }])
   })
 
-  test('a node whose links pull it two ways stands between them, unless the node at one end has the higher priority: then over it, so its link runs straight', () => {
+  test('a node whose edges pull it two ways stands between them, unless the node at one end has the higher priority: then over it, so its edge runs straight', () => {
     const graph = (priority?: number): Graph =>
       readGraph({
         nodes: [{ id: 'valid', label: 'Valid?' }, { id: 'save', label: 'Save it', ...(priority === undefined ? {} : { priority }) }, { id: 'ask', label: 'Ask again' }],
-        links: [{ from: 'valid', to: 'save' }, { from: 'valid', to: 'ask' }],
+        edges: [{ from: 'valid', to: 'save' }, { from: 'valid', to: 'ask' }],
       })
     expect(graphRows(drawn(graph()))).toEqual([
       '              ┌────────┐',
@@ -105,7 +105,7 @@ describe('the drawing', () => {
     ])
   })
 
-  test('a link that closes a loop runs back up dashed, down a lane past the layers between, to an arrowhead beside where the node\'s own links leave', () => {
+  test('an edge that closes a loop runs back up dashed, down a lane past the layers between, to an arrowhead beside where the node\'s own edges leave', () => {
     expect(graphRows(drawn(graphOf(['A', 'B', 'C'], [['A', 'B'], ['B', 'C'], ['C', 'A']])))).toEqual([
       '                ┌─────┐',
       '                │  A  │',
@@ -124,7 +124,7 @@ describe('the drawing', () => {
     ])
   })
 
-  test('two nodes that link to each other are joined by two links side by side, one each way', () => {
+  test('two nodes with edges to each other are joined by two edges side by side, one each way', () => {
     expect(graphRows(drawn(graphOf(['A', 'B'], [['A', 'B'], ['B', 'A']])))).toEqual([
       '                ┌─────┐',
       '                │  A  │',
@@ -138,7 +138,7 @@ describe('the drawing', () => {
     ])
   })
 
-  test('the two links between two nodes stay side by side, though a link from farther up reaches the lower one too', () => {
+  test('the two edges between two nodes stay side by side, though an edge from farther up reaches the lower one too', () => {
     const graph = graphOf(['Home', 'Glider', 'Building', 'Writings'], [['Home', 'Glider'], ['Glider', 'Building'], ['Building', 'Writings'], ['Writings', 'Building'], ['Home', 'Writings']])
     expect(graphRows(drawn(graph, null, { columns: 60, rows: 60 }))).toEqual([
       '                        ┌──────┐',
@@ -163,11 +163,11 @@ describe('the drawing', () => {
     ])
   })
 
-  test('where two bundles of links must each pass over the other, they step between rows at jogs, and never run into one line', () => {
+  test('where two bundles of edges must each pass over the other, they step between rows at jogs, and never run into one line', () => {
     const at = (id: string, layer: number) => ({ id, label: id, layer })
     const graph = readGraph({
       nodes: [at('a', 0), at('b', 0), at('c', 0), at('x', 1), at('y', 1), at('z', 1)],
-      links: [
+      edges: [
         { from: 'a', to: 'y' },
         { from: 'b', to: 'x' },
         { from: 'b', to: 'z' },
@@ -189,10 +189,10 @@ describe('the drawing', () => {
     ])
   })
 
-  test('a link\'s label is written beside the port it leaves its box by, each port far enough from the next for its label, and lit with its link', () => {
+  test('an edge\'s label is written beside the port it leaves its box by, each port far enough from the next for its label, and lit with its edge', () => {
     const graph = readGraph({
       nodes: ['Read', 'Valid?', 'Save', 'Ask again'].map(id => ({ id, label: id })),
-      links: [
+      edges: [
         { from: 'Read', to: 'Valid?' },
         { from: 'Valid?', to: 'Save', label: 'yes' },
         { from: 'Valid?', to: 'Ask again', label: 'no' },
@@ -220,7 +220,7 @@ describe('the drawing', () => {
     expect([...spansWith(lit, 'yes'), ...spansWith(lit, 'no'), ...spansWith(lit, 'retry')].map(span => span.paint)).toEqual(['accent', 'accent', 'plain'])
   })
 
-  test('links past a layer from one node run down one lane beside that layer\'s boxes, which branches where each of them leaves it', () => {
+  test('edges past a layer from one node run down one lane beside that layer\'s boxes, which branches where each of them leaves it', () => {
     const graph = graphOf(['A', 'B', 'C', 'D', 'E'], [['A', 'B'], ['B', 'C'], ['A', 'C'], ['C', 'D'], ['A', 'D'], ['B', 'E'], ['E', 'D']])
     expect(graphRows(drawn(graph))).toEqual([
       '                       ┌─────┐',
@@ -244,7 +244,7 @@ describe('the drawing', () => {
     ])
   })
 
-  test('a link between two nodes of one layer runs under the layer, to an arrowhead under the node it reaches', () => {
+  test('an edge between two nodes of one layer runs under the layer, to an arrowhead under the node it reaches', () => {
     const graph = readGraph({
       nodes: [
         { id: 'A', label: 'A', layer: 0 },
@@ -252,7 +252,7 @@ describe('the drawing', () => {
         { id: 'C', label: 'C', layer: 1 },
         { id: 'D', label: 'D', layer: 1 },
       ],
-      links: [
+      edges: [
         { from: 'A', to: 'B' },
         { from: 'A', to: 'C' },
         { from: 'A', to: 'D' },
@@ -275,7 +275,7 @@ describe('the drawing', () => {
     ])
   })
 
-  test('a node that links to itself carries the sign of a loop', () => {
+  test('a node with an edge to itself carries the sign of a loop', () => {
     expect(graphRows(drawn(graphOf(['A', 'B'], [['A', 'A'], ['A', 'B']])))).toEqual([
       '                ┌──────┐',
       '                │ A  ↺ │',
@@ -294,7 +294,7 @@ describe('the drawing', () => {
       { id: 'b', label: 'Validate the incoming request and normalize every field before it is stored' },
       { id: 'c', label: 'ok' },
     ],
-    links: [
+    edges: [
       { from: 'a', to: 'b' },
       { from: 'b', to: 'c' },
     ],
@@ -340,7 +340,7 @@ describe('the drawing', () => {
     ])
   })
 
-  test('a box shorter than the tallest of its layer is drawn from the layer\'s top, and its links run on down past the rows it leaves', () => {
+  test('a box shorter than the tallest of its layer is drawn from the layer\'s top, and its edges run on down past the rows it leaves', () => {
     const tall = 'a-file-with-a-very-long-name.component.ts'
     const graph = graphOf(['top', 'short', tall, 'end'], [['top', 'short'], ['top', tall], ['short', 'end'], [tall, 'end'], ['end', 'short']])
     expect(graphRows(drawn(graph, null, { columns: 60, rows: 60 }))).toEqual([
@@ -369,13 +369,13 @@ describe('the drawing', () => {
     ])
   })
 
-  test('a link between two boxes of one layer and different heights is whole from the shorter box to the taller', () => {
+  test('an edge between two boxes of one layer and different heights is whole from the shorter box to the taller', () => {
     const graph = readGraph({
       nodes: [
         { id: 'a', label: 'cart.ts', layer: 0 },
         { id: 'b', label: 'invoice-line-item-renderer.component.ts', layer: 0 },
       ],
-      links: [{ from: 'a', to: 'b' }],
+      edges: [{ from: 'a', to: 'b' }],
     })
     expect(graphRows(drawn(graph, null, { columns: 60, rows: 60 }))).toEqual([
       '           ┌─────────┐  ┌───────────────────────┐',
@@ -388,7 +388,7 @@ describe('the drawing', () => {
   })
 
   test('with labels cut, every box is three rows, its label cut in the middle to fit one line', () => {
-    expect(graphRows(drawn(LONG, null, { columns: 60, rows: 60 }, { ...LOOK, labels: 'clip' })).slice(0, 8)).toEqual([
+    expect(graphRows(drawn(LONG, null, { columns: 60, rows: 60 }, { ...SEPARATE, labels: 'clip' })).slice(0, 8)).toEqual([
       '            ┌──────────────────────────────────┐',
       '            │ invoice-line-ite…er.component.ts │',
       '            └─────────────────┬────────────────┘',
@@ -402,7 +402,7 @@ describe('the drawing', () => {
 
   const MESH = graphOf(['b', 'a', 'c', 'z', 'x', 'y'], [['a', 'x'], ['a', 'y'], ['a', 'z'], ['b', 'x'], ['b', 'z'], ['c', 'y'], ['c', 'x']])
 
-  test('links from different nodes reach a node at arrowheads of their own, and a link that crosses another passes over it unbroken', () => {
+  test('edges from different nodes reach a node at arrowheads of their own, and an edge that crosses another passes over it unbroken', () => {
     expect(graphRows(drawn(MESH)).slice(2, 7)).toEqual([
       '       └──┬──┘  └──┬──┘  └──┬──┘',
       '         ┌┴──────┐ │ ┌──────┴┐',
@@ -412,13 +412,13 @@ describe('the drawing', () => {
     ])
   })
 
-  test('one node\'s links turn on a row of their own where they would run into another node\'s; merged, they share one', () => {
+  test('one node\'s edges turn on a row of their own where they would run into another node\'s; merged, they share one', () => {
     const graph = readGraph({
       nodes: [
         ...['u0', 'u1'].map(id => ({ id, label: id, layer: 0 })),
         ...['d0', 'd1', 'd2'].map(id => ({ id, label: id, layer: 1 })),
       ],
-      links: [
+      edges: [
         { from: 'u0', to: 'd0' },
         { from: 'u0', to: 'd1' },
         { from: 'u0', to: 'd2' },
@@ -437,20 +437,20 @@ describe('the drawing', () => {
       '                      │ d1  │  │ d0  │  │ d2  │',
       '                      └─────┘  └─────┘  └─────┘',
     ])
-    expect(graphRows(drawn(graph, null, { columns: 70, rows: 60 }, { ...LOOK, links: 'merged' })).slice(2, 5)).toEqual([
+    expect(graphRows(drawn(graph, null, { columns: 70, rows: 60 }, LOOK)).slice(2, 5)).toEqual([
       '                               └──┬──┘  └──┬──┘',
       '                         ┌────────┼────────┤',
       '                         ▼        ▼        ▼',
     ])
   })
 
-  test('links that come down a column to their row go above links that leave the row down that column, so the two never run into one line', () => {
+  test('edges that come down a column to their row go above edges that leave the row down that column, so the two never run into one line', () => {
     const graph = readGraph({
       nodes: [
         ...['u0', 'u1'].map(id => ({ id, label: id, layer: 0 })),
         ...['d0', 'd1', 'd2'].map(id => ({ id, label: id, layer: 1 })),
       ],
-      links: [
+      edges: [
         { from: 'u0', to: 'd0' },
         { from: 'u0', to: 'd1' },
         { from: 'u0', to: 'd2' },
@@ -466,15 +466,15 @@ describe('the drawing', () => {
     ])
   })
 
-  test('merged, every link turns on one row and every node has one arrowhead', () => {
-    expect(graphRows(drawn(MESH, null, SMALL, { ...LOOK, links: 'merged' })).slice(2, 5)).toEqual([
+  test('merged, every edge turns on one row and every node has one arrowhead', () => {
+    expect(graphRows(drawn(MESH, null, SMALL, LOOK)).slice(2, 5)).toEqual([
       '       └──┬──┘  └──┬──┘  └──┬──┘',
       '          ├────────┼────────┤',
       '          ▼        ▼        ▼',
     ])
   })
 
-  test('nodes that all link to the very same nodes share one row, which says nothing false', () => {
+  test('nodes that all edge to the very same nodes share one row, which says nothing false', () => {
     expect(graphRows(drawn(graphOf(['A', 'B', 'C', 'D'], [['A', 'C'], ['A', 'D'], ['B', 'C'], ['B', 'D']]))).slice(2, 5)).toEqual([
       '            └──┬──┘  └──┬──┘',
       '               ├────────┤',
@@ -482,7 +482,7 @@ describe('the drawing', () => {
     ])
   })
 
-  test('an undirected graph is laid out from the node it names first, a link meets both its boxes at ticks with no arrowhead, and the link that closes a loop runs under a layer', () => {
+  test('an undirected graph is laid out from the node it names first, an edge meets both its boxes at ticks with no arrowhead, and the edge that closes a loop runs under a layer', () => {
     const graph = undirected(graphOf(['a', 'b', 'c', 'd'], [['b', 'a'], ['a', 'c'], ['c', 'b'], ['d', 'c'], ['c', 'd'], ['d', 'd']]))
     expect(graphRows(drawn(graph))).toEqual([
       '                ┌─────┐',
@@ -499,23 +499,23 @@ describe('the drawing', () => {
     ])
   })
 
-  test('in an undirected graph, a link between two nodes of one layer is a line of its own between ticks of its own; merged, it shares the one row', () => {
+  test('in an undirected graph, an edge between two nodes of one layer is a line of its own between ticks of its own; merged, it shares the one row', () => {
     const whole = undirected(graphOf(['a', 'b', 'c', 'd'], [['a', 'b'], ['a', 'c'], ['a', 'd'], ['b', 'c'], ['b', 'd'], ['c', 'd']]))
     expect(graphRows(drawn(whole)).slice(6)).toEqual([
       '       └─┬─┬─┘  └─┬─┬─┘  └─┬─┬─┘',
       '         └─│──────┘ └──────│─┘',
       '           └───────────────┘',
     ])
-    expect(graphRows(drawn(whole, null, SMALL, { ...LOOK, links: 'merged' })).slice(6)).toEqual([
+    expect(graphRows(drawn(whole, null, SMALL, LOOK)).slice(6)).toEqual([
       '       └──┬──┘  └─┬─┬─┘  └──┬──┘',
       '          └───────┴─┴───────┘',
     ])
   })
 
-  test('in a graph of both kinds, a link that runs one way ends at an arrowhead, one that runs no way meets both its boxes at ticks, and the two never share a line', () => {
+  test('in a graph of both kinds, an edge that runs one way ends at an arrowhead, one that runs no way meets both its boxes at ticks, and the two never share a line', () => {
     const home = readGraph({
       nodes: ['Modem', 'Router', 'Laptop', 'TV', 'NAS'].map(id => ({ id, label: id })),
-      links: [
+      edges: [
         { from: 'Modem', to: 'Router', isDirected: false },
         { from: 'Router', to: 'Laptop', isDirected: false },
         { from: 'Router', to: 'TV', isDirected: false },
@@ -544,10 +544,10 @@ describe('the drawing', () => {
     ])
   })
 
-  test('two links between the same two nodes with different labels are two lines, each with its label and its own arrowhead', () => {
+  test('two edges between the same two nodes with different labels are two lines, each with its label and its own arrowhead', () => {
     const graph = readGraph({
       nodes: ['Idle', 'Running'].map(id => ({ id, label: id })),
-      links: [
+      edges: [
         { from: 'Idle', to: 'Running', label: 'start' },
         { from: 'Idle', to: 'Running', label: 'resume' },
         { from: 'Running', to: 'Idle', label: 'done' },
@@ -566,10 +566,10 @@ describe('the drawing', () => {
     ])
   })
 
-  test('a link\'s tone paints its line, its arrowhead, and its label where it is not lit, and it never shares a line with links of another tone, merged or not', () => {
+  test('an edge\'s tone paints its line, its arrowhead, and its label where it is not lit, and it never shares a line with edges of another tone, merged or not', () => {
     const graph = readGraph({
       nodes: ['Build', 'Test', 'Lint', 'Deploy'].map(id => ({ id, label: id })),
-      links: [
+      edges: [
         { from: 'Build', to: 'Test', tone: 'bad', label: 'fails' },
         { from: 'Build', to: 'Lint' },
         { from: 'Build', to: 'Deploy' },
@@ -594,8 +594,8 @@ describe('the drawing', () => {
     ]
     const paints = (drawing: Drawing, row: number): Array<[string, string]> =>
       (drawing.rows[row] ?? []).filter(span => span.text.trim() !== '').map(span => [span.text.trim(), span.paint])
-    for (const links of ['separate', 'merged'] as const) {
-      const drawing = drawn(graph, null, SMALL, { ...LOOK, links })
+    for (const edges of ['separate', 'merged'] as const) {
+      const drawing = drawn(graph, null, SMALL, { ...SEPARATE, edges })
       expect(graphRows(drawing)).toEqual(pictured)
       expect([3, 4, 5, 9, 10].map(row => paints(drawing, row))).toEqual([
         [['│fails', 'bad'], ['│', 'dim']],
@@ -609,7 +609,7 @@ describe('the drawing', () => {
   })
 
   test('an empty graph draws nothing', () => {
-    expect(drawn(readGraph({ nodes: [], links: [] }))).toEqual({ rows: [], hits: [] })
+    expect(drawn(readGraph({ nodes: [], edges: [] }))).toEqual({ rows: [], hits: [] })
   })
 
   test('the last row is the foot, and in its corner a click on copy copies the graph as text and one on html ↗ opens it as a web page', () => {
@@ -636,7 +636,7 @@ describe('what is selected', () => {
     ])
   })
 
-  test('the selected box, the boxes linked to it, and the links between them are lit; the rest keep their own paint', () => {
+  test('the selected box, the boxes joined to it, and the edges between them are lit; the rest keep their own paint', () => {
     expect(drawing.rows[0]?.filter(span => span.text.includes('┌')).map(span => span.paint)).toEqual(['dim', 'accent'])
     expect(drawing.rows[4]?.filter(span => span.text.trim() === '▼').map(span => span.paint)).toEqual(['dim', 'accent'])
     expect(drawing.rows[5]?.filter(span => span.text.trim() !== '').map(span => span.paint)).toEqual(['bad', 'accent', 'dim', 'warn'])
@@ -649,7 +649,7 @@ describe('what is selected', () => {
     expect(spansWith(drawing, '● cart.ts').map(span => span.paint)).toEqual(['bad'])
   })
 
-  test('where a link leaves a box, the border shows it in the border\'s own paint, lit or not', () => {
+  test('where an edge leaves a box, the border shows it in the border\'s own paint, lit or not', () => {
     expect(drawing.rows[7]?.filter(span => span.text.trim() !== '').map(span => span.paint)).toEqual(['bad', 'accent', 'dim', 'warn'])
     expect(drawing.rows[12]?.filter(span => span.text.trim() !== '').map(span => span.paint)).toEqual(['accent'])
   })
@@ -662,7 +662,7 @@ describe('what is selected', () => {
     ])
   })
 
-  test('a link back up is lit along its whole way, through the lane it passes in', () => {
+  test('an edge back up is lit along its whole way, through the lane it passes in', () => {
     const loop = drawn(graphOf(['A', 'B', 'C'], [['A', 'B'], ['B', 'C'], ['C', 'A']]), 'C')
     expect(spansWith(loop, '┊').every(span => span.paint === 'accent')).toBe(true)
     expect(spansWith(loop, '▲')).toEqual([{ text: '▲', paint: 'accent' }])
@@ -670,10 +670,10 @@ describe('what is selected', () => {
 })
 
 describe('a graph that runs right', () => {
-  const loop = readGraph({ nodes: ['A', 'B', 'C'].map(id => ({ id, label: id })), links: [{ from: 'A', to: 'B' }, { from: 'B', to: 'C' }, { from: 'C', to: 'A' }], direction: 'right' })
+  const loop = readGraph({ nodes: ['A', 'B', 'C'].map(id => ({ id, label: id })), edges: [{ from: 'A', to: 'B' }, { from: 'B', to: 'C' }, { from: 'C', to: 'A' }], direction: 'right' })
   const ROOM = { columns: 40, rows: 20 }
 
-  test('its layers stand side by side, each a column of boxes, its links run across the room into arrowheads that point right, and the link that closes a loop runs back dashed, along a lane past the layer between', () => {
+  test('its layers stand side by side, each a column of boxes, its edges run across the room into arrowheads that point right, and the edge that closes a loop runs back dashed, along a lane past the layer between', () => {
     expect(graphRows(drawn(loop, null, ROOM))).toEqual([
       '┌─────┐   ┌─────┐  ┌─────┐',
       '│     ├──▶│  B  ├─▶│     │',
@@ -683,7 +683,7 @@ describe('a graph that runs right', () => {
     ])
   })
 
-  test('the selected box has a double frame its links leave through, and its lines are lit back across the room too', () => {
+  test('the selected box has a double frame its edges leave through, and its lines are lit back across the room too', () => {
     expect(graphRows(drawn(loop, 'C', ROOM))).toEqual([
       '┌─────┐   ┌─────┐  ╔═════╗',
       '│     ├──▶│  B  ├─▶║     ║',
@@ -693,10 +693,10 @@ describe('a graph that runs right', () => {
     ])
   })
 
-  test('a link\'s label lies on its own line, just past the box it leaves, and a box makes room down its side for its ports, its label in the middle', () => {
+  test('an edge\'s label lies on its own line, just past the box it leaves, and a box makes room down its side for its ports, its label in the middle', () => {
     const graph = readGraph({
       nodes: ['Valid?', 'Save', 'Ask again'].map(id => ({ id, label: id })),
-      links: [{ from: 'Valid?', to: 'Save', label: 'yes' }, { from: 'Valid?', to: 'Ask again', label: 'no' }, { from: 'Ask again', to: 'Valid?', label: 'retry' }],
+      edges: [{ from: 'Valid?', to: 'Save', label: 'yes' }, { from: 'Valid?', to: 'Ask again', label: 'no' }, { from: 'Ask again', to: 'Valid?', label: 'retry' }],
       direction: 'right',
     })
     expect(graphRows(drawn(graph, null, ROOM))).toEqual([
@@ -719,13 +719,13 @@ describe('groups', () => {
   const tiers = (direction: 'down' | 'right'): Graph =>
     readGraph({
       nodes: [n('Browser'), n('API', 'back'), n('Auth', 'back'), n('Cache', 'back'), n('Postgres', 'data'), n('Redis', 'data'), n('Logs')],
-      links: [l('Browser', 'API'), l('API', 'Auth'), l('API', 'Cache'), l('Auth', 'Postgres'), l('Cache', 'Redis'), l('API', 'Logs')],
+      edges: [l('Browser', 'API'), l('API', 'Auth'), l('API', 'Cache'), l('Auth', 'Postgres'), l('Cache', 'Redis'), l('API', 'Logs')],
       groups: [{ id: 'back', label: 'Backend' }, { id: 'data', label: 'Data' }],
       direction,
     })
   const ROOM = { columns: 60, rows: 40 }
 
-  test('a group\'s nodes are drawn in a frame with round corners and its label in the top border, where no line crosses it; nothing else stands inside, and a link that crosses the frame passes over it', () => {
+  test('a group\'s nodes are drawn in a frame with round corners and its label in the top border, where no line crosses it; nothing else stands inside, and an edge that crosses the frame passes over it', () => {
     expect(graphRows(drawn(tiers('down'), null, ROOM))).toEqual([
       '                          ┌─────────┐',
       '                          │ Browser │',
@@ -752,7 +752,7 @@ describe('groups', () => {
     ])
   })
 
-  test('collapsed, a group is one box with round corners, saying its label after ▸ and how many nodes it holds, and its links are those of all of them', () => {
+  test('collapsed, a group is one box with round corners, saying its label after ▸ and how many nodes it holds, and its edges are those of all of them', () => {
     expect(graphRows(drawn(collapsedOf(tiers('down'), new Set(['back'])), null, ROOM))).toEqual([
       '                          ┌─────────┐',
       '                          │ Browser │',
@@ -800,7 +800,7 @@ describe('what the window does not show', () => {
   )
   const room = { columns: 40, rows: 8 }
   const shown = (selected: string): Drawing => {
-    const view = viewOf(LOOK)
+    const view = viewOf(SEPARATE)
     return view.draw(graph, selected, room, view.show(graph, selected, room, ORIGIN))
   }
 
@@ -835,7 +835,7 @@ describe('what the window does not show', () => {
       ['Checkout', 'Car', 'Payments', 'Shipping', 'Receipts', 'Ledger'],
       [['Checkout', 'Car'], ['Checkout', 'Payments'], ['Checkout', 'Shipping'], ['Checkout', 'Receipts'], ['Payments', 'Ledger'], ['Receipts', 'Ledger']],
     )
-    const view = viewOf(LOOK)
+    const view = viewOf(SEPARATE)
     const rows = graphRows(view.draw(shorter, 'Checkout', room, view.show(shorter, 'Checkout', room, ORIGIN)))
     expect(rows.filter(row => row.endsWith('│ …') || row.endsWith('Receipts ▸'))).toHaveLength(2)
   })
@@ -844,9 +844,9 @@ describe('what the window does not show', () => {
     const fan = (priority?: number): Graph =>
       readGraph({
         nodes: [{ id: 'hub', label: 'Hub' }, ...['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'].map((label, index) => ({ id: label, label, ...(index === 4 && priority !== undefined ? { priority } : {}) }))],
-        links: ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'].map(to => ({ from: 'hub', to })),
+        edges: ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'].map(to => ({ from: 'hub', to })),
       })
-    const names = (graph: Graph): string[] => graphRows(viewOf(LOOK).draw(graph, 'hub', { columns: 40, rows: 6 }, ORIGIN))
+    const names = (graph: Graph): string[] => graphRows(viewOf(SEPARATE).draw(graph, 'hub', { columns: 40, rows: 6 }, ORIGIN))
     expect(names(fan())).toEqual([
       '                ╔═════╗',
       '                ║ Hub ║',
@@ -864,8 +864,8 @@ describe('what the window does not show', () => {
   })
 
   test('a node the window shows, and any node while the selected one is out of view, is not named', () => {
-    expect(boxes(viewOf(LOOK).draw(graph, 'Payments', WHOLE, ORIGIN)).map(hit => hit.node)).toEqual(graph.nodes.map(node => node.id))
-    expect(boxes(viewOf(LOOK).draw(graph, 'Ledger', room, ORIGIN)).map(hit => hit.node)).toEqual(['Checkout', 'Cart', 'Payments', 'Shipping', 'Receipts'])
+    expect(boxes(viewOf(SEPARATE).draw(graph, 'Payments', WHOLE, ORIGIN)).map(hit => hit.node)).toEqual(graph.nodes.map(node => node.id))
+    expect(boxes(viewOf(SEPARATE).draw(graph, 'Ledger', room, ORIGIN)).map(hit => hit.node)).toEqual(['Checkout', 'Cart', 'Payments', 'Shipping', 'Receipts'])
   })
 })
 
@@ -924,23 +924,23 @@ type Said = { node: string; channel: number; side: 'from' | 'to' | 'above' | 'be
 
 /**
  * What a picture says, read the way a person reads it: in each channel, the
- * links its lines make, as `channel from to`. Where boxes and lanes stand is
+ * edges its lines make, as `channel from to`. Where boxes and lanes stand is
  * taken from the layout, and every line is read from its characters alone. A
  * line joins every box it leaves at a tick to every box it reaches at an
  * arrowhead; with no arrowheads, every box above it to every box below, or
  * where it meets boxes on one side only, each of them to each. A lane stands
- * for the one link it carries, and a line that meets another's side passes
+ * for the one edge it carries, and a line that meets another's side passes
  * under it. A line the window's edge cuts says nothing of what it was bound
  * for. Also answers where each line ends with nothing to meet it, and each
  * label that is not where it should be: the words beside a tick, in the row
  * past the box, are written on that line for each node it reaches, and
  * between any two nodes the labels written so must be the labels of the
- * links between them, one for one, and a link's label must be written beside
+ * edges between them, one for one, and an edge's label must be written beside
  * a tick of the node it leaves. Through a window, which may cut a label or
  * leave its box out of view, the words beside a tick need only start the
- * label of a link between the two; and beside a line the edge cuts with no
+ * label of an edge between the two; and beside a line the edge cuts with no
  * arrowhead left in view, which may run either way or none, they need only
- * start the label of a link of that node.
+ * start the label of an edge of that node.
  */
 function readOff(
   graph: Graph,
@@ -948,7 +948,7 @@ function readOff(
   drawing: Drawing,
   xOf: (place: Place) => number,
   isWindow = false,
-): { links: string[]; loose: string[]; labels: string[] } {
+): { edges: string[]; loose: string[]; labels: string[] } {
   const rows = picture(drawing).slice(0, -1).map(cellsOf)
   const at = (x: number, y: number): string => rows[y]?.[x] ?? ' '
   const isOff = (x: number): boolean => x < 0 || x >= layout.columns
@@ -982,16 +982,16 @@ function readOff(
       if (!('lane' in place.slot) || isOff(x)) continue
       const { lane, isUp } = place.slot
       const [top, bottom] = [`${x},${shelf.top}`, `${x},${shelf.top + shelf.rows - 1}`]
-      const highOf = (link: GraphletLink): [string, string] =>
-        (shelfOf.get(link.from) ?? 0) < (shelfOf.get(link.to) ?? 0) ? [link.from, link.to] : [link.to, link.from]
+      const highOf = (edge: GraphletEdge): [string, string] =>
+        (shelfOf.get(edge.from) ?? 0) < (shelfOf.get(edge.to) ?? 0) ? [edge.from, edge.to] : [edge.to, edge.from]
       ways.set(top, UP)
       ways.set(bottom, DOWN)
-      if (lane.every(link => !link.isDirected)) {
-        ends.set(top, lane.map(link => ({ node: highOf(link)[1], channel: index - 1, side: 'below' as const })))
-        ends.set(bottom, lane.map(link => ({ node: highOf(link)[0], channel: index, side: 'above' as const })))
+      if (lane.every(edge => !edge.isDirected)) {
+        ends.set(top, lane.map(edge => ({ node: highOf(edge)[1], channel: index - 1, side: 'below' as const })))
+        ends.set(bottom, lane.map(edge => ({ node: highOf(edge)[0], channel: index, side: 'above' as const })))
       } else {
-        ends.set(top, lane.map(link => (isUp ? { node: link.from, channel: index - 1, side: 'from' as const } : { node: link.to, channel: index - 1, side: 'to' as const })))
-        ends.set(bottom, lane.map(link => (isUp ? { node: link.to, channel: index, side: 'to' as const } : { node: link.from, channel: index, side: 'from' as const })))
+        ends.set(top, lane.map(edge => (isUp ? { node: edge.from, channel: index - 1, side: 'from' as const } : { node: edge.to, channel: index - 1, side: 'to' as const })))
+        ends.set(bottom, lane.map(edge => (isUp ? { node: edge.to, channel: index, side: 'to' as const } : { node: edge.from, channel: index, side: 'from' as const })))
       }
     }
   })
@@ -1048,18 +1048,18 @@ function readOff(
 
   const lines = new Map<string, Said[]>()
   for (const [key, said] of ends) lines.set(find(key), [...(lines.get(find(key)) ?? []), ...said])
-  /** The lines that run one way: those with an arrowhead, or a lane of links that do. Their ticks are where they leave. */
+  /** The lines that run one way: those with an arrowhead, or a lane of edges that do. Their ticks are where they leave. */
   const isOneWay = new Set([...lines].filter(([, said]) => said.some(end => end.side === 'to' || end.side === 'from')).map(([line]) => line))
   for (const [line, said] of lines) if (isOneWay.has(line)) lines.set(line, said.map(end => (end.side === 'above' || end.side === 'below' ? { ...end, side: 'from' as const } : end)))
   const isCut = new Set([...cut].map(find))
-  const links = new Set<string>()
+  const edges = new Set<string>()
   const labels: string[] = []
   /** Who a label stands between: the node it is written beside and the node a line from there reaches, either way round where the line runs no way. */
   const pairOf = (node: string, other: string, isDirected: boolean): string => JSON.stringify(isDirected ? [true, node, other] : [false, ...[node, other].sort()])
-  const linkLabels = new Map<string, string[]>()
-  for (const link of graph.links.filter(one => one.from !== one.to && labelOf(one) !== '')) {
-    const pair = pairOf(link.from, link.to, link.isDirected)
-    linkLabels.set(pair, [...(linkLabels.get(pair) ?? []), labelOf(link)])
+  const edgeLabels = new Map<string, string[]>()
+  for (const edge of graph.edges.filter(one => one.from !== one.to && labelOf(one) !== '')) {
+    const pair = pairOf(edge.from, edge.to, edge.isDirected)
+    edgeLabels.set(pair, [...(edgeLabels.get(pair) ?? []), labelOf(edge)])
   }
   const writtenLabels = new Map<string, string[]>()
   for (const [key, { node, text }] of written) {
@@ -1068,28 +1068,28 @@ function readOff(
     const said = lines.get(find(key)) ?? []
     const isDirected = isOneWay.has(find(key))
     if (!isDirected && isCut.has(find(key))) {
-      const isOwn = graph.links.some(link => (link.from === node || link.to === node) && labelOf(link).startsWith(text))
-      if (!isOwn) labels.push(`'${text}' beside ${node}, which has no link labelled so`)
+      const isOwn = graph.edges.some(edge => (edge.from === node || edge.to === node) && labelOf(edge).startsWith(text))
+      if (!isOwn) labels.push(`'${text}' beside ${node}, which has no edge labelled so`)
       continue
     }
     const across = said.filter(end => (isDirected ? end.side === 'to' : end.side !== own.side))
     for (const other of new Set((across.length > 0 || isDirected ? across : said).map(end => end.node).filter(one => one !== node))) {
       const pair = pairOf(node, other, isDirected)
-      if (isWindow && !(linkLabels.get(pair) ?? []).some(label => label.startsWith(text))) labels.push(`'${text}' beside ${node}, on a line to ${other} with no such label`)
+      if (isWindow && !(edgeLabels.get(pair) ?? []).some(label => label.startsWith(text))) labels.push(`'${text}' beside ${node}, on a line to ${other} with no such label`)
       writtenLabels.set(pair, [...(writtenLabels.get(pair) ?? []), text])
     }
   }
   if (!isWindow) {
-    for (const pair of new Set([...linkLabels.keys(), ...writtenLabels.keys()])) {
-      const [had, said] = [(linkLabels.get(pair) ?? []).toSorted(), (writtenLabels.get(pair) ?? []).toSorted()]
-      if (JSON.stringify(had) !== JSON.stringify(said)) labels.push(`between ${pair}, labels ${JSON.stringify(said)} are written for links labelled ${JSON.stringify(had)}`)
+    for (const pair of new Set([...edgeLabels.keys(), ...writtenLabels.keys()])) {
+      const [had, said] = [(edgeLabels.get(pair) ?? []).toSorted(), (writtenLabels.get(pair) ?? []).toSorted()]
+      if (JSON.stringify(had) !== JSON.stringify(said)) labels.push(`between ${pair}, labels ${JSON.stringify(said)} are written for edges labelled ${JSON.stringify(had)}`)
     }
   }
   if (!isWindow) {
-    for (const link of graph.links) {
-      const label = labelOf(link)
-      const isBeside = [...written.values()].some(({ node, text }) => text === label && (node === link.from || (!link.isDirected && node === link.to)))
-      if (label !== '' && link.from !== link.to && !isBeside) labels.push(`'${label}' of ${link.from} to ${link.to} is written nowhere beside it`)
+    for (const edge of graph.edges) {
+      const label = labelOf(edge)
+      const isBeside = [...written.values()].some(({ node, text }) => text === label && (node === edge.from || (!edge.isDirected && node === edge.to)))
+      if (label !== '' && edge.from !== edge.to && !isBeside) labels.push(`'${label}' of ${edge.from} to ${edge.to} is written nowhere beside it`)
     }
   }
   for (const [line, said] of lines) {
@@ -1102,19 +1102,19 @@ function readOff(
             ? []
             : [...on('above'), ...on('below')].flatMap((one, index, all) => all.slice(index + 1).map(other => [one, other]))
         ).map(ends => ends.sort().join(' -- '))
-    for (const pair of pairs) links.add(`${said[0]?.channel} ${pair}`)
+    for (const pair of pairs) edges.add(`${said[0]?.channel} ${pair}`)
   }
-  return { links: [...links].sort(), loose, labels }
+  return { edges: [...edges].sort(), loose, labels }
 }
 
-/** The links a picture of a graph laid out so should say: each link, in every channel it crosses. */
-function linksOf(graph: Graph, layout: Layout): string[] {
+/** The edges a picture of a graph laid out so should say: each edge, in every channel it crosses. */
+function edgesOf(graph: Graph, layout: Layout): string[] {
   const shelfOf = new Map(layout.shelves.flatMap((shelf, index) => shelf.places.flatMap(place => ('node' in place.slot ? [[place.slot.node.id, index] as const] : []))))
-  return graph.links
-    .filter(link => link.from !== link.to)
-    .flatMap(link => {
-      const [from, to] = [shelfOf.get(link.from) ?? 0, shelfOf.get(link.to) ?? 0]
-      const ends = link.isDirected ? `${link.from} ${link.to}` : [link.from, link.to].sort().join(' -- ')
+  return graph.edges
+    .filter(edge => edge.from !== edge.to)
+    .flatMap(edge => {
+      const [from, to] = [shelfOf.get(edge.from) ?? 0, shelfOf.get(edge.to) ?? 0]
+      const ends = edge.isDirected ? `${edge.from} ${edge.to}` : [edge.from, edge.to].sort().join(' -- ')
       return Array.from({ length: Math.max(1, Math.abs(from - to)) }, (_, step) => `${Math.min(from, to) + step} ${ends}`)
     })
     .sort()
@@ -1126,30 +1126,30 @@ describe('what a picture says', () => {
   const nameOf = (index: number): string => [`Validate the request ${index}`, `数据库 ${index}`, `✅ ${index}`][pick(4)] ?? `n${index}`
   /** A priority for a node, now and then, so that some are put foremost and some placed first. */
   const somePriority = (): { priority?: number } => (pick(4) === 0 ? { priority: pick(5) - 2 } : {})
-  /** A link's own direction, now and then, so that a graph has links of both kinds. */
+  /** An edge's own direction, now and then, so that a graph has edges of both kinds. */
   const someWay = (): { isDirected?: boolean } => (pick(4) === 0 ? { isDirected: pick(2) === 0 } : {})
-  /** A label for a link, now and then. */
+  /** A label for an edge, now and then. */
   const someLabel = (): { label?: string } => (pick(3) === 0 ? { label: ['yes', 'no', 'retry', '数据', 'GET /items', 'a much longer label than fits'][pick(6)] ?? 'x' } : {})
-  /** A graph of any shape, its links often running both ways. */
+  /** A graph of any shape, its edges often running both ways. */
   const someGraph = (): Graph => {
     const count = 2 + pick(15)
-    const links = Array.from({ length: pick(count * 2 + 2) }, () => [`n${pick(count)}`, `n${pick(count)}`])
+    const edges = Array.from({ length: pick(count * 2 + 2) }, () => [`n${pick(count)}`, `n${pick(count)}`])
     return readGraph({
       nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: nameOf(index), ...somePriority() })),
-      links: [...links, ...links.filter(() => pick(3) === 0).map(([from, to]) => [to, from])].map(([from = '', to = '']) => ({ from, to, ...someLabel(), ...someWay() })),
+      edges: [...edges, ...edges.filter(() => pick(3) === 0).map(([from, to]) => [to, from])].map(([from = '', to = '']) => ({ from, to, ...someLabel(), ...someWay() })),
       isDirected: pick(4) !== 0,
     })
   }
-  /** A graph in two or three layers it names, few nodes over many and densely linked, which is where bundles most often ask to pass over each other. */
+  /** A graph in two or three layers it names, few nodes over many and densely joined, which is where bundles most often ask to pass over each other. */
   const crowdedGraph = (): Graph => {
     const count = 4 + pick(10)
     return readGraph({
       nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: nameOf(index), layer: index < 2 ? 0 : pick(2 + pick(2)), ...somePriority() })),
-      links: Array.from({ length: count + pick(count) }, () => ({ from: `n${pick(count)}`, to: `n${pick(count)}`, ...someLabel(), ...someWay() })),
+      edges: Array.from({ length: count + pick(count) }, () => ({ from: `n${pick(count)}`, to: `n${pick(count)}`, ...someLabel(), ...someWay() })),
       isDirected: pick(5) !== 0,
     })
   }
-  /** Two layers facing each other, linked both ways. */
+  /** Two layers facing each other, joined both ways. */
   const facingGraph = (): Graph => {
     const [top, bottom] = [2 + pick(3), 2 + pick(4)]
     return readGraph({
@@ -1157,18 +1157,18 @@ describe('what a picture says', () => {
         ...Array.from({ length: top }, (_, index) => ({ id: `t${index}`, label: nameOf(index), layer: 0, ...somePriority() })),
         ...Array.from({ length: bottom }, (_, index) => ({ id: `b${index}`, label: nameOf(index), layer: 1, ...somePriority() })),
       ],
-      links: Array.from({ length: top + bottom + pick(top * bottom) }, () =>
+      edges: Array.from({ length: top + bottom + pick(top * bottom) }, () =>
         pick(2) === 0 ? { from: `t${pick(top)}`, to: `b${pick(bottom)}`, ...someLabel() } : { from: `b${pick(bottom)}`, to: `t${pick(top)}`, ...someLabel() },
       ),
     })
   }
   const anyGraph = (run: number): Graph => ({ ...([someGraph, crowdedGraph, facingGraph][run % 3]?.() ?? someGraph()), direction: 'down' })
-  const someLook = (scroll = pick(2) === 0 ? 'pinned' : 'sheet'): Look => ({ scroll: scroll as Look['scroll'], labels: pick(3) === 0 ? 'clip' : 'wrap', links: 'separate' })
+  const someLook = (scroll = pick(2) === 0 ? 'pinned' : 'sheet'): Look => ({ scroll: scroll as Look['scroll'], labels: pick(3) === 0 ? 'clip' : 'wrap', edges: 'separate' })
 
   /** How long a test that reads many pictures may take: a slow machine's while. */
   const READING = { timeoutMs: 30_000 }
 
-  test('a graph drawn whole, or folded into a room, says every link it has, in every channel the link crosses, and no link it does not have', READING, () => {
+  test('a graph drawn whole, or folded into a room, says every edge it has, in every channel the edge crosses, and no edge it does not have', READING, () => {
     for (let run = 0; run < 900; run += 1) {
       const graph = anyGraph(run)
       const look = someLook()
@@ -1179,7 +1179,7 @@ describe('what a picture says', () => {
       const said = readOff(graph, layout, drawing, place => place.x - slideOf(layout, layout.shelves[place.shelf], 0))
       expect(said.loose).toEqual([])
       expect(said.labels).toEqual([])
-      expect(said.links).toEqual([...new Set(linksOf(graph, layout))])
+      expect(said.edges).toEqual([...new Set(edgesOf(graph, layout))])
     }
   })
 
@@ -1190,12 +1190,12 @@ describe('what a picture says', () => {
     '▼': '▶',
   }
 
-  test('a graph drawn running right says every link it has, in every channel the link crosses, and no link it does not have, and writes each label on its own link\'s line', READING, () => {
+  test('a graph drawn running right says every edge it has, in every channel the edge crosses, and no edge it does not have, and writes each label on its own edge\'s line', READING, () => {
     for (let run = 0; run < 400; run += 1) {
       const base = anyGraph(run)
       const graph = readGraph({
         nodes: base.nodes.map(node => ({ ...node, ...(run % 2 === 0 || pick(3) === 0 ? {} : { group: `g${pick(2)}` }) })),
-        links: base.links,
+        edges: base.edges,
         direction: 'right',
       })
       const look = someLook()
@@ -1224,7 +1224,7 @@ describe('what a picture says', () => {
       }
       for (const channel of layout.channels) {
         for (const wire of channel.wires) {
-          const text = labelOf(wire.link)
+          const text = labelOf(wire.edge)
           if (text === '' || 'lane' in wire.from.place.slot) continue
           const shelf = layout.shelves[wire.from.place.shelf]
           const border = wire.from.isAbove ? (shelf?.top ?? 0) + wire.from.place.rows - 1 : channel.top + channel.rows
@@ -1235,16 +1235,16 @@ describe('what a picture says', () => {
       }
       const said = readOff(graph, layout, { rows: [...turned.map(row => [{ text: row.join(''), paint: 'plain' as const }]), []], hits: [] }, xOf)
       expect(said.loose).toEqual([])
-      expect(said.links).toEqual([...new Set(linksOf(graph, layout))])
+      expect(said.edges).toEqual([...new Set(edgesOf(graph, layout))])
     }
   })
 
-  test('in any graph with groups, each frame holds every node of its group and no other, no two frames that share a shelf stand over each other, and the picture says every link it has', READING, () => {
+  test('in any graph with groups, each frame holds every node of its group and no other, no two frames that share a shelf stand over each other, and the picture says every edge it has', READING, () => {
     for (let run = 0; run < 200; run += 1) {
       const base = anyGraph(run)
       const graph = readGraph({
         nodes: base.nodes.map(node => ({ ...node, ...(pick(3) === 0 ? {} : { group: `g${pick(3)}` }) })),
-        links: base.links,
+        edges: base.edges,
         groups: [{ id: 'g0', label: 'zero' }, { id: 'g1', label: 'a longer name for a group' }],
         direction: 'down',
       })
@@ -1279,22 +1279,22 @@ describe('what a picture says', () => {
       const said = readOff(graph, layout, { rows: rows.map(row => [{ text: row.join(''), paint: 'plain' as const }]), hits: [] }, place => place.x)
       expect(said.loose).toEqual([])
       expect(said.labels).toEqual([])
-      expect(said.links).toEqual([...new Set(linksOf(graph, layout))])
+      expect(said.edges).toEqual([...new Set(edgesOf(graph, layout))])
     }
   })
 
-  test('merged, a labeled link with no direction between two nodes of one layer keeps a line of its own', () => {
+  test('merged, a labeled edge with no direction between two nodes of one layer keeps a line of its own', () => {
     const graph = undirected(graphOf(['r', 'a', 'b', 'c'], [['r', 'a'], ['r', 'b'], ['a', 'c']]))
-    const labeled = readGraph({ ...graph, links: [...graph.links, { from: 'a', to: 'b', isDirected: false, label: 'go' }].map(link => (link.from === 'a' && link.to === 'c' ? { ...link, label: 'go' } : link)) })
-    const look: Look = { ...LOOK, links: 'merged' }
+    const labeled = readGraph({ ...graph, edges: [...graph.edges, { from: 'a', to: 'b', isDirected: false, label: 'go' }].map(edge => (edge.from === 'a' && edge.to === 'c' ? { ...edge, label: 'go' } : edge)) })
+    const look: Look = LOOK
     const layout = layoutOf(labeled, { columns: 60, rows: 0 }, look)
     expect(readOff(labeled, layout, paint(layout, labeled, null, { columns: 60, rows: layout.rows + 1 }, ORIGIN), place => place.x).labels).toEqual([])
   })
 
-  test('merged, where the links between two layers share one row, every label still stands beside links it is true of', READING, () => {
+  test('merged, where the edges between two layers share one row, every label still stands beside edges it is true of', READING, () => {
     for (let run = 0; run < 400; run += 1) {
       const graph = anyGraph(run)
-      const look: Look = { ...someLook(), links: 'merged' }
+      const look: Look = { ...someLook(), edges: 'merged' }
       const columns = viewOf(look).measure(graph, 40 + pick(100)).columns
       const layout = layoutOf(graph, { columns, rows: 0 }, look)
       const said = readOff(graph, layout, paint(layout, graph, null, { columns, rows: layout.rows + 1 }, ORIGIN), place => place.x)
@@ -1303,12 +1303,12 @@ describe('what a picture says', () => {
     }
   })
 
-  test('scrolled to any column, a window lays its links within the rows each channel has, and says no link the graph does not have', READING, () => {
+  test('scrolled to any column, a window lays its edges within the rows each channel has, and says no edge the graph does not have', READING, () => {
     for (let run = 0; run < 60; run += 1) {
       const graph = anyGraph(run)
       const room = { columns: 40 + pick(30), rows: 1000 }
       const layout = layoutOf(graph, room, someLook('pinned'))
-      const links = new Set(linksOf(graph, layout))
+      const edges = new Set(edgesOf(graph, layout))
       for (let x = 0; x <= sightOf(layout, room).most.x; x += 1) {
         const drawing = paint(layout, graph, null, { columns: room.columns, rows: layout.rows + 1 }, { x, y: 0 })
         for (const channel of layout.channels) {
@@ -1318,7 +1318,7 @@ describe('what a picture says', () => {
         const said = readOff(graph, layout, drawing, place => place.x - slideOf(layout, layout.shelves[place.shelf], x), true)
         expect(said.loose).toEqual([])
         expect(said.labels).toEqual([])
-        expect(said.links.filter(link => !links.has(link))).toEqual([])
+        expect(said.edges.filter(edge => !edges.has(edge))).toEqual([])
       }
     }
   })

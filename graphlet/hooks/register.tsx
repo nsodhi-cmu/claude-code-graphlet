@@ -163,13 +163,13 @@ const tallOf = (room: Room): Room => ({ columns: room.columns, rows: MOST_CELLS 
  * How graphs are drawn: as the plugin's options say, in a mod's site; folded
  * into the reply's width and at its left edge, in a reply on the terminal;
  * and still, in plain text and as a copy takes them, folded into the room
- * they have, with their links kept separate, since nothing still can be
- * selected to tell merged links apart, and no corner, which plain text has no
+ * they have, with their edges kept separate, since nothing still can be
+ * selected to tell merged edges apart, and no corner, which plain text has no
  * click for.
  */
-let view = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate' })
-let folded = inReply(viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate' }, true))
-let still = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate' }, true, false)
+let view = viewOf({ scroll: 'pinned', labels: 'wrap', edges: 'merged' })
+let folded = inReply(viewOf({ scroll: 'pinned', labels: 'wrap', edges: 'merged' }, true))
+let still = viewOf({ scroll: 'pinned', labels: 'wrap', edges: 'separate' }, true, false)
 
 /** The programs that open a file as the person's system would, each tried in turn: Linux's, macOS's, and Windows's. */
 const OPENERS: ReadonlyArray<(path: string) => string[]> = [
@@ -446,11 +446,11 @@ export const register: Register = (on, options) => {
   const look = {
     scroll: options.scroll === 'sheet' ? ('sheet' as const) : ('pinned' as const),
     labels: options.labels === 'clip' ? ('clip' as const) : ('wrap' as const),
-    links: options.links === 'merged' ? ('merged' as const) : ('separate' as const),
+    edges: options.edges === 'separate' ? ('separate' as const) : ('merged' as const),
   }
   view = viewOf(look)
   folded = inReply(viewOf(look, true))
-  still = viewOf({ ...look, links: 'separate' }, true, false)
+  still = viewOf({ ...look, edges: 'separate' }, true, false)
   const isDrawingReplies = options.replies !== 'off'
   vectored = new Set<Vectored>(options.pictures === 'on' ? ['desktop', 'vscode', 'mobile'] : [])
 

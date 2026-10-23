@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import type { GraphletMove } from '../types'
-import { LOOK, SHOP, graphOf, picture } from './fixture'
+import { LOOK, SEPARATE, SHOP, graphOf, picture } from './fixture'
 import type { Hit, Pan } from '../hooks/draw'
 import { readGraph } from '../hooks/layers'
 import type { Graph } from '../hooks/layers'
@@ -9,8 +9,8 @@ import { layoutOf } from '../hooks/layout'
 import { viewOf } from '../hooks/view'
 import { orderOf, stepThrough } from '../hooks/window'
 
-const pinned = viewOf(LOOK)
-const sheet = viewOf({ ...LOOK, scroll: 'sheet' })
+const pinned = viewOf(SEPARATE)
+const sheet = viewOf({ ...SEPARATE, scroll: 'sheet' })
 
 const ORIGIN: Pan = { x: 0, y: 0 }
 /** A room the shop fits whole, one too narrow for its longest layer, and one too short for its layers. */
@@ -18,7 +18,7 @@ const WHOLE = { columns: 90, rows: 40 }
 const NARROW = { columns: 44, rows: 40 }
 const SHORT = { columns: 90, rows: 12 }
 
-/** One node with `count` nodes that link to it. */
+/** One node with edges to it from `count` nodes. */
 const wide = (count: number): Graph => {
   const users = Array.from({ length: count }, (_, index) => `user${index}`)
   return graphOf(['core', ...users], users.map(user => [user, 'core']))
@@ -58,7 +58,7 @@ describe('a layer longer than the room', () => {
     ])
   })
 
-  test('scrolled, it slides under the window while the layers that fit stay where they are, and each link to it keeps a row of its own', () => {
+  test('scrolled, it slides under the window while the layers that fit stay where they are, and each edge to it keeps a row of its own', () => {
     const start = picture(pinned.draw(SHOP, 'src/email.ts', NARROW, ORIGIN))
     const end = picture(pinned.draw(SHOP, 'src/email.ts', NARROW, { x: 20, y: 0 }))
     expect(end.slice(2, 10)).toEqual([
@@ -75,13 +75,13 @@ describe('a layer longer than the room', () => {
     for (const row of [1, 12, 17]) expect(end[row]).toBe(start[row])
   })
 
-  test('the links between a layer that fits and one that has slid are given their rows again as they now stand, so they never run into one line', () => {
+  test('the edges between a layer that fits and one that has slid are given their rows again as they now stand, so they never run into one line', () => {
     const graph = readGraph({
       nodes: [
         ...['A', 'B'].map(id => ({ id, label: id, layer: 0 })),
         ...Array.from({ length: 8 }, (_, index) => ({ id: `c${index + 1}`, label: `c${index + 1}`, layer: 1 })),
       ],
-      links: [
+      edges: [
         { from: 'A', to: 'c4' },
         { from: 'B', to: 'c5' },
       ],
@@ -153,7 +153,7 @@ describe('a layer longer than the room', () => {
       [wide(25), 'user12'],
       [loops, 'D'],
     ]
-    for (const view of [pinned, sheet, viewOf({ ...LOOK, links: 'merged', labels: 'clip' })]) {
+    for (const view of [pinned, sheet, viewOf({ ...LOOK, labels: 'clip' })]) {
       for (const columns of [40, 41, 47, 59, 72, 100, 160]) {
         for (const [graph, selected] of graphs) {
           for (const x of [0, 7, 33, 400]) {
@@ -179,7 +179,7 @@ describe('a layer longer than the room', () => {
 })
 
 describe('laid on one sheet', () => {
-  test('every layer lies across the longest, each box by what it is linked to, and all of them move together', () => {
+  test('every layer lies across the longest, each box by what it is joined to, and all of them move together', () => {
     expect(picture(sheet.draw(SHOP, 'src/cart.ts', NARROW, ORIGIN))).toEqual([
       '┌───────────────┐  ┌────────────────────┐',
       '│ ○ checkout.ts │  │ ○ pages/invoice.ts │',
@@ -217,7 +217,7 @@ describe('laid on one sheet', () => {
 })
 
 describe('a room too short for every layer', () => {
-  test('the window shows the selected layer with its links, and the row under it counts the nodes above and below', () => {
+  test('the window shows the selected layer with its edges, and the row under it counts the nodes above and below', () => {
     expect(picture(pinned.draw(SHOP, 'src/money.ts', SHORT, pinned.show(SHOP, 'src/money.ts', SHORT, ORIGIN)))).toEqual([
       '               └─────┬─────┘  └────────────────┬─┘  └────┬────┘  └──────┬─────┘',
       '                     └─────────────────────────┼─────────┴──────────────┘',
@@ -237,7 +237,7 @@ describe('a room too short for every layer', () => {
     expect(top.at(-1)?.trim()).toStartWith('↓ 2 more')
   })
 
-  test('moving a layer down shows that layer and the links on both sides of it', () => {
+  test('moving a layer down shows that layer and the edges on both sides of it', () => {
     const shownFor = (id: string, from: number): number => pinned.show(SHOP, id, SHORT, { x: 0, y: from }).y
     expect(shownFor('src/pages/checkout.ts', 0)).toBe(0)
     expect(shownFor('src/cart.ts', 0)).toBe(0)
@@ -258,14 +258,14 @@ describe('moving the selection', () => {
     expect(inShop('src/cart.ts', 'left')).toBe('src/cart.ts')
   })
 
-  test('up and down follow a link, to the linked node nearest in the window', () => {
+  test('up and down follow an edge, to the joined node nearest in the window', () => {
     expect(inShop('src/invoice.ts', 'up')).toBe('src/pages/invoice.ts')
     expect(inShop('src/pages/invoice.ts', 'down')).toBe('src/invoice.ts')
     expect(inShop('src/price.ts', 'up')).toBe('src/invoice.ts')
     expect(inShop('src/price.ts', 'down')).toBe('src/money.ts')
   })
 
-  test('with no link to follow, they land on the node of the next layer nearest in the window', () => {
+  test('with no edge to follow, they land on the node of the next layer nearest in the window', () => {
     expect(inShop('src/ui.ts', 'up')).toBe('src/pages/invoice.ts')
     expect(inShop('src/email.ts', 'up')).toBe('src/pages/invoice.ts')
   })
@@ -280,10 +280,10 @@ describe('moving the selection', () => {
     expect(inShop('src/money.ts', 'down')).toBe('src/money.ts')
   })
 
-  test('up and down move a layer at a time, whatever link passes it, so the keys reach every node; a step along a layer skips its lanes', () => {
+  test('up and down move a layer at a time, whatever edge passes it, so the keys reach every node; a step along a layer skips its lanes', () => {
     const passed = readGraph({
       nodes: ['A', 'B', 'C'].map((id, layer) => ({ id, label: id, layer })),
-      links: [{ from: 'A', to: 'C' }],
+      edges: [{ from: 'A', to: 'C' }],
       direction: 'down',
     })
     expect(walk(passed, WHOLE, ORIGIN, 'A', 'down')).toBe('B')
@@ -292,8 +292,8 @@ describe('moving the selection', () => {
     expect(walk(passed, WHOLE, ORIGIN, 'A', 'down', 'down')).toBe('C')
   })
 
-  test('in a graph that runs right, the keys are turned with it: left and right follow its links, and up and down walk a layer', () => {
-    const graph = readGraph({ nodes: ['A', 'B', 'C', 'D'].map(id => ({ id, label: id })), links: [{ from: 'A', to: 'B' }, { from: 'A', to: 'C' }, { from: 'C', to: 'D' }], direction: 'right' })
+  test('in a graph that runs right, the keys are turned with it: left and right follow its edges, and up and down walk a layer', () => {
+    const graph = readGraph({ nodes: ['A', 'B', 'C', 'D'].map(id => ({ id, label: id })), edges: [{ from: 'A', to: 'B' }, { from: 'A', to: 'C' }, { from: 'C', to: 'D' }], direction: 'right' })
     expect(walk(graph, WHOLE, ORIGIN, 'A', 'right')).not.toBe('A')
     expect(walk(graph, WHOLE, ORIGIN, 'B', 'down')).toBe('C')
     expect(walk(graph, WHOLE, ORIGIN, 'C', 'up')).toBe('B')
@@ -304,7 +304,7 @@ describe('moving the selection', () => {
 
   test('a graph that runs right is scrolled by cells as the room asks, across it and down it, and by the wheel along its layers, across the room', () => {
     const ids = Array.from({ length: 12 }, (_, index) => `step${index}`)
-    const chain = readGraph({ nodes: ids.map(id => ({ id, label: id })), links: ids.slice(1).map((id, index) => ({ from: ids[index] ?? '', to: id })), direction: 'right' })
+    const chain = readGraph({ nodes: ids.map(id => ({ id, label: id })), edges: ids.slice(1).map((id, index) => ({ from: ids[index] ?? '', to: id })), direction: 'right' })
     const room = { columns: 40, rows: 6 }
     expect(pinned.scroll(chain, room, ORIGIN, { x: 5, y: 0 })).toEqual({ x: 0, y: 5 })
     expect(pinned.scroll(chain, room, ORIGIN, 1)).toEqual({ x: 0, y: 8 })
@@ -312,10 +312,10 @@ describe('moving the selection', () => {
     expect(moved[1]?.startsWith('│ step1 ├')).toBe(true)
   })
 
-  test('in an undirected graph, a step follows a link whichever way round it names its nodes, past a nearer node it does not join', () => {
+  test('in an undirected graph, a step follows an edge whichever way round it names its nodes, past a nearer node it does not join', () => {
     const nodes = [...['p', 'q', 't'].map(id => ({ id, label: id, layer: 0 })), { id: 'r', label: 'r', layer: 1 }]
     for (const [one, other] of [[['r', 'p'], ['t', 'r']], [['p', 'r'], ['r', 't']]] as const) {
-      const graph = readGraph({ nodes, links: [one, other].map(([from, to]) => ({ from, to })), isDirected: false })
+      const graph = readGraph({ nodes, edges: [one, other].map(([from, to]) => ({ from, to })), isDirected: false })
       expect(walk(graph, WHOLE, ORIGIN, 'r', 'up')).toBe('p')
     }
   })
@@ -325,7 +325,7 @@ describe('moving the selection', () => {
   })
 
   test('a graph with no nodes has a window that stands still', () => {
-    const empty = readGraph({ nodes: [], links: [] })
+    const empty = readGraph({ nodes: [], edges: [] })
     expect(pinned.show(empty, null, WHOLE, { x: 5, y: 5 })).toEqual(ORIGIN)
     expect(pinned.scroll(empty, WHOLE, ORIGIN, 3)).toEqual(ORIGIN)
   })
@@ -334,7 +334,7 @@ describe('moving the selection', () => {
 describe('the order a layout is read in', () => {
   test('a layout is read a shelf at a time, from the first, and each shelf across', () => {
     const graph = graphOf(['top1', 'top2', 'x', 'y', 'under'], [['top1', 'y'], ['top2', 'x'], ['x', 'under']])
-    expect(orderOf(layoutOf(graph, WHOLE, LOOK, true, 'down'))).toEqual(['top1', 'top2', 'y', 'x', 'under'])
+    expect(orderOf(layoutOf(graph, WHOLE, SEPARATE, true, 'down'))).toEqual(['top1', 'top2', 'y', 'x', 'under'])
   })
 
   test('a step through it goes on or back from the selected node, round from the last to the first, and from none selected to the first or the last', () => {

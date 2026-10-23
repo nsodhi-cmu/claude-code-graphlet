@@ -2,7 +2,7 @@ import type { GraphletMove, GraphletSize } from '../types'
 import { MOST_CELLS } from './draw'
 import type { Drawing, Pan, Room } from './draw'
 import { priorityOf, ranksOf } from './layers'
-import type { Graph, Link, Node } from './layers'
+import type { Edge, Graph, Node } from './layers'
 import { LEAST_COLUMNS, breadthOf, layoutOf } from './layout'
 import type { Direction, Layout, Look } from './layout'
 import { paint } from './paint'
@@ -28,9 +28,9 @@ const SURFACE_CELL: Readonly<Record<Direction, number>> = { down: 8, right: 16 }
 
 /**
  * A graph in focus on its selected node: that node and those nearest it, by
- * the fewest links between, whichever way they run, up to `FOCUS_NODES`, of
+ * the fewest edges between, whichever way they run, up to `FOCUS_NODES`, of
  * nodes as near those of highest priority, and of those the ones the graph
- * names first; and the links among them. A
+ * names first; and the edges among them. A
  * node shown that is joined to nodes not shown says how many after its badge,
  * `+3`, and what is not shown is counted as left out. With nothing selected,
  * or a graph no larger than that, it is the graph.
@@ -38,9 +38,9 @@ const SURFACE_CELL: Readonly<Record<Direction, number>> = { down: 8, right: 16 }
 export function focusOf(graph: Graph, selected: string | null): Graph {
   if (selected === null || graph.nodes.length <= FOCUS_NODES || !graph.nodes.some(node => node.id === selected)) return graph
   const joined = new Map<string, string[]>()
-  for (const link of graph.links) {
-    joined.set(link.from, [...(joined.get(link.from) ?? []), link.to])
-    joined.set(link.to, [...(joined.get(link.to) ?? []), link.from])
+  for (const edge of graph.edges) {
+    joined.set(edge.from, [...(joined.get(edge.from) ?? []), edge.to])
+    joined.set(edge.to, [...(joined.get(edge.to) ?? []), edge.from])
   }
   const reached = new Map([[selected, 0]])
   for (const id of reached.keys()) for (const other of joined.get(id) ?? []) if (!reached.has(other)) reached.set(other, (reached.get(id) ?? 0) + 1)
@@ -51,15 +51,15 @@ export function focusOf(graph: Graph, selected: string | null): Graph {
       .sort((a, b) => (reached.get(a) ?? 0) - (reached.get(b) ?? 0) || (priority.get(b) ?? 0) - (priority.get(a) ?? 0) || (order.get(a) ?? 0) - (order.get(b) ?? 0))
       .slice(0, FOCUS_NODES),
   )
-  const links: Link[] = graph.links.filter(link => shown.has(link.from) && shown.has(link.to))
+  const edges: Edge[] = graph.edges.filter(edge => shown.has(edge.from) && shown.has(edge.to))
   const nodes: Node[] = graph.nodes
     .filter(node => shown.has(node.id))
     .map(node => {
       const hidden = (joined.get(node.id) ?? []).filter(other => !shown.has(other)).length
       return hidden === 0 ? node : { ...node, badge: [node.badge, `+${hidden}`].filter(word => word !== undefined).join(' ') }
     })
-  const unread = { nodes: graph.unread.nodes + graph.nodes.length - nodes.length, links: graph.unread.links + graph.links.length - links.length }
-  return { ...graph, nodes, links, unread }
+  const unread = { nodes: graph.unread.nodes + graph.nodes.length - nodes.length, edges: graph.unread.edges + graph.edges.length - edges.length }
+  return { ...graph, nodes, edges, unread }
 }
 
 /** The sign before the label of a box that stands for a collapsed group. */
@@ -71,9 +71,9 @@ const COLLAPSED = '▸'
  * graph's nodes, in its layer where it names one, saying the group's label
  * after `COLLAPSED`, in its tone,
  * and how many nodes it holds as its badge; put foremost where any of them
- * is, and of the highest priority any of them has. A link to or from any of
+ * is, and of the highest priority any of them has. An edge to or from any of
  * them is to or from the box, given once for each label and tone however
- * many of them it joins it to; a link between two of them is not drawn. A graph with nothing shut is
+ * many of them it joins it to; an edge between two of them is not drawn. A graph with nothing shut is
  * as it is.
  */
 export function collapsedOf(graph: Graph, shut: Set<string>): Graph {
@@ -90,15 +90,15 @@ export function collapsedOf(graph: Graph, shut: Set<string>): Graph {
     return [{ id: group.id, label: group.label, mark: COLLAPSED, badge: String(held.length), holds: held.length, isForemost: held.some(one => one.isForemost), ...(group.tone === undefined ? {} : { tone: group.tone }), ...(priority === 0 ? {} : { priority }), ...(node.layer === undefined ? {} : { layer: node.layer }) }]
   })
   const kept = new Set<string>()
-  const links = graph.links.flatMap((link): Link[] => {
-    const [from, to] = [into.get(link.from) ?? link.from, into.get(link.to) ?? link.to]
-    if (from === to && (into.has(link.from) || into.has(link.to))) return []
-    const key = JSON.stringify([...(link.isDirected ? [from, to] : [from, to].sort().concat('--')), link.label ?? '', link.tone ?? ''])
+  const edges = graph.edges.flatMap((edge): Edge[] => {
+    const [from, to] = [into.get(edge.from) ?? edge.from, into.get(edge.to) ?? edge.to]
+    if (from === to && (into.has(edge.from) || into.has(edge.to))) return []
+    const key = JSON.stringify([...(edge.isDirected ? [from, to] : [from, to].sort().concat('--')), edge.label ?? '', edge.tone ?? ''])
     if (kept.has(key)) return []
     kept.add(key)
-    return [{ ...link, from, to }]
+    return [{ ...edge, from, to }]
   })
-  return { ...graph, nodes, links, groups: graph.groups.filter(group => !shut.has(group.id)) }
+  return { ...graph, nodes, edges, groups: graph.groups.filter(group => !shut.has(group.id)) }
 }
 
 /** The node a graph is drawn with selected when nothing else is: the first it names of those of the highest priority; null in a graph with no nodes. */

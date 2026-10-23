@@ -22,12 +22,12 @@ While developing, load both from disk, a `--plugin-dir` each: `claude --plugin-d
 ## A Graph
 
 ```ts
-type GraphletGraph = { nodes: GraphletNode[]; links: GraphletLink[]; groups?: GraphletGroup[]; isDirected?: boolean; direction?: 'down' | 'right' }
+type GraphletGraph = { nodes: GraphletNode[]; edges: GraphletEdge[]; groups?: GraphletGroup[]; isDirected?: boolean; direction?: 'down' | 'right' }
 type GraphletGroup = { id: string; label?: string; tone?: GraphletTone; isCollapsed?: boolean }
-type GraphletLink = { from: string; to: string; label?: string; tone?: GraphletTone; isDirected?: boolean }
+type GraphletEdge = { from: string; to: string; label?: string; tone?: GraphletTone; isDirected?: boolean }
 ```
 
-A link names its two nodes by their ids, and the links may run in a loop. A link's `label`, a few words, is written beside it where it leaves the node it is drawn from: its `from` node, or for a link with no direction the one of its two that stands higher. A label longer than a link's labels may be is cut in its middle, in the terminal and in every [picture in SVG](SVG.md). A link's `tone`, one of a node's tones, paints its line, its arrowhead, and its label where it is not lit: a link that fails in `bad`, the path a mod would show in `note`. A link with no tone, or `plain`, is a dim line, and links of different tones never share a line, as links of different labels never do. Two nodes may be linked more than once under different labels, and each such link is drawn as a line of its own with its label; a link given again under the same label, or with none again, is one link. A link from a node to itself, drawn as `↺`, has no label written. A link runs from one node to the other unless it says `isDirected: false`: then it only joins its two nodes, whichever it names first, and such a link given both ways round is one link. A link that says nothing takes its graph's `isDirected`, and a graph says nothing for a link that runs one way. A graph may have links of both kinds, and a link of each kind between the same two nodes is two links.
+An edge names its two nodes by their ids, and the edges may run in a loop. An edge's `label`, a few words, is written beside it where it leaves the node it is drawn from: its `from` node, or for an edge with no direction the one of its two that stands higher. A label longer than an edge's labels may be is cut in its middle, in the terminal and in every [picture in SVG](SVG.md). An edge's `tone`, one of a node's tones, paints its line, its arrowhead, and its label where it is not lit: an edge that fails in `bad`, the path a mod would show in `note`. An edge with no tone, or `plain`, is a dim line, and edges of different tones never share a line, as edges of different labels never do. Two nodes may be joined more than once under different labels, and each such edge is drawn as a line of its own with its label; an edge given again under the same label, or with none again, is one edge. An edge from a node to itself, drawn as `↺`, has no label written. An edge runs from one node to the other unless it says `isDirected: false`: then it only joins its two nodes, whichever it names first, and such an edge given both ways round is one edge. An edge that says nothing takes its graph's `isDirected`, and a graph says nothing for an edge that runs one way. A graph may have edges of both kinds, and an edge of each kind between the same two nodes is two edges.
 
 A graph runs the way its `direction` says: `down`, its layers one under another, or `right`, its layers side by side, each a column of boxes. Left out, graphlet runs it down, unless running right fits the room's columns, no layer of it longer than the room, in `FEWER_ROWS` times fewer rows than running down, or fits the room whole where running down does not; `isRighter` in `graphlet/hooks/view.ts` says which. A graph with more layers than the room's columns could hold running right, `LEAST_LAYER_COLUMNS` and `LEAST_CHANNEL_COLUMNS` a layer, is not laid out running right to ask. A graph that names no way may so turn as it grows or its room changes, so a mod whose graph changes as the person looks names one.
 
@@ -40,13 +40,13 @@ A graph runs the way its `direction` says: `down`, its layers one under another,
 | `badge` | A few characters drawn dim after the label: a count, a tag. Optional. |
 | `priority` | A whole number for how much the graph is about the node, against its other nodes. Optional; 0 when left out. See below. |
 | `group` | The id of the group the node is drawn in. Optional; in none when left out. See below. |
-| `layer` | The layer the node stands in. The layers are drawn in the order of their numbers, the lowest first, at the top, or running right at the left, and the numbers need not start anywhere or follow on. Optional: left out on any node of a graph, graphlet works every layer out from the links. |
+| `layer` | The layer the node stands in. The layers are drawn in the order of their numbers, the lowest first, at the top, or running right at the left, and the numbers need not start anywhere or follow on. Optional: left out on any node of a graph, graphlet works every layer out from the edges. |
 
-A node's `priority` matters as it compares with the priorities of the graph's other nodes, and with 0: a graph whose nodes all have one priority, or none, is drawn as one with none. The nodes of the highest priority, where it is above 0 and above another node's, are drawn with heavy frames and bold labels, in the terminal and in every picture in SVG. Where graphlet must choose between nodes, the one of higher priority goes first: it is the one a pane selects when nothing else says which, and among nodes that otherwise tie, the one kept in focus and the one named first at a window's edge. And the layout straightens the links of the nodes of higher priority first, where the drawing's rows and bent links, weighed together, weigh no more, as [LAYOUT.md](LAYOUT.md#shelves) tells.
+A node's `priority` matters as it compares with the priorities of the graph's other nodes, and with 0: a graph whose nodes all have one priority, or none, is drawn as one with none. The nodes of the highest priority, where it is above 0 and above another node's, are drawn with heavy frames and bold labels, in the terminal and in every picture in SVG. Where graphlet must choose between nodes, the one of higher priority goes first: it is the one a pane selects when nothing else says which, and among nodes that otherwise tie, the one kept in focus and the one named first at a window's edge. And the layout straightens the edges of the nodes of higher priority first, where the drawing's rows and bent edges, weighed together, weigh no more, as [LAYOUT.md](LAYOUT.md#shelves) tells.
 
 A group is a set of nodes drawn together in a frame: a tier of services, a package of files, a phase of states. A node is in the group its `group` names, and the graph's `groups` say what each frame says, its `label`, and how it is painted, its `tone`, dim when left out. A node may name a group the graph does not list; that group is labelled by its id. A group's id is unique among its graph's groups and nodes. A group holds nodes, not groups. Its nodes stand together in each layer, its frame around all of them across the layers they stand in, and nothing else stands inside it, as [LAYOUT.md](LAYOUT.md#frames) tells.
 
-A group may be collapsed: drawn as one box that stands for all it holds, where its first node stood, saying its label after `▸` and how many nodes it holds, `▸ Backend  3`. A link to or from any of its nodes is a link to or from the box, given once for each label and tone however many of them it joins, and a link between two of them is not drawn. A group is drawn collapsed where its `isCollapsed` says, until the person or the mod opens or collapses it in a pane, as [Groups](#groups) tells; a graph in a reply starts with every group open.
+A group may be collapsed: drawn as one box that stands for all it holds, where its first node stood, saying its label after `▸` and how many nodes it holds, `▸ Backend  3`. An edge to or from any of its nodes is an edge to or from the box, given once for each label and tone however many of them it joins, and an edge between two of them is not drawn. A group is drawn collapsed where its `isCollapsed` says, until the person or the mod opens or collapses it in a pane, as [Groups](#groups) tells; a graph in a reply starts with every group open.
 
 ## Showing A Graph
 
@@ -72,7 +72,7 @@ on('ui.render', { component: 'Pane', requestId: 'mine' }, async ($, e, next) => 
       { id: 'b', label: 'Check', tone: 'warn', mark: '▲' },
       { id: 'c', label: 'Emit' },
     ],
-    links: [
+    edges: [
       { from: 'a', to: 'b' },
       { from: 'b', to: 'c' },
       { from: 'c', to: 'a' },
@@ -105,7 +105,7 @@ On the terminal, the drawing is a `Client`, the surface module that paints the g
 | Method | What it does |
 | :- | :- |
 | `measure({ graph, columns })` | Answers the size of the graph's drawing in a room `columns` wide and as tall as it needs: the rows it takes, and the columns it is laid out across, its longest layer's or the room's running down and all its layers' running right, which are more than `columns` when the graph scrolls sideways. |
-| `text({ graph, columns })` | Answers the graph as plain text: its still picture, drawn with nothing selected and its links kept separate, folded into a room `columns` wide, a line a row with no blanks at its end. For what a tool hands back to the model, or a file. |
+| `text({ graph, columns })` | Answers the graph as plain text: its still picture, drawn with nothing selected and its edges kept separate, folded into a room `columns` wide, a line a row with no blanks at its end. For what a tool hands back to the model, or a file. |
 | `show({ site, graph, columns, rows, selected? })` | Says what a site holds and the room the drawing may take. Answers the rows the drawing takes on the terminal, and the node drawn as selected. A drawing of a graph with nodes takes at least two rows, a row of the graph and its foot, and no more than it was given where it was given two or more. |
 | `step({ site, move })` | Answers the node a move from the selected one lands on, for a mod that has keys of its own: `left`, `right`, `up`, or `down`. |
 | `scroll({ site, by })` | Scrolls the graph: by cells, `{ x, y }`, or by turns of the wheel, a number. |
@@ -162,10 +162,10 @@ The graph is drawn by a surface module, the only kind of element that receives a
 
 | Key | What it does |
 | :- | :- |
-| arrows, `h` `j` `k` `l` | Moves the selection: along a layer, or along a link to the next, as the graph runs. |
+| arrows, `h` `j` `k` `l` | Moves the selection: along a layer, or along an edge to the next, as the graph runs. |
 | return | Opens the selected node, or the collapsed group whose box is selected. With nothing selected, it is handed on. |
 | space | Collapses the selected node's group, or opens the collapsed group whose box is selected. With a node in no group selected, it is handed on. |
-| `c` | Copies the whole graph as plain text, as a click on `copy` in the corner does: its still picture, with nothing selected and its links kept separate, running the way it runs in the pane, its groups collapsed or open as they are there, in a room `MOST_CELLS` each way, so that a graph no wider than that is copied whole. A toast says whether it was copied. |
+| `c` | Copies the whole graph as plain text, as a click on `copy` in the corner does: its still picture, with nothing selected and its edges kept separate, running the way it runs in the pane, its groups collapsed or open as they are there, in a room `MOST_CELLS` each way, so that a graph no wider than that is copied whole. A toast says whether it was copied. |
 | `f` | Draws the graph in focus on the selected node, or draws it all again. |
 | `/` | Starts finding a node by its label. While finding, what is typed is what is looked for, the selection goes to the first node found, return goes to the next in place of opening one, and backspace takes back what was typed, or with nothing typed, stops finding. A click on a box stops it too. |
 
@@ -189,7 +189,7 @@ A click on one of the counts under a graph larger than its room scrolls it a pag
 
 ## On Other Surfaces
 
-On the desktop app, VS Code, and the mobile app, a site's drawing is the graph as plain text, as on any surface but the terminal, unless the person turns on the `pictures` setting, an experiment. With it on, a site's drawing there is the graph as a [picture in SVG](SVG.md), drawn whole, running the way it runs on the terminal, with its groups as they are there and its selected node selected, folded into the site's columns, its links kept separate whatever the `links` setting. Where that leaves the picture short enough, it lights a node and its links as the pointer passes over it, as [SVG.md](SVG.md#on-a-surface) tells. Under it, a dim line says what was left out of the graph, or what is out of focus, where anything is, and a row of controls does what the terminal's keys do, each raising the method a key raises, so the site's owner hears it the same way:
+On the desktop app, VS Code, and the mobile app, a site's drawing is the graph as plain text, as on any surface but the terminal, unless the person turns on the `pictures` setting, an experiment. With it on, a site's drawing there is the graph as a [picture in SVG](SVG.md), drawn whole, running the way it runs on the terminal, with its groups as they are there and its selected node selected, folded into the site's columns, its edges kept separate whatever the `edges` setting. Where that leaves the picture short enough, it lights a node and its edges as the pointer passes over it, as [SVG.md](SVG.md#on-a-surface) tells. Under it, a dim line says what was left out of the graph, or what is out of focus, where anything is, and a row of controls does what the terminal's keys do, each raising the method a key raises, so the site's owner hears it the same way:
 
 | Control | What it does |
 | :- | :- |

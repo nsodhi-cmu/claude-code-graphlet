@@ -1,14 +1,14 @@
 import { bounded, canvasOf, clipMiddle, footRow, leftOut, sizeOf, spansOf } from './draw'
 import type { Canvas, Cell, Drawing, Hit, Paint, Pan, Room } from './draw'
 import { isJoined, priorityOf } from './layers'
-import type { Graph, Link, Node } from './layers'
+import type { Edge, Graph, Node } from './layers'
 import { labelOf, layTracks, routeOf } from './layout'
 import type { Channel, End, Frame as GroupFrame, Layout, Place, Shelf } from './layout'
 import { sightOf, slideOf, within } from './window'
 
 // The picture: a layout painted through a window, the boxes in box
 // characters and the wires in the channels between them, with the selected
-// node and everything linked to it lit. A layout is worked out across its
+// node and everything joined to it lit. A layout is worked out across its
 // shelves and along its layers; running right, the picture turns it, so its
 // lines run the other way while every box and every word reads as ever.
 
@@ -19,7 +19,7 @@ const SIGN_CELLS = 20
 /** The fewest cells of a frame's top border its label is written in: a blank, a character of the label and an ellipsis, a blank, and a cell of border after. A frame with no stretch so long has no label. */
 const LEAST_TITLE_CELLS = 5
 
-/** A box's frame: its corners, its sides, and the tick on each side where a link meets it. */
+/** A box's frame: its corners, its sides, and the tick on each side where an edge meets it. */
 type Frame = { corners: string; across: string; down: string; exits: { top: string; bottom: string; left: string; right: string } }
 
 const FRAMES = {
@@ -72,13 +72,13 @@ function insetOf(box: Box): number {
 const firstRowOf = (box: Box): number => box.y + 1 + Math.floor((box.height - 2 - (box.place.words?.lines.length ?? 0)) / 2)
 
 
-/** The paint of a link's line where it is not lit: its tone, or dim. */
-const lineOf = (link: Link | undefined): Paint => link?.tone ?? 'dim'
+/** The paint of an edge's line where it is not lit: its tone, or dim. */
+const lineOf = (edge: Edge | undefined): Paint => edge?.tone ?? 'dim'
 
 /** What is being looked for in a graph, and the nodes whose labels hold it, in the graph's order. */
 export type Finding = { query: string; found: string[] }
 
-/** The paint of a box's border: lit where it is the selected node's or one linked to it, else `note` where its node was found, else its tone. */
+/** The paint of a box's border: lit where it is the selected node's or one joined to it, else `note` where its node was found, else its tone. */
 function borderOf(graph: Graph, place: Place, selected: string | null, found: Set<string>): Paint {
   const id = idOf(place)
   if (id !== null && selected !== null && (id === selected || isJoined(graph, id, selected))) return 'accent'
@@ -100,7 +100,7 @@ function paintShelf(canvas: Canvas, graph: Graph, shelf: Shelf, selected: string
   for (const place of shelf.places) {
     if ('lane' in place.slot) {
       const { lane, isUp } = place.slot
-      const isLit = lane.some(link => link.from === selected || link.to === selected)
+      const isLit = lane.some(edge => edge.from === selected || edge.to === selected)
       const char = seen.isRight ? (isUp ? '┈' : '─') : isUp ? '┊' : '│'
       for (let row = 0; row < shelf.rows; row += 1) {
         const { x, y } = seen.realOf(seen.xOf(place), top + row)
@@ -235,7 +235,7 @@ type Mark = { ways: number; isLit: boolean; isSolid: boolean; line: Paint }
  * and along the window, and turned where it is written. A border shows a tick where a
  * wire leaves it, and where one with no arrowhead reaches it. A wire against
  * the flow is dashed, what touches the selected node is lit over what does
- * not, what does not is in its link's tone or dim, and a wire to a place out
+ * not, what does not is in its edge's tone or dim, and a wire to a place out
  * of the window runs off the window's edge.
  * Wires of one bundle that meet are joined, in a tee or a cross; a wire that
  * only crosses another bundle's passes over it unbroken, and breaks the line
@@ -257,12 +257,12 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
     const turn = tracks + wire.track
     const jog = wire.jog === null ? null : { x: seen.xOf(wire.from.place) + wire.jog.at, turn: tracks + wire.jog.track }
     const { out, into } = routeOf(wire, seen.xOf)
-    const isLit = selected !== null && (wire.link.from === selected || wire.link.to === selected)
+    const isLit = selected !== null && (wire.edge.from === selected || wire.edge.to === selected)
     const [start, end] = [borderOfEnd(wire.from), borderOfEnd(wire.to)]
     const draw = (x: number, y: number, ways: number): void => {
       if (x < 0 || x >= seen.columns) return
       const marks = cells.get(`${x},${y}`) ?? new Map<number, Mark>()
-      const mark = marks.get(wire.bundle) ?? { ways: 0, isLit: false, isSolid: false, line: lineOf(wire.link) }
+      const mark = marks.get(wire.bundle) ?? { ways: 0, isLit: false, isSolid: false, line: lineOf(wire.edge) }
       cells.set(`${x},${y}`, marks.set(wire.bundle, { ways: mark.ways | ways, isLit: mark.isLit || isLit, isSolid: mark.isSolid || !wire.isUp, line: mark.line }))
     }
     /** Marks a column of the wire, as it runs from row `from` to row `to`, leaving out row `skip`: a border's own row is the box's. */
@@ -303,7 +303,7 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
     if (wire.hasHead) {
       const key = `${into},${wire.to.isAbove ? end + 1 : end - 1}`
       const char = seen.isRight ? (wire.to.isAbove ? '◀' : '▶') : wire.to.isAbove ? '▲' : '▼'
-      heads.set(key, { char, isLit: isLit || (heads.get(key)?.isLit ?? false), line: lineOf(wire.link) })
+      heads.set(key, { char, isLit: isLit || (heads.get(key)?.isLit ?? false), line: lineOf(wire.edge) })
     } else {
       tick(wire.to, into, end)
     }
@@ -326,15 +326,15 @@ function paintChannel(canvas: Canvas, graph: Graph, layout: Layout, channel: Cha
   for (const [key, head] of heads) put(key, head.char, { paint: head.isLit ? 'accent' : head.line })
   const labels = new Map<string, { text: string; isLit: boolean; tone: Paint }>()
   for (const wire of channel.wires) {
-    const text = labelOf(wire.link)
+    const text = labelOf(wire.edge)
     if (text === '' || 'lane' in wire.from.place.slot) continue
     const border = borderOfEnd(wire.from)
     const port = seen.xOf(wire.from.place) + wire.from.at
     const key = seen.isRight
       ? `${port},${wire.from.isAbove ? border + 1 : border - sizeOf(text)}`
       : `${port + 1},${wire.from.isAbove ? border + 1 : border - 1}`
-    const isLit = selected !== null && (wire.link.from === selected || wire.link.to === selected)
-    labels.set(key, { text, isLit: isLit || (labels.get(key)?.isLit ?? false), tone: wire.link.tone ?? 'plain' })
+    const isLit = selected !== null && (wire.edge.from === selected || wire.edge.to === selected)
+    labels.set(key, { text, isLit: isLit || (labels.get(key)?.isLit ?? false), tone: wire.edge.tone ?? 'plain' })
   }
   for (const [key, label] of labels) put(key, label.text, { paint: label.isLit ? 'accent' : label.tone })
 }
