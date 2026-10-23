@@ -1,6 +1,6 @@
 # graphlet
 
-graphlet draws graphs in Claude Code: in Claude's replies, and in other mods.
+graphlet is a **mod** that draws graphs inside Claude Code!
 
 ```
 > "Hey Claude, can you sketch my system's architecture?"
@@ -29,11 +29,15 @@ At the prompt of a Claude Code session:
 /plugin install graphlet --marketplace nsodhi-cmu/claude-code-graphlet
 ```
 
-A mod that depends on graphlet installs it too. Claude Code mods were introduced in Claude Code 2.1.287.
+If another mod uses graphlet as a dependency, that mod will automatically install graphlet; you don't need to manually run the above command.
 
-## In Claude's Replies
+Claude Code mods were introduced in Claude Code 2.1.287.
 
-Ask Claude for a graph, or for something a graph answers, and it draws one in its reply: graphlet tells Claude it can, and draws the short block of arrows Claude writes. The graph above is this block:
+## 1. In Claude's Replies
+
+Having graphlet installed means Claude unlocks the ability to respond with graphs! Either ask Claude directly for a graph, or sometimes Claude will create a graph when it deems it appropriate to do so.
+
+graphlet modifies the system prompt and teaches Claude a new syntax, which graphlet can then render into a visual graph. The example graph above is written as:
 
 ````
 ```graphlet
@@ -52,11 +56,15 @@ Storage:
 ```
 ````
 
-In Claude Code's fullscreen layout, click a graph to move through it. On the desktop app, VS Code, and the mobile app, the graph is drawn as text in a code block, or as a picture with the experimental **Pictures in apps** setting. [docs/REPLIES.md](docs/REPLIES.md) has the block's whole syntax.
+On the desktop app, VS Code extension, or mobile app, rendering a text graph doesn't make much sense as none of them are terminal interfaces. Therefore, there is a setting that renders graphs on those platforms as images. However, that feature is currently **experimental**.
 
-## In Other Mods
+[docs/REPLIES.md](docs/REPLIES.md) has the full graphlet syntax.
 
-A mod can use graphlet to draw graphs in its panes, in the band above the prompt, and in its tools' and commands' rows, and hear what the person clicks; or get a graph as plain text, for a tool to hand back to Claude. It lists graphlet in its `.claude-plugin/plugin.json`:
+## 2. In Other Mods
+
+If you are creating your own mod and would like to draw graphs, you can also use graphlet to render those graphs.
+
+It should list graphlet in its `.claude-plugin/plugin.json`:
 
 ```json
 { "name": "my-mod", "dependencies": ["graphlet"] }
@@ -82,7 +90,7 @@ on('graphlet.select', async ($, e, next) => {
 
 [docs/API.md](docs/API.md) has the whole API, and how to ship a mod that uses graphlet.
 
-## Features
+## Graph Features
 
 - **Directed and undirected links**, in one graph if you like.
 - **Labels** on links, like `yes` or `retry`.
@@ -90,12 +98,12 @@ on('graphlet.select', async ($, e, next) => {
 - **Emphasis**: heavy frames for the nodes that matter most.
 - **Groups**, framed and named, that collapse into one box and open again.
 - **Down or right**, whichever fits better.
-- **Pictures beyond the terminal**, an experiment you turn on: on the desktop app, VS Code, and the mobile app, a graph is drawn as a picture that follows your light or dark setting and, where you point, lights a node's links.
 - **Fitting its room**: a graph folds to a reply's width, and scrolls, following the selection, when it is too large.
 - **Selecting**: click a node to light its links, and move along them with the arrow keys. In a mod's graph, return or a double click opens a node.
 - **Finding and focusing**: `/` finds a node as you type, and in a large graph, `f` shows just the selected node and its nearest.
 - **Copy**: `copy`, or `c`, puts the graph on your clipboard as text.
 - **The web page**: `html ↗`, or `Open in browser` under a picture, opens the graph in your browser, to zoom and pan.
+- **Pictures beyond the terminal**, an experimental feature to draw images on the desktop app, VS Code extension, and the mobile app.
 
 ## Settings
 
@@ -107,12 +115,12 @@ In `/config`, or `/plugin configure graphlet@claude-code-graphlet`. The first ch
 | **Long labels** | `wrap` breaks a long label onto more lines; `clip` cuts it to one. |
 | **Links** | `separate` gives each node's links lines of their own; `merged` lets them share, which is shorter. |
 | **Motion** | `still` lights the selected node's links; `flowing` also sets them moving. |
-| **Graphs in replies** | `on` lets Claude draw graphs in its replies, with a few lines in its system prompt; `off` leaves graphlet to the mods that use it. |
-| **Pictures in apps (experimental)** | `off` draws a graph on the desktop app, VS Code, and the mobile app as text in a code block; `on` draws it as a picture, with controls under a mod's graph. |
+| **Graphs in replies** | `on` lets Claude draw graphs in its normal replies; `off` keeps graphlet out of Claude's replies and the system prompt, leaving it only for mods that use it. |
+| **Pictures in apps (experimental)** | `off` draws a graph on the desktop app, VS Code extension, and the mobile app as text in a code block; `on` draws it as a picture, with controls under a mod's graph. |
 
 ## Limits
 
-- On the desktop app, VS Code, and the mobile app, a graph is a still picture in text, with nothing to click. With **Pictures in apps** on, it is a picture: a mod's graph has a row of controls under it in place of clicks and keys, nothing there copies a graph as text, and the mobile app opens no web page. VS Code draws mods from extension 2.1.299. The mobile app, reached by remote control, shows a reply's graph block as Claude wrote it.
+- The pictures drawn on the desktop app, VS Code extension, and the mobile app still have some visual bugs, which is why this feature is experimental.
 - The mouse reaches a graph only in Claude Code's fullscreen layout. On the main screen, a reply's graph is a still picture.
 - A clicked graph keeps the keys until Escape. A drag moves it rather than selecting its text, so use `copy`.
 - Where an organization manages Claude Code, Claude is told it can draw graphs only if graphlet is listed in managed settings.
