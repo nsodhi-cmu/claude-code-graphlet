@@ -1104,11 +1104,11 @@ test('in a reply, space folds a group into one box and opens it again, / finds a
   expect(await selectedIn(reply, key)).toEqual(['▸ Backend'])
   await reply.key({ key: 'c', in: key })
   expect(seen.copied[0]?.split('\n')).toEqual([
-    '┌────────┐  ╭──────────────╮ ╭─ Data ────────╮',
-    '│ Client ├─▶│ ▸ Backend  3 ├┐│               │',
-    '└────────┘  ╰──────────────╯││  ┌──────────┐ │',
-    '                            └──▶│ Postgres │ │',
-    '                             │  └──────────┘ │',
+    '                             ╭─ Data ────────╮',
+    '                             │               │',
+    '┌────────┐  ╭──────────────╮ │  ┌──────────┐ │',
+    '│ Client ├─▶│ ▸ Backend  3 ├───▶│ Postgres │ │',
+    '└────────┘  ╰──────────────╯ │  └──────────┘ │',
     '                             │               │',
     '                             ╰───────────────╯',
   ])
@@ -1119,15 +1119,15 @@ test('in a reply, space folds a group into one box and opens it again, / finds a
   expect(await rowsOf(reply, key)).toEqual([
     '           ╭─ Backend ────────────╮',
     '           │                      │',
-    '┌────────┐ │           ┌──────┐   │ ╭─ Data ────────╮',
-    '│ Client ├┐│         ┌▶│ Auth │   │ │               │',
-    '└────────┘││  ┌─────┐│ └──────┘   │ │  ╔══════════╗ │',
-    '          └──▶│ API ├┤            │┌──▶║ Postgres ║ │',
-    '           │  └─────┘│ ┌────────┐ │││  ╚══════════╝ │',
-    '           │         └▶│ Orders ├──┘│               │',
-    '           │           └────────┘ │ ╰───────────────╯',
-    '           │                      │',
-    '           ╰──────────────────────╯',
+    '           │           ┌──────┐   │',
+    '           │         ┌▶│ Auth │   │',
+    '┌────────┐ │  ┌─────┐│ └──────┘   │ ╭─ Data ────────╮',
+    '│ Client ├───▶│ API ├┤            │ │               │',
+    '└────────┘ │  └─────┘│ ┌────────┐ │ │  ╔══════════╗ │',
+    '           │         └▶│ Orders ├─────▶║ Postgres ║ │',
+    '           │           └────────┘ │ │  ╚══════════╝ │',
+    '           │                      │ │               │',
+    '           ╰──────────────────────╯ ╰───────────────╯',
     '                         /gre · 1 of 1  copy · html ↗',
   ])
   await reply.unmount()

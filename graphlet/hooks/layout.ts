@@ -92,6 +92,8 @@ const LANE_BEND = 2
 const BREAKS = '/-_.'
 /** The sign in the box of a node with an edge to itself. */
 const LOOP = '↺'
+/** How many times the units on shelves with frames are each moved toward their wires, where nothing stops them sooner. */
+const SETTLES = 8
 /** How far a group's frame stands out from what it holds across a shelf: its border, and a blank inside it. */
 const FRAME_MARGIN = 2
 /** What a frame's top border takes besides its label: its two corners, a cell of border and a blank before the label, and a blank and a cell of border after. */
@@ -1077,9 +1079,10 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
  * frame, with all it holds, moved on; and what stands after it moved on.
  * That is done over and over, the frames only ever moving on, until nothing
  * is moved. Where that leaves the layout reaching past `columns`, every shelf
- * is packed from its start instead, the frames still whole, and the whole
- * set in the middle of the columns. A shelf a frame passes with nothing of its group on it takes the
- * frame where it stands among the shelf's places.
+ * is packed from its start instead, the frames still whole. A shelf a frame
+ * passes with nothing of its group on it takes the frame where it stands
+ * among the shelf's places. Last, what stands on the shelves is settled, as
+ * `settle` says.
  */
 function framesOf(graph: Graph, shelves: Shelf[], channels: Channel[], columns: number, gap: number, direction: Direction): Frame[] {
   if (graph.groups.length === 0) return []
@@ -1179,8 +1182,70 @@ function framesOf(graph: Graph, shelves: Shelf[], channels: Channel[], columns: 
     for (const one of framed) shift(one, -one.frame.x)
     for (const place of shelves.flatMap(shelf => shelf.places)) if (!isHeld(place)) place.x = 0
     clear(true)
-    const by = Math.floor((columns - Math.max(...spans.map(one => one.x + one.width))) / 2)
-    if (by > 0) for (const one of spans) one.x += by
   }
+  settle(
+    [
+      ...framed.map(one => ({ first: one.frame.first, last: one.frame.last, width: one.frame.width, x: () => one.frame.x, move: (by: number) => shift(one, by), places: one.held })),
+      ...shelves.flatMap((shelf, index) =>
+        shelf.places.filter(place => !isHeld(place)).map(place => ({ first: index, last: index, width: place.width, x: () => place.x, move: (by: number) => void (place.x += by), places: new Set([place]) })),
+      ),
+    ],
+    channels.flatMap(channel => channel.wires),
+    columns,
+    gap,
+    direction === 'down',
+  )
   return framed.map(({ frame }) => frame)
+}
+
+/** What moves as one where frames stand: a frame with all it holds, from shelf `first` to shelf `last`, or a place no frame holds. */
+type Unit = { first: number; last: number; width: number; x: () => number; move: (by: number) => void; places: Set<Place> }
+
+/**
+ * Settles the units on shelves with frames, each keeping its order among the
+ * units it shares a shelf with. They are first packed from the left, each a
+ * gap clear of what stands before it on any shelf it stands on. Then, up to
+ * `SETTLES` times or until nothing moves, each unit in turn moves toward where
+ * its wires to other units run least sideways, weighed as `balance` weighs
+ * them, as far as the units beside it let it, and within `columns` or as far
+ * as the units already reach, where that is farther. Last, where they are
+ * to be `isCentered`, they are set in the middle of `columns` where they fit
+ * them, and else they start where they started.
+ */
+function settle(units: Unit[], wires: Wire[], columns: number, gap: number, isCentered: boolean): void {
+  const start = Math.min(...units.map(unit => unit.x()))
+  const reach = (): number => Math.max(0, ...units.map(unit => unit.x() + unit.width))
+  const limit = Math.max(columns, reach())
+  const unitOf = new Map(units.flatMap(unit => [...unit.places].map(place => [place, unit] as const)))
+  const pulls = new Map<Unit, Array<{ near: End; far: End; weight: number }>>()
+  for (const wire of wires) {
+    for (const [near, far] of [[wire.from, wire.to], [wire.to, wire.from]] as const) {
+      const [own, other] = [unitOf.get(near.place), unitOf.get(far.place)]
+      if (own === undefined || other === undefined || own === other) continue
+      pulls.set(own, [...(pulls.get(own) ?? []), { near, far, weight: ('lane' in near.place.slot ? LANE_WEIGHT : 1) * (wire.isUp ? 1 : FLOW_WEIGHT) }])
+    }
+  }
+  const order = units.toSorted((a, b) => a.x() - b.x())
+  for (let time = 0; time < SETTLES; time += 1) {
+    let isMoved = false
+    for (const unit of time % 2 === 0 ? order : order.toReversed()) {
+      const wishes = (pulls.get(unit) ?? []).map(({ near, far, weight }) => ({ at: far.place.x + far.at - near.place.x - near.at, weight, rank: 0 }))
+      const wanted = medianOf(wishes)
+      if (wanted === undefined) continue
+      let [least, most] = [-unit.x(), limit - unit.width - unit.x()]
+      for (const other of units) {
+        if (other === unit || other.last < unit.first || other.first > unit.last) continue
+        if (other.x() < unit.x()) least = Math.max(least, other.x() + other.width + gap - unit.x())
+        else most = Math.min(most, other.x() - gap - unit.width - unit.x())
+      }
+      const by = Math.max(least, Math.min(most, wanted))
+      if (by === 0) continue
+      unit.move(by)
+      isMoved = true
+    }
+    if (!isMoved) break
+  }
+  const left = Math.min(...units.map(unit => unit.x()))
+  const by = isCentered && reach() - left <= columns ? Math.floor((columns - (reach() - left)) / 2) - left : start - left
+  for (const unit of units) unit.move(by)
 }

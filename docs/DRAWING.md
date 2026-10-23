@@ -94,15 +94,15 @@ An edge's label is written beside its line, just past the box it leaves, in the 
                │     ▼         ▼     │      ▼
                │ ┌──────┐  ┌───────┐ │  ┌──────┐
                │ │ Auth │  │ Cache │ │  │ Logs │
-               │ └─┬────┘  └───┬───┘ │  └──────┘
-               ╰───│───────────│─────╯
-                   │           │
-           ╭───────│ Data ─────│─────╮
-           │       ▼           ▼     │
-           │ ┌──────────┐  ┌───────┐ │
-           │ │ Postgres │  │ Redis │ │
-           │ └──────────┘  └───────┘ │
-           ╰─────────────────────────╯
+               │ └──┬───┘  └────┬──┘ │  └──────┘
+               ╰────│───────────│────╯
+                    │           │
+            ╭───────│ Data ─────│─────╮
+            │       ▼           ▼     │
+            │ ┌──────────┐  ┌───────┐ │
+            │ │ Postgres │  │ Redis │ │
+            │ └──────────┘  └───────┘ │
+            ╰─────────────────────────╯
 ```
 
 In a pane, the same graph with its `Data` group collapsed and `API` selected, in a room 44 columns wide, with the foot under it:

@@ -4,7 +4,7 @@ import { LOOK, SEPARATE, graphOf, numbers } from './fixture'
 import { readGraph } from '../hooks/layers'
 import { graphOf as graphLines } from '../hooks/reply'
 import type { Graph } from '../hooks/layers'
-import { breadthOf, costOf, layoutOf, wordsOf, wrap } from '../hooks/layout'
+import { breadthOf, costOf, layoutOf, routeOf, wordsOf, wrap } from '../hooks/layout'
 import type { Layout, Wire } from '../hooks/layout'
 
 const ROOM = { columns: 80, rows: 40 }
@@ -267,6 +267,18 @@ describe('folding into a room', () => {
 })
 
 describe('frames', () => {
+  test('a frame, with all it holds, and a node no frame holds are each moved toward the edges that join them, so an edge between them runs straight where nothing beside them stops it', () => {
+    const graph = readGraph({
+      nodes: [{ id: 'Browser', label: 'Browser' }, ...['API', 'Auth', 'Cache'].map(id => ({ id, label: id, group: 'back' })), ...['Postgres', 'Redis'].map(id => ({ id, label: id, group: 'data' })), { id: 'Logs', label: 'Logs' }],
+      edges: [['Browser', 'API'], ['API', 'Auth'], ['API', 'Cache'], ['Auth', 'Postgres'], ['Cache', 'Redis'], ['API', 'Logs']].map(([from = '', to = '']) => ({ from, to })),
+      groups: [{ id: 'back', label: 'Backend' }, { id: 'data', label: 'Data' }],
+      direction: 'right',
+    })
+    const wires = layoutOf(graph, { columns: 60, rows: 40 }, LOOK, false, 'right').channels.flatMap(channel => channel.wires)
+    const straight = (from: string, to: string): boolean => wires.filter(wire => wire.edge.from === from && wire.edge.to === to).every(wire => routeOf(wire, place => place.x).out === routeOf(wire, place => place.x).into)
+    expect([straight('Browser', 'API'), straight('Auth', 'Postgres'), straight('Cache', 'Redis')]).toEqual([true, true, true])
+  })
+
   test('a group\'s nodes on one shelf are packed a gap apart, however far apart the shelves above would seat them, so its frame is no wider than they are', () => {
     const graph = readGraph({
       nodes: [...['Left side', 'Middle one', 'Middle two', 'Right side'].map(id => ({ id, label: id })), { id: 'A', label: 'A', group: 'g' }, { id: 'B', label: 'B', group: 'g' }],
