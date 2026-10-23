@@ -153,8 +153,6 @@ A graph that runs right has its layers side by side, each a column of boxes, and
 - A link's label is written on its line, just past the box it leaves.
 - A box is as tall as its ports down its side need, its label in its middle.
 
-`paint` works the picture out across and along the window, as the layout is laid out, and turns it where it writes it: a line's ways, its arrowheads, and the ticks of a box's frame are turned, `turnedOf`, while a box is drawn where it stands and its words, and a label, are written across the room, as in a graph that runs down.
-
 ## What Is Selected
 
 The selected node's box has a double frame, in place of the heavy one of a node put foremost, and its label is bold and inverse in the node's own tone. Every link that touches the selected node is lit along its whole way, in the theme's accent color, and so are its label and the borders of the boxes at the other ends. Everything else keeps its own paint: a box's border takes its node's tone, and a link takes its own tone, in its line, its arrowhead, and its label, or is dim where it has none.
@@ -163,12 +161,7 @@ Lit is painted over unlit. Where links share a stretch of line, selecting a node
 
 ### Flowing
 
-With the `motion` setting at `flowing`, the lit lines move. A lit link that runs one way, with no link running back the other way between the same two nodes, flows: beads run along it toward the node it reaches. Every other lit link pulses: one with no direction, and each of two links that run both ways between two nodes, since neither has one way to show.
-
-- **Flowing.** Each cell of a flowing line has a beat, one of `BEATS`, from where it stands along the way its link runs there: its row on a stretch that runs down, its row counted upward on one that runs up, and its column counted the way a stretch across runs. A run of a flowing line has the beat of its first cell, as its `beat`, and where it runs on across cells, the `way` its beat steps from each cell to the next, so a stretch across is one run. At each step of the flow, the cells whose beat it is are beads, bright and bold in the accent, and the rest of the line is dim; at the next step the beads stand a cell farther along, and every `BEATS` steps they come round again.
-- **Pulsing.** A run of a pulsing line `isPulsing`. At each step all of it glows alike, as `PULSE` says: dim, as it is, bright, as it is, and round again.
-
-`piecesOf` cuts a run at a step into the pieces it glows in. A cell several lit lines share takes the beat of one of them, the one that runs up or down where they cross, and pulses only where none of them flows; a lane flows where any lit link it carries flows, and else pulses. Arrowheads, ticks and labels stay as they are. The surface module takes a step every `STEP_MS`, and only while its drawing has lines that move.
+With the `motion` setting at `flowing`, the lit lines move. A lit link that runs one way, with no link running back the other way between the same two nodes, flows: beads, bright and bold in the accent, run along its dim line toward the node it reaches. Every other lit link pulses, all of it dim and bright in turn: one with no direction, and each of two links that run both ways between two nodes, since neither has one way to show. A cell several lit lines share flows where any of them flows, and else pulses. Arrowheads, ticks and labels stay as they are. The surface module takes a step every `STEP_MS`, and only while its drawing has lines that move.
 
 ## The Window
 
@@ -210,7 +203,7 @@ While a node is being found, the nodes whose labels hold what is typed, in any c
 
 ## Paints
 
-A run of text is in one paint: a node's tone, or `accent` for what is selected or linked to it. `COLORS` in `draw.ts` gives each paint a key of the person's theme, so a drawing follows the theme they chose, and `styleOf` turns a run into the props of the `Text` that paints it. `spansOf` reads a row of cells as its runs. A blank looks the same in any paint but inverse, so a blank joins the run before it, and blanks before any other run take its paint, which keeps a row to few runs.
+A run of text is in one paint: a node's tone, or `accent` for what is selected or linked to it. `COLORS` in `draw.ts` gives each paint a key of the person's theme, so a drawing follows the theme they chose, and `styleOf` turns a run into the props of the `Text` that paints it.
 
 | Paint | Theme color |
 | :- | :- |
