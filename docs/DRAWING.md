@@ -1,6 +1,6 @@
 # The Drawing
 
-A drawing is rows of painted text, and the rectangles of them that answer a click. Painting one is `graphlet/hooks/paint.ts`, the window it is painted through is `graphlet/hooks/window.ts`, and what both are made of is `graphlet/hooks/draw.ts`. The surface module `graphlet/hooks/surface.tsx` puts a drawing's rows on the terminal, in a pane, the band, a tool's or command's row, or a reply in the fullscreen layout, moves the beads of lines that flow, and posts what a click lands on, whether two make a double click on a box, and how far a drag has gone. A graph in a reply on the main screen is drawn as a [still picture](REPLIES.md#the-picture), its rows put on the terminal by the hook itself.
+A drawing is rows of painted text, and the rectangles of them that answer a click. Painting one is `graphlet/hooks/paint.ts`, the window it is painted through is `graphlet/hooks/window.ts`, and what both are made of is `graphlet/hooks/draw.ts`. The surface module `graphlet/hooks/surface.tsx` puts a drawing's rows on the terminal, in a pane, the band, a tool's or command's row, or a reply in the fullscreen layout, and posts what a click lands on, whether two make a double click on a box, and how far a drag has gone. A graph in a reply on the main screen is drawn as a [still picture](REPLIES.md#the-picture), its rows put on the terminal by the hook itself.
 
 ## Reading The Picture
 
@@ -159,10 +159,6 @@ The selected node's box has a double frame, in place of the heavy one of a node 
 
 Lit is painted over unlit. Where links share a stretch of line, selecting a node shows which of them are its own.
 
-### Flowing
-
-With the `motion` setting at `flowing`, the lit lines move. A lit link that runs one way, with no link running back the other way between the same two nodes, flows: beads, bright and bold in the accent, run along its dim line toward the node it reaches. Every other lit link pulses, all of it dim and bright in turn: one with no direction, and each of two links that run both ways between two nodes, since neither has one way to show. A cell several lit lines share flows where any of them flows, and else pulses. Arrowheads, ticks and labels stay as they are. The surface module takes a step every `STEP_MS`, and only while its drawing has lines that move.
-
 ## The Window
 
 A graph larger than its room is seen through a window, and never laid out again to fit: the layout depends only on the room's width, and for a graph that runs right, on its rows.
@@ -217,7 +213,7 @@ A run of text is in one paint: a node's tone, or `accent` for what is selected o
 
 ### Too Large To Draw
 
-The engine draws a tree of elements only up to a size, and unmounts a surface module, or refuses a hook's drawing, past it; each run of a row is an element. `bounded` keeps a drawing's rows within `MOST_TREE_CHARS` characters as a tree, by `treeCharsOf`'s reckoning: each run costs `PIECE_CHARS` besides its text, a run of a flowing line as many times over as the most pieces its beads may cut it into, and each row `ROW_CHARS`. A drawing within it is drawn as it is. One past it is drawn plainer, each way plainer than the one before, until it fits: its lines still; then its dim paint plain; then all but what is lit or selected plain; then all of it plain. `paint` bounds every drawing, and a reply shares what is left of the bound, after its text, among its pictures.
+The engine draws a tree of elements only up to a size, and unmounts a surface module, or refuses a hook's drawing, past it; each run of a row is an element. `bounded` keeps a drawing's rows within `MOST_TREE_CHARS` characters as a tree, by `treeCharsOf`'s reckoning: each run costs `PIECE_CHARS` besides its text, and each row `ROW_CHARS`. A drawing within it is drawn as it is. One past it is drawn plainer, each way plainer than the one before, until it fits: its dim paint plain; then all but what is lit or selected plain; then all of it plain. `paint` bounds every drawing, and a reply shares what is left of the bound, after its text, among its pictures.
 
 ## Cells
 

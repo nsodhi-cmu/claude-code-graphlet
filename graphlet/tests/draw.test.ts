@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { cellsOf } from './fixture'
-import { beatOf, beyondRow, bounded, canvasOf, clipMiddle, footRow, leftOut, reveal, rowText, sizeOf, spansOf } from '../hooks/draw'
+import { beyondRow, bounded, canvasOf, clipMiddle, footRow, leftOut, reveal, rowText, sizeOf, spansOf } from '../hooks/draw'
 import type { Paint, Span } from '../hooks/draw'
 
 describe('a window brought to what it must show', () => {
@@ -158,14 +158,14 @@ describe('text and cells', () => {
 })
 
 describe('a drawing too large to draw', () => {
-  const row = (paints: Paint[], hasBeats = false): Span[] => paints.map((paint, x) => ({ text: '─', paint, ...(hasBeats ? { beat: beatOf(x) } : {}) }))
-  const rows = (paints: Paint[], hasBeats = false): Span[][] => Array.from({ length: 60 }, () => row(Array.from({ length: 150 }, (_, x) => paints[x % paints.length] ?? 'plain'), hasBeats))
+  const row = (paints: Paint[]): Span[] => paints.map(paint => ({ text: '─', paint }))
+  const rows = (paints: Paint[]): Span[][] => Array.from({ length: 60 }, () => row(Array.from({ length: 150 }, (_, x) => paints[x % paints.length] ?? 'plain')))
   const line = (paint: Paint): Span[][] => Array.from({ length: 60 }, () => [{ text: '─'.repeat(150), paint }])
 
-  test('is drawn plainer, as little as it takes: still, then with its dim paint plain, then plain but for what is lit, then all plain', () => {
-    const small = { rows: [row(['dim', 'accent', 'dim'], true)], hits: [] }
+  test('is drawn plainer, as little as it takes: with its dim paint plain, then plain but for what is lit, then all plain', () => {
+    const small = { rows: [row(['dim', 'accent', 'dim'])], hits: [] }
     expect(bounded(small)).toEqual(small)
-    expect(bounded({ rows: rows(['accent'], true), hits: [] }).rows).toEqual(line('accent'))
+    expect(bounded({ rows: rows(['accent']), hits: [] }).rows).toEqual(line('accent'))
     expect(bounded({ rows: rows(['dim', 'plain']), hits: [] }).rows).toEqual(line('plain'))
     expect(bounded({ rows: rows(['bad', 'warn']), hits: [] }).rows).toEqual(line('plain'))
     expect(bounded({ rows: rows(['accent', 'bad']), hits: [] }).rows).toEqual(line('plain'))

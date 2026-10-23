@@ -48,16 +48,6 @@
       ],
       "default": "separate"
     },
-    "motion": {
-      "type": "string",
-      "title": "Motion",
-      "description": "still lights the selected node's links; flowing also sets them moving.",
-      "options": [
-        "still",
-        "flowing"
-      ],
-      "default": "still"
-    },
     "replies": {
       "type": "string",
       "title": "Graphs in replies",

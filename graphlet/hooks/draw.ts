@@ -18,51 +18,18 @@ export const COLORS: Readonly<Record<Paint, string | undefined>> = {
   accent: 'claude',
 }
 
-/** How many cells apart the beads run on a line that flows: a cell of a line flows with the beat its place along the line gives it, one of this many. */
-export const BEATS = 4
+/** A run of text in one paint. */
+export type Span = { text: string; paint: Paint; isBold?: true; isInverse?: true }
 
-/** The beat of a cell of a flowing line that stands `along` cells the way the line runs. */
-export const beatOf = (along: number): number => ((along % BEATS) + BEATS) % BEATS
-
-/**
- * A run of text in one paint. A run of a line that flows has the `beat` of
- * its first cell, and where it runs on across cells, the `way` its beat steps
- * from each cell to the next: at each step of the flow, the cells whose beat
- * it is are beads, bright, and the rest of the line is dim. A run of a line
- * that pulses `isPulsing`: at each step, all of it glows as `PULSE` says.
- */
-export type Span = { text: string; paint: Paint; isBold?: true; isInverse?: true; beat?: number; way?: 1 | -1; isPulsing?: true }
-
-/** How a piece of a moving line glows at a step: dim, as it is, or bright. */
-export type Glow = 'dim' | 'plain' | 'bright'
-
-/** How a line that pulses glows at each step, round and round: it brightens and fades back. */
-const PULSE: readonly Glow[] = ['dim', 'plain', 'bright', 'plain']
-
-/** How a surface's `Text` paints a run, or a piece of a moving run as it glows. */
-export function styleOf(span: Span, glow: Glow = 'plain'): { color?: string; dimColor?: true; bold?: true; inverse?: true } {
+/** How a surface's `Text` paints a run. */
+export function styleOf(span: Span): { color?: string; dimColor?: true; bold?: true; inverse?: true } {
   const color = COLORS[span.paint]
   return {
     ...(color === undefined ? {} : { color }),
-    ...(span.paint === 'dim' || glow === 'dim' ? { dimColor: true } : {}),
-    ...(span.isBold || glow === 'bright' ? { bold: true } : {}),
+    ...(span.paint === 'dim' ? { dimColor: true } : {}),
+    ...(span.isBold ? { bold: true } : {}),
     ...(span.isInverse ? { inverse: true } : {}),
   }
-}
-
-/** A run cut as it glows at `step` of the flow: a run that does not move is one piece; one that pulses, one piece in its glow; and one that flows, its beads and the dim stretches between them. */
-export function piecesOf(span: Span, step: number): Array<{ text: string; glow: Glow }> {
-  const { beat, way = 1 } = span
-  if (span.isPulsing) return [{ text: span.text, glow: PULSE[beatOf(step) % PULSE.length] ?? 'plain' }]
-  if (beat === undefined) return [{ text: span.text, glow: 'plain' }]
-  const pieces: Array<{ text: string; glow: Glow }> = []
-  Array.from(span.text).forEach((char, index) => {
-    const glow = char !== ' ' && beatOf(beat + way * index) === beatOf(step) ? 'bright' : 'dim'
-    const last = pieces.at(-1)
-    if (last !== undefined && last.glow === glow) last.text += char
-    else pieces.push({ text: char, glow })
-  })
-  return pieces
 }
 
 /** Where a window stands over something larger than it, or how far it is to move: in cells. */
@@ -259,7 +226,7 @@ export function clipMiddle(label: string, max: number): string {
 }
 
 /** One cell of a canvas. The cell after a character two cells wide holds nothing, `''`, for the character covers it. */
-export type Cell = { char: string; paint: Paint; isBold?: true; isInverse?: true; beat?: number; isPulsing?: true }
+export type Cell = { char: string; paint: Paint; isBold?: true; isInverse?: true }
 
 /**
  * The cells a window is painted on, and the one way they are written: what
@@ -306,40 +273,24 @@ export function canvasOf(columns: number, rows: number): Canvas {
 /**
  * A row of cells as the runs of one paint it holds, less the blanks it ends
  * in. A blank looks the same in any paint but inverse, so a blank joins the
- * run before it, and a run of blanks takes the paint of what follows it,
- * unless that flows. A cell of a flowing line joins the run of its line
- * before it where its beat steps on from that run's.
+ * run before it, and a run of blanks takes the paint of what follows it.
  */
 export function spansOf(cells: Cell[]): Span[] {
   let end = cells.length
   while (end > 0 && cells[end - 1]?.char === ' ') end -= 1
   const spans: Span[] = []
-  const counts: number[] = []
   const styleOf = (cell: Cell): Omit<Span, 'text'> => ({
     paint: cell.paint,
     ...(cell.isBold ? { isBold: true as const } : {}),
     ...(cell.isInverse ? { isInverse: true as const } : {}),
-    ...(cell.beat === undefined ? {} : { beat: cell.beat }),
-    ...(cell.isPulsing ? { isPulsing: true as const } : {}),
   })
   for (const cell of cells.slice(0, end)) {
-    const [last, count = 0] = [spans.at(-1), counts.at(-1)]
+    const last = spans.at(-1)
     const isBlank = cell.char === ' ' && cell.isInverse !== true
-    const isLike = last !== undefined && last.paint === cell.paint && last.isBold === cell.isBold && last.isInverse === cell.isInverse && last.isPulsing === cell.isPulsing
-    const lastBeat = last?.beat
-    const ways = lastBeat === undefined || cell.beat === undefined ? [] : last?.way === undefined ? ([1, -1] as const) : [last.way]
-    const way = ways.find(one => lastBeat !== undefined && beatOf(lastBeat + one * count) === cell.beat)
-    if (last !== undefined && ((isLike && lastBeat === undefined && cell.beat === undefined) || (isLike && way !== undefined) || (isBlank && last.isInverse !== true))) {
-      last.text += cell.char
-      if (way !== undefined && !isBlank) last.way = way
-      counts[counts.length - 1] = count + 1
-    } else if (last !== undefined && last.text.trim() === '' && last.isInverse !== true && cell.isInverse !== true && cell.beat === undefined) {
-      spans[spans.length - 1] = { text: last.text + cell.char, ...styleOf(cell) }
-      counts[counts.length - 1] = count + 1
-    } else {
-      spans.push({ text: cell.char, ...styleOf(cell) })
-      counts.push(1)
-    }
+    const isLike = last !== undefined && last.paint === cell.paint && last.isBold === cell.isBold && last.isInverse === cell.isInverse
+    if (last !== undefined && (isLike || (isBlank && last.isInverse !== true))) last.text += cell.char
+    else if (last !== undefined && last.text.trim() === '' && last.isInverse !== true && cell.isInverse !== true) spans[spans.length - 1] = { text: last.text + cell.char, ...styleOf(cell) }
+    else spans.push({ text: cell.char, ...styleOf(cell) })
   }
   return spans
 }
@@ -350,31 +301,18 @@ export const MOST_TREE_CHARS = 90_000
 const PIECE_CHARS = 72
 const ROW_CHARS = 64
 
-/** About how many characters rows take as a tree, a run of a flowing line counted as the most pieces its beads may cut it into. */
+/** About how many characters rows take as a tree. */
 export function treeCharsOf(rows: Span[][]): number {
-  const piecesIn = (span: Span): number => (span.beat === undefined || span.isPulsing ? 1 : 2 * Math.ceil(span.text.trim().length / BEATS) + 1)
-  return rows.reduce((sum, row) => sum + ROW_CHARS + row.reduce((total, span) => total + span.text.length + PIECE_CHARS * piecesIn(span), 0), 0)
+  return rows.reduce((sum, row) => sum + ROW_CHARS + row.reduce((total, span) => total + span.text.length + PIECE_CHARS, 0), 0)
 }
 
-/** The cells of a row of runs, each with its run's paint, and a cell of a flowing run with its own beat. */
-const cellsOfRow = (row: Span[]): Cell[] =>
-  row.flatMap(({ text, beat, way = 1, ...style }) => {
-    const { paint, isBold, isInverse, isPulsing } = style
-    return Array.from(text).map((char, index) => ({
-      char,
-      paint,
-      ...(isBold ? { isBold } : {}),
-      ...(isInverse ? { isInverse } : {}),
-      ...(beat === undefined ? {} : { beat: beatOf(beat + way * index) }),
-      ...(isPulsing ? { isPulsing } : {}),
-    }))
-  })
+/** The cells of a row of runs, each with its run's paint. */
+const cellsOfRow = (row: Span[]): Cell[] => row.flatMap(({ text, ...style }) => Array.from(text).map(char => ({ char, ...style })))
 
-/** How a drawing too large for its tree is drawn plainer, each way plainer than the one before: its lines still; then its dim paint plain; then all but what is lit or selected plain; then all of it plain. */
+/** How a drawing too large for its tree is drawn plainer, each way plainer than the one before: its dim paint plain; then all but what is lit or selected plain; then all of it plain. */
 const PLAINER: ReadonlyArray<(cell: Cell) => Cell> = [
-  ({ beat: _beat, isPulsing: _isPulsing, ...cell }) => cell,
-  ({ beat: _beat, isPulsing: _isPulsing, ...cell }) => ({ ...cell, paint: cell.paint === 'dim' ? 'plain' : cell.paint }),
-  ({ beat: _beat, isPulsing: _isPulsing, ...cell }) => ({ ...cell, paint: cell.paint === 'accent' || cell.isInverse === true ? cell.paint : 'plain' }),
+  cell => ({ ...cell, paint: cell.paint === 'dim' ? 'plain' : cell.paint }),
+  cell => ({ ...cell, paint: cell.paint === 'accent' || cell.isInverse === true ? cell.paint : 'plain' }),
   cell => ({ char: cell.char, paint: 'plain' }),
 ]
 

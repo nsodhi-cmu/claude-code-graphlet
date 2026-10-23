@@ -167,9 +167,9 @@ const tallOf = (room: Room): Room => ({ columns: room.columns, rows: MOST_CELLS 
  * selected to tell merged links apart, and no corner, which plain text has no
  * click for.
  */
-let view = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate', motion: 'still' })
-let folded = inReply(viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate', motion: 'still' }, true))
-let still = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate', motion: 'still' }, true, false)
+let view = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate' })
+let folded = inReply(viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate' }, true))
+let still = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate' }, true, false)
 
 /** The programs that open a file as the person's system would, each tried in turn: Linux's, macOS's, and Windows's. */
 const OPENERS: ReadonlyArray<(path: string) => string[]> = [
@@ -447,7 +447,6 @@ export const register: Register = (on, options) => {
     scroll: options.scroll === 'sheet' ? ('sheet' as const) : ('pinned' as const),
     labels: options.labels === 'clip' ? ('clip' as const) : ('wrap' as const),
     links: options.links === 'merged' ? ('merged' as const) : ('separate' as const),
-    motion: options.motion === 'flowing' ? ('flowing' as const) : ('still' as const),
   }
   view = viewOf(look)
   folded = inReply(viewOf(look, true))

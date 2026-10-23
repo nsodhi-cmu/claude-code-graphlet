@@ -9,7 +9,7 @@ import { FOCUS_NODES, MOVES, collapsedOf, focusOf, viewOf } from '../hooks/view'
 
 const LABELS = ['a', 'node', 'src/some/long/path/to/file.component.ts', 'Validate the incoming request', 'x-y_z.w', '', '数据库连接池', '✅ 完成']
 const LOOKS: Look[] = (['pinned', 'sheet'] as const).flatMap(scroll =>
-  (['wrap', 'clip'] as const).flatMap(labels => (['separate', 'merged'] as const).map(links => ({ scroll, labels, links, motion: 'still' as const }))),
+  (['wrap', 'clip'] as const).flatMap(labels => (['separate', 'merged'] as const).map(links => ({ scroll, labels, links }))),
 )
 
 test('any graph, in any room, under any settings, is drawn inside its room with no two boxes on one cell, every move and scroll has an answer, and its picture in SVG holds every node once and is short enough for a surface', () => {
@@ -30,7 +30,7 @@ test('any graph, in any room, under any settings, is drawn inside its room with 
       isDirected: run % 3 !== 1,
       ...([{}, { direction: 'down' as const }, { direction: 'right' as const }][pick(3)] ?? {}),
     })
-    const view = viewOf(LOOKS[pick(LOOKS.length)] ?? { scroll: 'pinned', labels: 'wrap', links: 'separate', motion: 'still' })
+    const view = viewOf(LOOKS[pick(LOOKS.length)] ?? { scroll: 'pinned', labels: 'wrap', links: 'separate' })
     const room = { columns: 40 + pick(140), rows: 2 + pick(50) }
     const selected = pick(5) === 0 ? null : `n${pick(count)}`
 
@@ -116,7 +116,7 @@ test('in focus, of the nodes as near the selected one, those of highest priority
 })
 
 test('a graph that says not which way it runs runs right where that fits its room\'s columns in half the rows or fewer, or fits its room whole where running down does not, and else down', () => {
-  const view = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate', motion: 'still' })
+  const view = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate' })
   const chain = readGraph({ nodes: ['lint', 'test', 'build', 'deploy'].map(id => ({ id, label: id })), links: [['lint', 'test'], ['test', 'build'], ['build', 'deploy']].map(([from = '', to = '']) => ({ from, to })) })
   const fan = readGraph({ nodes: ['root', 'a', 'b'].map(id => ({ id, label: id })), links: [{ from: 'root', to: 'a' }, { from: 'root', to: 'b' }] })
   expect(view.direction(chain, { columns: 80, rows: 40 })).toBe('right')

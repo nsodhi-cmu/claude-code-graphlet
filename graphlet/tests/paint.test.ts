@@ -2,7 +2,7 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import { LOOK, SHOP, cellsOf, graphOf, graphRows, numbers, picture, undirected } from './fixture'
 import type { GraphletLink } from '../types'
-import { BEATS, piecesOf, sizeOf } from '../hooks/draw'
+import { sizeOf } from '../hooks/draw'
 import type { Drawing, Hit, Span } from '../hooks/draw'
 import { readGraph, slotGroups } from '../hooks/layers'
 import type { Graph } from '../hooks/layers'
@@ -669,84 +669,6 @@ describe('what is selected', () => {
   })
 })
 
-describe('lines that flow', () => {
-  /** The picture with each cell that is a bead at `step` of the flow drawn as `•`. */
-  const beadsAt = (drawing: Drawing, step: number): string[] =>
-    graphRows({
-      ...drawing,
-      rows: drawing.rows.map(row =>
-        row.flatMap(span => piecesOf(span, step).map(piece => ({ ...span, text: piece.glow === 'bright' ? '•'.repeat(cellsOf(piece.text).length) : piece.text }))),
-      ),
-    })
-  const loop = graphOf(['A', 'B', 'C'], [['A', 'B'], ['B', 'C'], ['C', 'A']])
-  const flowing = viewOf({ ...LOOK, motion: 'flowing' })
-
-  test('flowing, a lit line has a bead every few cells, and at each step of the flow the beads move on a cell the way the link runs: down, along, and back up', () => {
-    const drawing = flowing.draw(loop, 'C', SMALL, ORIGIN)
-    expect(beadsAt(drawing, 0)).toEqual([
-      '                ┌─────┐',
-      '                │  A  │',
-      '                └─┬───┘',
-      '                  │ ▲',
-      '                  │ •┈┈┈•',
-      '                  ▼     ┊',
-      '               ┌─────┐  ┊',
-      '               │  B  │  ┊',
-      '               └──┬──┘  •',
-      '                  │ ┌┈┈┈┘',
-      '                  ▼ ┊',
-      '                ╔═══╧═╗',
-      '                ║  C  ║',
-      '                ╚═════╝',
-    ])
-    expect(beadsAt(drawing, 1)).toEqual([
-      '                ┌─────┐',
-      '                │  A  │',
-      '                └─┬───┘',
-      '                  │ ▲',
-      '                  │ └┈┈•┐',
-      '                  ▼     ┊',
-      '               ┌─────┐  ┊',
-      '               │  B  │  •',
-      '               └──┬──┘  ┊',
-      '                  • ┌•┈┈┘',
-      '                  ▼ ┊',
-      '                ╔═══╧═╗',
-      '                ║  C  ║',
-      '                ╚═════╝',
-    ])
-    expect(beadsAt(drawing, BEATS)).toEqual(beadsAt(drawing, 0))
-  })
-
-  test('a lit link with no direction, and a lit link with another running back, pulse whole instead, brightening and fading at once', () => {
-    const glows = (drawing: Drawing, step: number): string[] => drawing.rows.flatMap(row => row.filter(span => span.isPulsing).flatMap(span => piecesOf(span, step).map(piece => piece.glow)))
-    const friends = flowing.draw(undirected(loop), 'C', SMALL, ORIGIN)
-    expect(friends.rows.flat().some(span => span.beat !== undefined)).toBe(false)
-    expect([0, 1, 2, 3].map(step => [...new Set(glows(friends, step))])).toEqual([['dim'], ['plain'], ['bright'], ['plain']])
-    const both = flowing.draw(graphOf(['A', 'B', 'C'], [['A', 'B'], ['B', 'A'], ['B', 'C']]), 'B', SMALL, ORIGIN)
-    expect(both.rows.flat().some(span => span.isPulsing)).toBe(true)
-    expect(both.rows.flat().some(span => span.beat !== undefined)).toBe(true)
-  })
-
-  test('a lane flows where a lit link it carries flows, though links it carries that are not lit run both ways', () => {
-    const graph = readGraph({
-      nodes: [['a', 0], ['b', 0], ['x', 1], ['y', 2], ['d', 3]].map(([id, layer]) => ({ id: String(id), label: String(id), layer: Number(layer) })),
-      links: [['a', 'x'], ['x', 'y'], ['y', 'd'], ['a', 'd'], ['b', 'd'], ['d', 'b']].map(([from = '', to = '']) => ({ from, to })),
-    })
-    const drawing = flowing.draw(graph, 'a', SMALL, ORIGIN)
-    expect(drawing.rows.flat().some(span => span.isPulsing)).toBe(false)
-    expect(drawing.rows.flat().some(span => span.beat !== undefined)).toBe(true)
-  })
-
-  test('nothing moves that is not lit, nor with the lines still', () => {
-    const moving = (drawing: Drawing): number => drawing.rows.flat().filter(span => span.beat !== undefined || span.isPulsing).length
-    expect(moving(flowing.draw(loop, null, SMALL, ORIGIN))).toBe(0)
-    expect(moving(drawn(loop, 'C'))).toBe(0)
-    expect(moving(drawn(undirected(loop), 'C'))).toBe(0)
-    expect(flowing.draw(loop, 'A', SMALL, ORIGIN).rows.flat().every(span => (span.beat === undefined && !span.isPulsing) || span.paint === 'accent')).toBe(true)
-  })
-})
-
 describe('a graph that runs right', () => {
   const loop = readGraph({ nodes: ['A', 'B', 'C'].map(id => ({ id, label: id })), links: [{ from: 'A', to: 'B' }, { from: 'B', to: 'C' }, { from: 'C', to: 'A' }], direction: 'right' })
   const ROOM = { columns: 40, rows: 20 }
@@ -761,23 +683,13 @@ describe('a graph that runs right', () => {
     ])
   })
 
-  test('the selected box has a double frame its links leave through, and flowing, beads run along each lit line the way its link runs, back across the room too', () => {
-    const flowing = viewOf({ ...LOOK, motion: 'flowing' }).draw(loop, 'C', ROOM, ORIGIN)
-    const beadsAt = (step: number): string[] =>
-      graphRows({ ...flowing, rows: flowing.rows.map(row => row.flatMap(span => piecesOf(span, step).map(piece => ({ ...span, text: piece.glow === 'bright' ? '•'.repeat(cellsOf(piece.text).length) : piece.text })))) })
-    expect(beadsAt(0)).toEqual([
+  test('the selected box has a double frame its links leave through, and its lines are lit back across the room too', () => {
+    expect(graphRows(drawn(loop, 'C', ROOM))).toEqual([
       '┌─────┐   ┌─────┐  ╔═════╗',
       '│     ├──▶│  B  ├─▶║     ║',
       '│  A  │   └─────┘  ║  C  ║',
-      '│     │◀•        ┌┈╢     ║',
-      '└─────┘ •┈┈┈•┈┈┈•┘ ╚═════╝',
-    ])
-    expect(beadsAt(1)).toEqual([
-      '┌─────┐   ┌─────┐  ╔═════╗',
-      '│     ├──▶│  B  ├•▶║     ║',
-      '│  A  │   └─────┘  ║  C  ║',
       '│     │◀┐        ┌┈╢     ║',
-      '└─────┘ └┈┈•┈┈┈•┈┘ ╚═════╝',
+      '└─────┘ └┈┈┈┈┈┈┈┈┘ ╚═════╝',
     ])
   })
 
@@ -1251,7 +1163,7 @@ describe('what a picture says', () => {
     })
   }
   const anyGraph = (run: number): Graph => ({ ...([someGraph, crowdedGraph, facingGraph][run % 3]?.() ?? someGraph()), direction: 'down' })
-  const someLook = (scroll = pick(2) === 0 ? 'pinned' : 'sheet'): Look => ({ scroll: scroll as Look['scroll'], labels: pick(3) === 0 ? 'clip' : 'wrap', links: 'separate', motion: 'still' })
+  const someLook = (scroll = pick(2) === 0 ? 'pinned' : 'sheet'): Look => ({ scroll: scroll as Look['scroll'], labels: pick(3) === 0 ? 'clip' : 'wrap', links: 'separate' })
 
   /** How long a test that reads many pictures may take: a slow machine's while. */
   const READING = { timeoutMs: 30_000 }

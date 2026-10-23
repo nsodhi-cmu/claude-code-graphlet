@@ -101,10 +101,7 @@ export const PALETTE = `
  * inside it, in the accent, and the boxes at the other ends of its links in
  * the accent too; a link's line and arrowhead in the color of lines, and its
  * label in the soft color of words, or all of them in its tone's, or lit in
- * the accent; a group's frame and its title; and a
- * lit link that `flows`, where the drawing is `flowing`, runs beads toward
- * the node it reaches, while one that `pulses` brightens and fades, unless
- * the person asks for less motion.
+ * the accent; and a group's frame and its title.
  */
 const SHAPES = `
 svg { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: ${FONT_SIZE}px; }
@@ -140,12 +137,7 @@ text { text-anchor: middle; fill: var(--ink); }
 .hull { fill: none; stroke: var(--tone); stroke-width: 1.25; }
 .title { text-anchor: start; font-size: ${BADGE_SIZE}px; font-weight: 600; fill: var(--soft); paint-order: stroke; stroke: var(--page); stroke-width: 6px; }
 .frame.dim .title { fill: var(--soft); }
-.frame:not(.dim) .title { fill: var(--tone); }
-.flowing .lit.flows path { stroke-dasharray: 3 5; animation: flow 0.8s linear infinite; }
-.flowing .lit.pulses { animation: pulse 1.2s ease-in-out infinite alternate; }
-@keyframes flow { to { stroke-dashoffset: -8; } }
-@keyframes pulse { from { opacity: 0.45; } }
-@media (prefers-reduced-motion: reduce) { .flowing .lit.flows path, .flowing .lit.pulses { animation: none; } }`
+.frame:not(.dim) .title { fill: var(--tone); }`
 
 const ESCAPES: Readonly<Record<string, string>> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
 /** What no XML document may hold: a control but a tab or a line's end, half of a pair of surrogates standing alone, and the two noncharacters at the end of the first plane. */
@@ -378,7 +370,7 @@ function boxOf(turning: Turning, node: Node, spot: Spot, index: number, state?: 
  * The rules that light the node the pointer is over, or else the one with
  * the keyboard's focus, a rule for each node: its links lit in the accent,
  * and every node not at the end of one of them, and every other link,
- * quieted, and still where it pulses.
+ * quieted.
  */
 function lightsOf(graph: Graph): string {
   const near = new Map<number, Set<number>>(graph.nodes.map((_, index) => [index, new Set([index])]))
@@ -392,7 +384,7 @@ function lightsOf(graph: Graph): string {
   return [...near].map(([index, nodes]) => {
     const lit = `svg:has(.n${index}:hover), svg:not(:has(.node:hover)):has(.n${index}:focus)`
     const others = [...nodes].map(one => `.n${one}`).join(',')
-    return `:is(${lit}) :is(.node:not(${others}), .link:not(.e${index})) { opacity: 0.25; animation: none; }\n:is(${lit}) .link.e${index} { color: var(--accent); --label: currentColor; }`
+    return `:is(${lit}) :is(.node:not(${others}), .link:not(.e${index})) { opacity: 0.25; }\n:is(${lit}) .link.e${index} { color: var(--accent); --label: currentColor; }`
   }).join('\n')
 }
 
@@ -417,8 +409,8 @@ function labelsAt(drawn: ReadonlyArray<{ link: Link; arrow: Arrow }>): Map<Link,
 /** A graph drawn in SVG: the document, and its width in pixels, which it is drawn at where its room is wide enough. */
 export type Drawn = { source: string; width: number }
 
-/** What a drawing shows besides its graph: the node selected, whose links are lit, and whether they move; and whether a node is lit as the pointer passes over it. */
-export type Seen = { selected: string | null; isFlowing: boolean; isLighting: boolean }
+/** What a drawing shows besides its graph: the node selected, whose links are lit; and whether a node is lit as the pointer passes over it. */
+export type Seen = { selected: string | null; isLighting: boolean }
 
 /**
  * A graph drawn in SVG, as one document: its colors and how its shapes are
@@ -432,8 +424,7 @@ export type Seen = { selected: string | null; isFlowing: boolean; isLighting: bo
  * as one before it, running the same way, along the page or back, runs
  * `TWIN_STEP` farther aside for each. A link from a node to itself has no
  * label written, as in the terminal. The links that touch the selected node
- * are lit: one that runs one way, with no link back, flows, and any other
- * pulses. The document is as large as what it draws and the room around it.
+ * are lit. The document is as large as what it draws and the room around it.
  */
 export function svgOf(graph: Graph, layout: Layout, cell: number, seen: Seen): Drawn {
   const turning = turningOf(layout.direction)
@@ -454,15 +445,13 @@ export function svgOf(graph: Graph, layout: Layout, cell: number, seen: Seen): D
   })
   const writtenAt = labelsAt(drawn)
   const isLit = (link: Link): boolean => seen.selected !== null && (link.from === seen.selected || link.to === seen.selected)
-  const isOneWay = (link: Link): boolean => link.isDirected && !graph.links.some(back => back.isDirected && back.from === link.to && back.to === link.from && back.from !== back.to)
   const links = drawn.map(({ link, from, to, arrow }) => {
     const dashes = arrow.isUp ? ` stroke-dasharray="${DASHES}"` : ''
     const head = link.isDirected ? `<polygon points="${headOf(arrow.tip, arrow.way)}"/>` : ''
     const at = writtenAt.get(link)
     const label = at === undefined ? '' : `<text x="${at.x}" y="${at.y + BASELINE}">${escaped(labelOf(link))}</text>`
     const tone = TONES.find(one => one === link.tone)
-    const motion = !isLit(link) ? [] : ['lit', isOneWay(link) ? 'flows' : 'pulses']
-    const classes = ['link', ...(tone === undefined ? [] : ['toned', tone]), ...motion, `e${from.index}`, `e${to.index}`].join(' ')
+    const classes = ['link', ...(tone === undefined ? [] : ['toned', tone]), ...(isLit(link) ? ['lit'] : []), `e${from.index}`, `e${to.index}`].join(' ')
     return `<g class="${classes}"><path${dashes} d="${arrow.path}"/>${head}${label}</g>`
   })
   const nearby = new Set(graph.links.filter(isLit).flatMap(link => [link.from, link.to]))
@@ -483,7 +472,7 @@ export function svgOf(graph: Graph, layout: Layout, cell: number, seen: Seen): D
   const style = `<style>${PALETTE}${SHAPES}${seen.isLighting ? `\n${lightsOf(graph)}` : ''}\n</style>`
   const back = `<rect class="sheet" x="${sheet.x}" y="${sheet.y}" width="${sheet.width}" height="${sheet.height}" rx="${BOX_RADIUS}"/>`
   const size = `width="${Math.ceil(sheet.width)}" height="${Math.ceil(sheet.height)}" viewBox="${sheet.x} ${sheet.y} ${sheet.width} ${sheet.height}"`
-  return { source: `<svg xmlns="http://www.w3.org/2000/svg" ${size} class="${seen.isFlowing ? 'flowing' : 'still'}">\n${style}\n${[back, ...frames, ...links, ...nodes].join('\n')}\n</svg>`, width: Math.ceil(sheet.width) }
+  return { source: `<svg xmlns="http://www.w3.org/2000/svg" ${size}>\n${style}\n${[back, ...frames, ...links, ...nodes].join('\n')}\n</svg>`, width: Math.ceil(sheet.width) }
 }
 
 /**

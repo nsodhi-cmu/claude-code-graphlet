@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 import type { Engine, Plugin } from 'claude-code/testing'
 import type { On, RenderPropsOf, RenderSurface } from 'claude-code'
 
-import { LOOK, SHOP, busy, cellsOf, graphOf, graphRows, picture, undirected } from './fixture'
+import { LOOK, SHOP, busy, graphOf, graphRows, picture, undirected } from './fixture'
 import type { Drawing, Hit } from '../hooks/draw'
 import { readGraph } from '../hooks/layers'
 import { GUIDE, graphOf as graphLines, pictureOf } from '../hooks/reply'
@@ -850,60 +850,20 @@ test('a graph too large for a picture a surface takes is plain text there, as it
 test('graphs are drawn as the person\'s settings say', { ...WITH_HOST, options: { scroll: 'sheet', labels: 'clip', links: 'merged' } }, async ($, on) => {
   world(on)
   const pane = await mount($, 'free', NARROW)
-  const sheet = viewOf({ scroll: 'sheet', labels: 'clip', links: 'merged', motion: 'still' })
+  const sheet = viewOf({ scroll: 'sheet', labels: 'clip', links: 'merged' })
   const rows = await rowsOf(pane)
   expect(rows).toEqual(picture(sheet.draw(SHOP, 'src/price.ts', { columns: 44, rows: 40 }, sheet.show(SHOP, 'src/price.ts', { columns: 44, rows: 40 }, ORIGIN))))
   expect(rows).not.toEqual(picture(view.draw(SHOP, 'src/price.ts', { columns: 44, rows: 40 }, ORIGIN)))
   await pane.unmount()
 })
 
-test('flowing, the beads of the selected node\'s links move on at each step of the surface\'s clock, and come round again; still, nothing moves', { ...WITH_HOST, options: { motion: 'flowing' } }, async ($, on) => {
-  world(on)
-  const pane = await mount($, 'free')
-  /** Where the bright cells of lit lines stand, as `row:column`. */
-  const beads = async (): Promise<string[]> => {
-    const drawn = (await pane.drawn({ in: 'graph' })) as { children?: Array<{ children?: unknown[] }> }
-    return (drawn.children ?? []).flatMap((row, y) => {
-      let x = 0
-      return (row.children ?? []).flatMap(span => {
-        const { props = {}, children = [] } = typeof span === 'string' ? {} : (span as { props?: Record<string, unknown>; children?: string[] })
-        const text = typeof span === 'string' ? span : children.join('')
-        const at = x
-        x += cellsOf(text).length
-        return props.color === 'claude' && props.bold === true && props.inverse !== true ? [`${y}:${at}`] : []
-      })
-    })
-  }
-  const first = await beads()
-  expect(first.length).toBeGreaterThan(0)
-  await pane.advance(150)
-  const second = await beads()
-  expect(second.length).toBeGreaterThan(0)
-  expect(second).not.toEqual(first)
-  await pane.advance(450)
-  expect(await beads()).toEqual(first)
-  await pane.unmount()
-})
-
-test('a graph too busy to draw whole in a large pane is drawn plainer, as far as the engine needs, and still drawn', { ...WITH_HOST, options: { motion: 'flowing' } }, async ($, on) => {
+test('a graph too busy to draw whole in a large pane is drawn plainer, as far as the engine needs, and still drawn', WITH_HOST, async ($, on) => {
   world(on)
   const pane = await mount($, 'dense', { ...PANE, bodyColumns: 200, scroll: { offset: 0, bodyRows: 60 } })
   const rows = await rowsOf(pane)
   expect(rows).toHaveLength(60)
   expect(rows.some(row => row.includes('node number 0'))).toBe(true)
   expect(JSON.stringify(await pane.drawn({ in: 'graph' })).length).toBeLessThan(100_000)
-  await pane.advance(150)
-  expect(JSON.stringify(await pane.drawn({ in: 'graph' })).length).toBeLessThan(100_000)
-  await pane.unmount()
-})
-
-test('still, the lit lines are drawn once and the clock moves nothing', WITH_HOST, async ($, on) => {
-  world(on)
-  const pane = await mount($, 'free')
-  const before = await pane.drawn({ in: 'graph' })
-  await pane.advance(600)
-  expect(await pane.drawn({ in: 'graph' })).toEqual(before)
-  expect((await pane.findAll({ type: 'Text', in: 'graph' })).some(text => text.props.color === 'claude' && text.props.dimColor === true)).toBe(false)
   await pane.unmount()
 })
 
@@ -965,20 +925,6 @@ test('a graph its owner says is undirected reaches graphlet as one, and is drawn
   const ring = undirected(graphOf(['a', 'b', 'c'], [['a', 'b'], ['b', 'c'], ['c', 'a']]))
   expect(await rowsOf(pane)).toEqual(picture(view.draw(ring, 'a', { columns: 90, rows: 40 }, ORIGIN)))
   expect((await rowsOf(pane)).join('\n')).not.toMatch(/[▲▼]/)
-  await pane.unmount()
-})
-
-test('flowing, the lit links of an undirected graph pulse together on the surface\'s clock, dim, then bright, and round again', { plugins: [RING_HOST], options: { motion: 'flowing' } }, async ($, on) => {
-  world(on)
-  const pane = await mount($, 'ring')
-  /** How the accent's runs that are not the selected label glow: dim, bright, or neither. */
-  const glows = async (): Promise<string[]> =>
-    [...new Set((await pane.findAll({ type: 'Text', in: 'graph' })).filter(text => text.props.color === 'claude' && text.props.inverse !== true).map(text => (text.props.dimColor === true ? 'dim' : text.props.bold === true ? 'bright' : 'plain')))].sort()
-  expect(await glows()).toEqual(['dim', 'plain'])
-  await pane.advance(300)
-  expect(await glows()).toEqual(['bright', 'plain'])
-  await pane.advance(300)
-  expect(await glows()).toEqual(['dim', 'plain'])
   await pane.unmount()
 })
 

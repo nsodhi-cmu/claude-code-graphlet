@@ -8,7 +8,7 @@ import { altOf, svgOf } from '../hooks/svg'
 import type { Seen } from '../hooks/svg'
 
 const ROOM = { columns: 80, rows: 1000 }
-const NOTHING: Seen = { selected: null, isFlowing: false, isLighting: false }
+const NOTHING: Seen = { selected: null, isLighting: false }
 
 /** A graph drawn as a surface draws it, laid out folded into an 80 columns' room, eight pixels a column. */
 const drawn = (graph: Graph, seen: Partial<Seen> = {}): string => svgOf(graph, layoutOf(graph, ROOM, LOOK, true, graph.direction ?? 'down'), 8, { ...NOTHING, ...seen }).source
@@ -26,7 +26,7 @@ describe('what a picture shows of its selection', () => {
     expect(svg).toMatch(/<g class="node bad selected n1"[^>]*><rect class="box"[^>]*\/><rect class="ring"/)
   })
 
-  test('the links that touch the selected node are lit: one that runs one way with no link back flows, and one back, or one with no direction, pulses', () => {
+  test('the links that touch the selected node are lit, whichever way they run, and no other', () => {
     const graph = readGraph({
       nodes: ['a', 'b', 'c', 'd'].map(id => ({ id, label: id })),
       links: [
@@ -37,14 +37,9 @@ describe('what a picture shows of its selection', () => {
         { from: 'c', to: 'd' },
       ],
     })
-    const lit = classes(drawn(graph, { selected: 'a' }), 'link').map(names => names.filter(name => ['lit', 'flows', 'pulses'].includes(name)).join(' '))
-    expect(lit).toEqual(['lit pulses', 'lit pulses', 'lit flows', 'lit pulses', ''])
+    const lit = classes(drawn(graph, { selected: 'a' }), 'link').map(names => names.includes('lit'))
+    expect(lit).toEqual([true, true, true, true, false])
     expect(classes(drawn(graph), 'link').flat()).not.toContain('lit')
-  })
-
-  test('the lit links move only in a drawing that flows', () => {
-    expect(drawn(SHOP, { selected: 'src/price.ts', isFlowing: true })).toContain('class="flowing"')
-    expect(drawn(SHOP, { selected: 'src/price.ts' })).toContain('class="still"')
   })
 })
 
@@ -52,8 +47,8 @@ describe('what a picture shows as the pointer passes over it', () => {
   test('each node has a rule that lights its links in the accent and quiets every other link and every node they do not reach, as the pointer is over it, or else as the keyboard is on it', () => {
     const svg = drawn(graphOf(['a', 'b', 'c'], [['a', 'b'], ['c', 'c']]), { isLighting: true })
     const lit = (index: number): string => `:is(svg:has(.n${index}:hover), svg:not(:has(.node:hover)):has(.n${index}:focus))`
-    expect(svg).toContain(`${lit(0)} :is(.node:not(.n0,.n1), .link:not(.e0)) { opacity: 0.25; animation: none; }\n${lit(0)} .link.e0 { color: var(--accent); --label: currentColor; }`)
-    expect(svg).toContain(`${lit(2)} :is(.node:not(.n2), .link:not(.e2)) { opacity: 0.25; animation: none; }`)
+    expect(svg).toContain(`${lit(0)} :is(.node:not(.n0,.n1), .link:not(.e0)) { opacity: 0.25; }\n${lit(0)} .link.e0 { color: var(--accent); --label: currentColor; }`)
+    expect(svg).toContain(`${lit(2)} :is(.node:not(.n2), .link:not(.e2)) { opacity: 0.25; }`)
     expect(drawn(graphOf(['a', 'b'], [['a', 'b']]))).not.toContain(':hover)')
   })
 })

@@ -106,7 +106,7 @@ import { graphOf, pictureOf } from '../hooks/reply'
 import { viewOf } from '../hooks/view'
 
 test('probe', () => {
-  const still = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate', motion: 'still' }, true, false)
+  const still = viewOf({ scroll: 'pinned', labels: 'wrap', links: 'separate' }, true, false)
   const graph = readGraph(graphOf(['Start -> Valid?', 'Valid? ->|yes| Save', 'Valid? ->|no| Retry', 'Retry -> Start']))
   expect(picture(pictureOf(still, graph, { columns: 78, rows: 1000 }))).toEqual([])
 })

@@ -167,7 +167,7 @@ export type View = {
  * graph in such a room. Its drawings have a corner to copy and open the graph
  * by where it `hasCorner`, as a drawing to click has. Its pictures in SVG
  * light the node the pointer is over, where that leaves the document short
- * enough for a surface, and move the selected node's links as `look` says.
+ * enough for a surface.
  */
 export function viewOf(look: Look, fold = false, hasCorner = true): View {
   const kept = new Map<string, Layout>()
@@ -197,11 +197,11 @@ export function viewOf(look: Look, fold = false, hasCorner = true): View {
         : Math.max(layout.columns, ...layout.shelves.map(shelf => shelf.across))
       return { columns: across, rows: layout.shelves.length === 0 ? 0 : layout.rows + 1 }
     },
-    draw: (graph, selected, room, pan, finding) => paint(laid(graph, room), graph, selected, room, pan, finding, look.motion === 'flowing', hasCorner),
+    draw: (graph, selected, room, pan, finding) => paint(laid(graph, room), graph, selected, room, pan, finding, hasCorner),
     vector: (graph, selected, room) => {
       if (graph.nodes.length === 0) return undefined
       const layout = laid(graph, room)
-      const drawn = (isLighting: boolean): Drawn => svgOf(graph, layout, SURFACE_CELL[layout.direction], { selected, isFlowing: look.motion === 'flowing', isLighting })
+      const drawn = (isLighting: boolean): Drawn => svgOf(graph, layout, SURFACE_CELL[layout.direction], { selected, isLighting })
       const lit = drawn(true)
       const picture = lit.source.length <= MOST_SVG_CHARS ? lit : drawn(false)
       return picture.source.length > MOST_SVG_CHARS ? undefined : { ...picture, alt: altOf(graph) }
