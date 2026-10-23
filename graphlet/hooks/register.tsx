@@ -27,7 +27,8 @@ type Held = { view: View; given: Graph; whole: Graph; graph: Graph; room: Room; 
  * What graphlet keeps for a place a graph is drawn, a mod's site or a graph
  * in a reply: the node the person last picked there; where they scrolled its
  * window to, missing while it follows the selection; whether each group is
- * collapsed, as last asked there; whether it is drawn in focus on the
+ * collapsed, as last asked there, and where in the window the group last
+ * collapsed or opened there stood, until it is drawn there again; whether it is drawn in focus on the
  * selected node; what the person is typing to find, missing while they are
  * not finding a node; how far they have dragged the graph since the button
  * went down, as far as it has scrolled the graph for, and in which drag; how
@@ -39,6 +40,7 @@ type Place = {
   picked?: string
   scrolled?: Pan
   shut: Map<string, boolean>
+  kept?: { id: string; spot: Pan }
   isFocused: boolean
   finding?: string
   dragged?: { grab: unknown; at: Pan }
@@ -100,7 +102,8 @@ const foundIn = (graph: Graph, query: string): string[] =>
  * node `asked` selected, or else the one last picked there, or the box of the
  * collapsed group either is in, or else the node `fallback` names; in focus
  * where the place is; with what is being found marked; through a window where
- * the person scrolled it, or else where it shows the selected node.
+ * the person scrolled it, or else where it shows the selected node, from
+ * where it keeps a group that was collapsed or opened where it stood.
  */
 const drawIn = (place: Place, given: Graph, room: Room, most: number, view: View, asked: string | undefined, fallback: (graph: Graph) => string | null): Held => {
   const shut = new Set(given.groups.filter(group => place.shut.get(group.id) ?? group.isCollapsed === true).map(group => group.id))
@@ -113,7 +116,9 @@ const drawIn = (place: Place, given: Graph, room: Room, most: number, view: View
   const graph = place.isFocused ? focusOf(whole, selected) : whole
   const query = place.finding
   const found = query === undefined ? undefined : { query, found: foundIn(given, query).map(id => whole.nodes.find(node => node.id === id)?.id ?? given.nodes.find(node => node.id === id)?.group ?? id) }
-  const pan = place.scrolled ?? view.show(graph, selected, room, place.held?.pan ?? ORIGIN)
+  const from = place.held?.pan ?? ORIGIN
+  const pan = place.scrolled ?? view.show(graph, selected, room, place.kept === undefined ? from : view.keep(graph, place.kept.id, room, place.kept.spot, from))
+  place.kept = undefined
   place.held = { view, given, whole, graph, room, most, selected, pan, drawing: bounded(view.draw(graph, selected, room, pan, found), most) }
   return place.held
 }
@@ -123,8 +128,17 @@ const pickIn = (place: Place, node: string): void => {
   place.picked = node
 }
 
-/** Collapses a group in a place or opens it, and where its box was picked, picks the first node it holds; the window follows the selection again. */
+/**
+ * Collapses a group in a place or opens it, and where its box was picked,
+ * picks the first node it holds; the window follows the selection again,
+ * from where it keeps the group where it stood: where its box was, or as it
+ * collapses, the selected node it holds, or else its frame.
+ */
 const collapseIn = (place: Place, group: string, isCollapsed: boolean): void => {
+  const at = place.held
+  const from = isCollapsed && at?.given.nodes.find(node => node.id === at.selected)?.group === group ? at.selected : group
+  const spot = at === undefined || from === null ? undefined : at.view.spot(at.graph, from, at.room, at.pan)
+  place.kept = spot === undefined ? undefined : { id: group, spot }
   place.shut = new Map(place.shut).set(group, isCollapsed)
   const first = place.held?.given.nodes.find(node => node.group === group)
   if (!isCollapsed && place.picked === group && first !== undefined) place.picked = first.id
@@ -347,6 +361,10 @@ const copyGraph = async ($: EngineInterface, graph: Graph, room: Room, surface?:
 const BULLET_COLUMNS = 2
 /** How wide a reply is taken to be on a surface that has not said. */
 const REPLY_COLUMNS = 80
+/** How many of the terminal's rows a reply's graph to click leaves to the rest of the screen, the prompt and the lines around it, so that all of its window and its foot can be in view at once. */
+const SPARE_ROWS = 8
+/** The fewest rows a reply's graph to click is seen through, however short the terminal. */
+const LEAST_REPLY_ROWS = 10
 /** The key of the graph at `index` among a reply block's graphs: of the Client that draws it, and of the place it keeps. */
 const keyOf = (index: number): string => `${GRAPH}:${index}`
 /** What the web page of a reply block's graph is named: for the block's request, and the graph's place among its graphs. */
@@ -525,6 +543,7 @@ export const register: Register = (on, options) => {
     if (!parts.some(part => 'graph' in part)) return next(e)
     hasDrawn = true
     const room = { columns: cellsOf((e.viewport?.columns ?? REPLY_COLUMNS) - BULLET_COLUMNS), rows: MOST_CELLS }
+    const screen = e.viewport?.rows === undefined ? room : { columns: room.columns, rows: cellsOf(Math.max(LEAST_REPLY_ROWS, e.viewport.rows - SPARE_ROWS)) }
     const words = parts.reduce((sum, part) => sum + ('text' in part ? part.text.length : 0), 0)
     const share = Math.max(0, MOST_TREE_CHARS - words) / parts.filter(part => 'graph' in part).length
     const graphs = parts.flatMap(part => ('graph' in part ? [readGraph(part.graph)] : []))
@@ -551,14 +570,15 @@ export const register: Register = (on, options) => {
     /**
      * The graph at `index` among the block's graphs: in the fullscreen layout,
      * which alone reports the mouse, to click and move through, as the person
-     * left it in its place; and else, or where that failed, still.
+     * left it in its place, through a window no taller than the screen has
+     * room for; and else, or where that failed, still and as tall as it needs.
      */
     const treeOf = (graph: Graph, index: number) => {
       const key = keyOf(index)
       if (!isClickable(e.viewport) || faulted.has(faultOf(e.requestId, key))) return rowsOf(Text, bounded(pictureOf(still, graph, room), share))
       const place = kept.get(key) ?? placeOf()
       kept.set(key, place)
-      return <Client key={key} module="./surface.tsx" props={drawIn(place, graph, room, share, folded, undefined, () => null).drawing} />
+      return <Client key={key} module="./surface.tsx" props={drawIn(place, graph, screen, share, folded, undefined, () => null).drawing} />
     }
     return (
       <Box flexDirection="column">
@@ -697,7 +717,7 @@ export const register: Register = (on, options) => {
     } else if (copy === true || (query === undefined && key === 'c')) {
       const graph = runningOf(at)
       const isFitting = isReply && still.measure(graph, at.room.columns).columns <= at.room.columns
-      await copyGraph($, graph, isFitting ? at.room : SHEET, e.surface)
+      await copyGraph($, graph, isFitting ? tallOf(at.room) : SHEET, e.surface)
     } else if (page === true) {
       const graph = runningOf(at)
       await openPage($, isReply ? pageNameOf(site, e.element) : site, isReply ? 'reply' : site, graph, graph.direction)

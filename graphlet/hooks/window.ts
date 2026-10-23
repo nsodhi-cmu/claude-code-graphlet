@@ -77,6 +77,28 @@ export function showIn(layout: Layout, selected: string | null, room: Room, from
   )
 }
 
+/** Where a node's box, or a group's frame, has its top left corner as laid out, and the shelf it slides with: none where the layout has neither. */
+function cornerOf(layout: Layout, id: string): { x: number; y: number; shelf: number } | undefined {
+  const found = placeOf(layout, id)
+  if (found !== undefined) return { x: found.place.x, y: found.shelf.top, shelf: found.place.shelf }
+  const frame = layout.frames.find(one => one.group.id === id)
+  return frame === undefined ? undefined : { x: frame.x, y: frame.top, shelf: frame.first }
+}
+
+/** Where a node's box, or a group's frame, has its top left corner in a window at `pan`, across and along it: none where the layout has neither. */
+export function spotIn(layout: Layout, id: string, room: Room, pan: Pan): Pan | undefined {
+  const at = within(pan, sightOf(layout, room).most)
+  const corner = cornerOf(layout, id)
+  return corner === undefined ? undefined : { x: corner.x - slideOf(layout, layout.shelves[corner.shelf], at.x), y: corner.y - at.y }
+}
+
+/** Where the window stands for a node's box, or a group's frame, to have its top left corner at `spot` in it, or as near there as the layout goes: where it stands at `from` where the layout has neither. */
+export function keepIn(layout: Layout, id: string, room: Room, spot: Pan, from: Pan): Pan {
+  const most = sightOf(layout, room).most
+  const corner = cornerOf(layout, id)
+  return within(corner === undefined ? from : { x: corner.x - spot.x, y: corner.y - spot.y }, most)
+}
+
 /**
  * Where the window stands after it is scrolled from `from`: by cells across
  * the room and down it, or by turns of the wheel, which go the way the graph

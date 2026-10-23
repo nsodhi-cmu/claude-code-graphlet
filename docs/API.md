@@ -154,7 +154,7 @@ A pane draws each group collapsed or open as `$.graphlet.collapse` was last call
 - `Collapse` or `Expand`, under the picture on another surface, does as space does;
 - finding a node in a collapsed group, with `/`, opens the group.
 
-A node in a collapsed group is drawn as the group's box selected, and `show` answers the group's id as `selected`. A collapsed group's box is selected as a node is, so a click on it, a step onto it, and a key pressed with it selected all name the group's id, and so does `graphlet.select`. Opening a group whose box is selected, by space, return, or a double click, selects the first node it holds with `select`, so a mod that says which node is selected hears which. The web page and `c` take the graph as the pane has it, its groups collapsed or open.
+A node in a collapsed group is drawn as the group's box selected, and `show` answers the group's id as `selected`. A collapsed group's box is selected as a node is, so a click on it, a step onto it, and a key pressed with it selected all name the group's id, and so does `graphlet.select`. Opening a group whose box is selected, by space, return, or a double click, selects the first node it holds with `select`, so a mod that says which node is selected hears which. A group collapsed or opened stays where it stood in the window, as near as the graph lets it: its box where the selected node it holds was, or its frame where its box was. The web page and `c` take the graph as the pane has it, its groups collapsed or open.
 
 ## Keys And The Wheel
 

@@ -1133,6 +1133,57 @@ test('in a reply, space folds a group into one box and opens it again, / finds a
   await reply.unmount()
 })
 
+/** Where a text first stands in the rows the Client under `key` drew last: its column and its row. */
+const textAt = async (reply: Reply, key: string, text: string): Promise<{ x: number; y: number }> => {
+  const rows = await rowsOf(reply, key)
+  const y = rows.findIndex(row => row.includes(text))
+  return { x: (rows[y] ?? '').indexOf(text), y }
+}
+
+/** A click on the count of what is out of view below a reply's graph, which scrolls it a page down. */
+const pageDown = async (reply: Reply, key: string): Promise<void> => {
+  const rows = await rowsOf(reply, key)
+  await reply.pointer({ type: 'down', x: rows.at(-1)?.indexOf('↓') ?? 0, y: rows.length - 1, button: 'left', in: key })
+}
+
+/** The fourteen steps of a chain too long for the screen. */
+const STEPS = Array.from({ length: 14 }, (_, at) => `step number ${at + 1}`)
+
+test('in the fullscreen layout, a reply\'s graph taller than the screen is seen through a window the screen has room for, which a click on a count moves down it; on the main screen it is drawn whole', async ($, on) => {
+  replies(on)
+  const text = ['```graphlet', STEPS.join(' -> '), '```'].join('\n')
+  const clicked = await say($, 'terminal', text)
+  const [{ key = '', drawing = { rows: [], hits: [] } } = {}] = await clientsOf(clicked)
+  expect(drawing.rows).toHaveLength(32)
+  expect(picture(drawing).join('\n')).not.toContain('step number 14')
+  await pageDown(clicked, key)
+  await pageDown(clicked, key)
+  expect(await rowsOf(clicked, key)).toHaveLength(32)
+  expect((await rowsOf(clicked, key)).join('\n')).toContain('step number 14')
+  await clicked.unmount()
+  const still = await say($, 'terminal', text, {}, false)
+  const whole = screenOf(await still.drawn()).join('\n')
+  expect(STEPS.filter(step => !whole.includes(step))).toEqual([])
+  await still.unmount()
+})
+
+test('a group collapsed or opened stays on the rows where it stood in the window: its box where the selected node it holds was, and its frame where its box was', async ($, on) => {
+  replies(on)
+  const steps = Array.from({ length: 20 }, (_, at) => `step number ${at + 1}`)
+  const block = [steps.join(' -> '), 'Middle:', ...steps.slice(5, 9).map(step => `  ${step}`)]
+  const reply = await say($, 'terminal', ['```graphlet', ...block, '```'].join('\n'))
+  const [{ key = '' } = {}] = await clientsOf(reply)
+  await pageDown(reply, key)
+  const node = await textAt(reply, key, 'step number 8')
+  await reply.pointer({ type: 'down', ...node, button: 'left', in: key })
+  await reply.key({ key: 'space', in: key })
+  const box = await textAt(reply, key, '▸ Middle')
+  expect(box.y).toBe(node.y)
+  await reply.key({ key: 'space', in: key })
+  expect((await textAt(reply, key, ' Middle ')).y).toBe(box.y - 1)
+  await reply.unmount()
+})
+
 test('in a reply, a graph too large to fold into the reply\'s width is copied whole, as a mod\'s graph is', async ($, on) => {
   const seen = world(on)
   replies(on)

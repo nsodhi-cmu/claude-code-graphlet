@@ -121,6 +121,7 @@ In `/config`, or `/plugin configure graphlet@claude-code-graphlet`. The first ch
 
 - The pictures drawn on the desktop app, VS Code extension, and the mobile app still have some visual bugs, which is why this feature is experimental.
 - The mouse reaches a graph only in Claude Code's fullscreen layout. On the main screen, a reply's graph is a still picture.
+- The wheel scrolls the transcript, not a graph: drag a graph taller than the screen, or move through it with the arrow keys.
 - A clicked graph keeps the keys until Escape. A drag moves it rather than selecting its text, so use `copy`.
 - Where an organization manages Claude Code, Claude is told it can draw graphs only if graphlet is listed in managed settings.
 - A graph is read up to 1000 nodes and 2000 edges, and the row under it says what was left out.

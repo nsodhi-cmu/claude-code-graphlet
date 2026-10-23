@@ -9,7 +9,7 @@ import { paint } from './paint'
 import type { Finding } from './paint'
 import { MOST_SVG_CHARS, altOf, svgOf } from './svg'
 import type { Drawn } from './svg'
-import { orderOf, scrollIn, showIn, sightOf, stepIn } from './window'
+import { keepIn, orderOf, scrollIn, showIn, sightOf, spotIn, stepIn } from './window'
 
 // A graph as a person looks at it: laid out for a room, seen through a
 // window, with one node selected.
@@ -150,6 +150,10 @@ export type View = {
   show: (graph: Graph, selected: string | null, room: Room, from: Pan) => Pan
   /** Where the window stands after it is scrolled from `from`: by cells, or by turns of the wheel. */
   scroll: (graph: Graph, room: Room, from: Pan, by: Pan | number) => Pan
+  /** Where a node's box, or a group's frame, has its top left corner in the window at `pan`: none where the graph has neither. */
+  spot: (graph: Graph, id: string, room: Room, pan: Pan) => Pan | undefined
+  /** Where the window stands for a node's box, or a group's frame, to have its top left corner at `spot` in it, as near as the graph lets it. */
+  keep: (graph: Graph, id: string, room: Room, spot: Pan, from: Pan) => Pan
   /** The node a move from the selected one lands on. */
   step: (graph: Graph, selected: string | null, move: GraphletMove, room: Room, pan: Pan) => string | null
 }
@@ -209,6 +213,8 @@ export function viewOf(look: Look, fold = false, hasCorner = true): View {
     order: (graph, room) => orderOf(laid(graph, room)),
     show: (graph, selected, room, from) => showIn(laid(graph, room), selected, room, from),
     scroll: (graph, room, from, by) => scrollIn(laid(graph, room), room, from, by),
+    spot: (graph, id, room, pan) => spotIn(laid(graph, room), id, room, pan),
+    keep: (graph, id, room, spot, from) => keepIn(laid(graph, room), id, room, spot, from),
     step: (graph, selected, move, room, pan) => stepIn(laid(graph, room), graph, selected, move, room, pan),
   }
 }
