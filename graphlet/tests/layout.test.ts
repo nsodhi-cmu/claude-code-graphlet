@@ -2,8 +2,9 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import { LOOK, SEPARATE, graphOf, numbers } from './fixture'
 import { readGraph } from '../hooks/layers'
+import { graphOf as graphLines } from '../hooks/reply'
 import type { Graph } from '../hooks/layers'
-import { costOf, layoutOf, wordsOf, wrap } from '../hooks/layout'
+import { breadthOf, costOf, layoutOf, wordsOf, wrap } from '../hooks/layout'
 import type { Layout, Wire } from '../hooks/layout'
 
 const ROOM = { columns: 80, rows: 40 }
@@ -241,5 +242,26 @@ describe('the rows between two shelves', () => {
     expect(loose.shelves[0]?.across).not.toBe(loose.shelves[1]?.across)
     expect(tracks(loose)).toBe(2)
     expect(tracks(laid(graph, { ...SEPARATE, scroll: 'sheet' }))).toBe(1)
+  })
+})
+
+describe('folding into a room', () => {
+  /** A small site in groups, its gallery holding eight photos: too wide for a narrow reply however it folds. */
+  const SITE = readGraph(
+    graphLines([
+      'Browser -> DNS', 'Browser -> TCP -> TLS -> CDN', 'CDN -> Next.js -> Router', 'Router -> Home', 'Router -> Blog', 'Router -> Contact',
+      'Home -> Header', 'Blog -> Header', 'Contact -> Header', 'Blog -> Gallery', 'Contact -> Form',
+      ...Array.from({ length: 8 }, (_, at) => `Gallery -> photo-${at + 1}.webp`),
+      'Form -> /api/contact -> Mailer',
+      'Network:', '  DNS', '  TCP', '  TLS', 'App:', '  Next.js', '  Router', '  /api/contact', '  Mailer', 'Pages:', '  Home', '  Blog', '  Contact',
+      'Components:', '  Header', '  Gallery', '  Form', 'Assets:', ...Array.from({ length: 8 }, (_, at) => `  photo-${at + 1}.webp`),
+    ]),
+  )
+
+  test('a graph still wider than its room once folded is folded again only where that fits it or takes less room all told, not narrower and far taller', () => {
+    const layout = layoutOf(SITE, { columns: 60, rows: 1000 }, LOOK, true)
+    expect(breadthOf(layout)).toBeGreaterThan(60)
+    expect(layout.rows).toBeLessThan(90)
+    expect(layout.shelves.length).toBeLessThan(15)
   })
 })

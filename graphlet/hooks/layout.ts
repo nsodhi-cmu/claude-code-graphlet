@@ -912,8 +912,9 @@ export function layTracks(channel: Channel, xOf: (place: Place) => number, under
  * Lays a graph out. Where it is to `fold`, its layers are folded first into
  * as many as it takes for each to fit the room, a box and the room beside it
  * a node and a column and the room beside it a lane; where the boxes' ports
- * then make a shelf wider than the room after all, it is folded again into
- * less room, as long as that makes it narrower. A graph of more than
+ * or the frames then make a shelf wider than the room after all, it is
+ * folded again into less room, and kept so where that fits the room, or
+ * takes fewer of its columns times its rows. A graph of more than
  * `FOLDED_NODES` nodes or `FOLDED_EDGES` edges is laid out unfolded. Every
  * face of every box is dealt its ports. The longest shelf is seated first, in
  * the middle of what it is laid out across, then each other shelf against the
@@ -936,7 +937,7 @@ export function layoutOf(graph: Graph, room: Room, look: Look, fold = false, dir
   for (let tries = 0; tries < REFOLDS && breadthOf(layout) > columns; tries += 1) {
     into -= breadthOf(layout) - columns
     const narrower = laidOut(graph, columns, look, into)
-    if (breadthOf(narrower) >= breadthOf(layout)) break
+    if (breadthOf(narrower) > columns && breadthOf(narrower) * narrower.rows >= breadthOf(layout) * layout.rows) break
     layout = narrower
   }
   return layout
