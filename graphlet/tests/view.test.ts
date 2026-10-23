@@ -206,6 +206,5 @@ test('collapsed from the order its nodes stand in across the open picture, a gro
   const open = layoutOf(graph, room, LOOK)
   /** Whether n3 stands left of n4 in a layout. */
   const isInOrder = (shown: Graph): boolean => acrossOf(layoutOf(shown, room, LOOK)).indexOf('n3') < acrossOf(layoutOf(shown, room, LOOK)).indexOf('n4')
-  expect(isInOrder(graph)).toBe(acrossOf(open).indexOf('n3') < acrossOf(open).indexOf('n4'))
   expect(isInOrder(collapsedOf(graph, new Set(['g']), acrossOf(open)))).toBe(isInOrder(graph))
 })

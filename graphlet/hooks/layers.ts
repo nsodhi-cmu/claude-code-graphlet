@@ -635,7 +635,8 @@ function inOrder(slots: Slot[][], groupOf: (slot: Slot) => string | undefined): 
  * layers are then ordered against the layer above on the way down and the
  * layer below on the way back up, a few times over, and the ordering whose
  * stretches cross least is the one kept; with nothing crossing, every layer
- * keeps the order the graph names its nodes in. The slots of a group stand
+ * keeps the order it starts in: the graph's `order`, where it has one, and
+ * else the order the graph names its nodes in. The slots of a group stand
  * together in each layer, and the groups in one order across the layers.
  * Given a room to `fold` into, the layers are folded into it first.
  */

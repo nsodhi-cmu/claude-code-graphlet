@@ -14,8 +14,8 @@ import { acrossOf, keepIn, orderOf, scrollIn, showIn, sightOf, spotIn, stepIn } 
 // A graph as a person looks at it: laid out for a room, seen through a
 // window, with one node selected.
 
-/** How many layouts a view keeps, the last it laid out, so that a graph drawn again in the same room is not laid out again. */
-const KEPT_LAYOUTS = 8
+/** How many layouts a view keeps, the last it laid out, so that a graph drawn again in the same room is not laid out again: each graph with a group collapsed keeps its open layout here too. */
+const KEPT_LAYOUTS = 16
 /** The fewest columns a layer of a graph that runs right takes, a box of the narrowest, and the channel between two layers: a graph with more layers than these fill the room's columns with never runs right. */
 const LEAST_LAYER_COLUMNS = 7
 const LEAST_CHANNEL_COLUMNS = 2

@@ -279,6 +279,16 @@ describe('frames', () => {
     expect([straight('Browser', 'API'), straight('Auth', 'Postgres'), straight('Cache', 'Redis')]).toEqual([true, true, true])
   })
 
+  test('settling is undone where it would leave the layout weighing more, its edges running farther sideways with none straighter', () => {
+    const graph = readGraph({
+      nodes: [{ id: 'n0', label: 'Validate request0', group: 'g2', priority: 2 }, { id: 'n1', label: 'n1', group: 'g0' }, { id: 'n2', label: 'n2' }, { id: 'n3', label: 'n3', group: 'g0' }],
+      edges: [['n1', 'n1'], ['n3', 'n1'], ['n1', 'n0'], ['n0', 'n3']].map(([from = '', to = '']) => ({ from, to })),
+    })
+    const layout = layoutOf(graph, { columns: 137, rows: 1000 }, { ...LOOK, scroll: 'sheet' }, true)
+    const sideways = layout.channels.flatMap(channel => channel.wires).reduce((sum, wire) => sum + Math.abs(routeOf(wire, place => place.x).out - routeOf(wire, place => place.x).into), 0)
+    expect([breadthOf(layout), sideways]).toEqual([34, 12])
+  })
+
   test('a group\'s nodes on one shelf are packed a gap apart, however far apart the shelves above would seat them, so its frame is no wider than they are', () => {
     const graph = readGraph({
       nodes: [...['Left side', 'Middle one', 'Middle two', 'Right side'].map(id => ({ id, label: id })), { id: 'A', label: 'A', group: 'g' }, { id: 'B', label: 'B', group: 'g' }],

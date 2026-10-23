@@ -915,8 +915,9 @@ export function layTracks(channel: Channel, xOf: (place: Place) => number, under
  * as many as it takes for each to fit the room, a box and the room beside it
  * a node and a column and the room beside it a lane; where the boxes' ports
  * or the frames then make a shelf wider than the room after all, it is
- * folded again into less room, and kept so where that fits the room, or
- * takes fewer of its columns times its rows. A graph of more than
+ * folded again into less room, and kept so where that makes it narrower
+ * and fits the room, or takes fewer of its columns times its rows. A graph
+ * of more than
  * `FOLDED_NODES` nodes or `FOLDED_EDGES` edges is laid out unfolded. Every
  * face of every box is dealt its ports. The longest shelf is seated first, in
  * the middle of what it is laid out across, then each other shelf against the
@@ -939,7 +940,7 @@ export function layoutOf(graph: Graph, room: Room, look: Look, fold = false, dir
   for (let tries = 0; tries < REFOLDS && breadthOf(layout) > columns; tries += 1) {
     into -= breadthOf(layout) - columns
     const narrower = laidOut(graph, columns, look, into)
-    if (breadthOf(narrower) > columns && breadthOf(narrower) * narrower.rows >= breadthOf(layout) * layout.rows) break
+    if (breadthOf(narrower) >= breadthOf(layout) || (breadthOf(narrower) > columns && breadthOf(narrower) * narrower.rows >= breadthOf(layout) * layout.rows)) break
     layout = narrower
   }
   return layout
@@ -1021,9 +1022,10 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
     })
   })
   const priority = new Map(graph.nodes.map(node => [node.id, priorityOf(node)]))
-  reseat(shelves, channels, columns, wire => Math.max(priority.get(wire.edge.from) ?? 0, priority.get(wire.edge.to) ?? 0), gap)
+  const rankOf = (wire: Wire): number => Math.max(priority.get(wire.edge.from) ?? 0, priority.get(wire.edge.to) ?? 0)
+  reseat(shelves, channels, columns, rankOf, gap)
 
-  const frames = framesOf(graph, shelves, channels, direction === 'down' ? columns : room, gap, direction)
+  const frames = framesOf(graph, shelves, channels, direction === 'down' ? columns : room, gap, direction, rankOf)
   shelves.forEach((shelf, index) => {
     const spans = [...shelf.places, ...frames.filter(frame => frame.first <= index && index <= frame.last)]
     if (spans.length > 0) shelf.width = Math.max(shelf.width, Math.max(...spans.map(one => one.x + one.width)) - Math.min(...spans.map(one => one.x)))
@@ -1084,7 +1086,7 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
  * among the shelf's places. Last, what stands on the shelves is settled, as
  * `settle` says.
  */
-function framesOf(graph: Graph, shelves: Shelf[], channels: Channel[], columns: number, gap: number, direction: Direction): Frame[] {
+function framesOf(graph: Graph, shelves: Shelf[], channels: Channel[], columns: number, gap: number, direction: Direction, rankOf: (wire: Wire) => number): Frame[] {
   if (graph.groups.length === 0) return []
   const groupOf = slotGroups(graph)
   const framed = graph.groups.flatMap(group => {
@@ -1190,10 +1192,11 @@ function framesOf(graph: Graph, shelves: Shelf[], channels: Channel[], columns: 
         shelf.places.filter(place => !isHeld(place)).map(place => ({ first: index, last: index, width: place.width, x: () => place.x, move: (by: number) => void (place.x += by), places: new Set([place]) })),
       ),
     ],
-    channels.flatMap(channel => channel.wires),
+    channels,
     columns,
     gap,
     direction === 'down',
+    rankOf,
   )
   return framed.map(({ frame }) => frame)
 }
@@ -1202,42 +1205,62 @@ function framesOf(graph: Graph, shelves: Shelf[], channels: Channel[], columns: 
 type Unit = { first: number; last: number; width: number; x: () => number; move: (by: number) => void; places: Set<Place> }
 
 /**
- * Settles the units on shelves with frames, each keeping its order among the
- * units it shares a shelf with. They are first packed from the left, each a
- * gap clear of what stands before it on any shelf it stands on. Then, up to
- * `SETTLES` times or until nothing moves, each unit in turn moves toward where
- * its wires to other units run least sideways, weighed as `balance` weighs
- * them, as far as the units beside it let it, and within `columns` or as far
- * as the units already reach, where that is farther. Last, where they are
- * to be `isCentered`, they are set in the middle of `columns` where they fit
- * them, and else they start where they started.
+ * Settles the units, each frame with all it holds and each place no frame
+ * holds, each keeping its order among the units it shares a shelf with: up
+ * to `SETTLES` times or until nothing moves, each unit in turn moves toward
+ * where its wires to other units run least sideways, weighed and ranked as
+ * `balance` weighs and ranks them, as far as its neighbors on its shelves let
+ * it, and within `columns` or as far as the units already reach, where that
+ * is farther. A settling that weighs more than what it started from, as
+ * `costOf` weighs it, is undone. Last, where they are to be `isCentered`,
+ * they are set in the middle of `columns` where they fit them, and else
+ * they start where they started.
  */
-function settle(units: Unit[], wires: Wire[], columns: number, gap: number, isCentered: boolean): void {
+function settle(units: Unit[], channels: Channel[], columns: number, gap: number, isCentered: boolean, rankOf: (wire: Wire) => number): void {
   const start = Math.min(...units.map(unit => unit.x()))
   const reach = (): number => Math.max(0, ...units.map(unit => unit.x() + unit.width))
   const limit = Math.max(columns, reach())
+  const ranks = [...new Set(channels.flatMap(channel => channel.wires.map(rankOf)))].sort((a, b) => b - a)
+  const weighed = (cost: Cost): number[] => [cost.weight, ...cost.ranked, cost.sideways]
+  const before = weighed(costOf(channels, ranks, rankOf))
+  const started = units.map(unit => unit.x())
   const unitOf = new Map(units.flatMap(unit => [...unit.places].map(place => [place, unit] as const)))
-  const pulls = new Map<Unit, Array<{ near: End; far: End; weight: number }>>()
-  for (const wire of wires) {
+  const pulls = new Map<Unit, Array<{ near: End; far: End; weight: number; rank: number }>>()
+  for (const wire of channels.flatMap(channel => channel.wires)) {
     for (const [near, far] of [[wire.from, wire.to], [wire.to, wire.from]] as const) {
       const [own, other] = [unitOf.get(near.place), unitOf.get(far.place)]
       if (own === undefined || other === undefined || own === other) continue
-      pulls.set(own, [...(pulls.get(own) ?? []), { near, far, weight: ('lane' in near.place.slot ? LANE_WEIGHT : 1) * (wire.isUp ? 1 : FLOW_WEIGHT) }])
+      const pulled = pulls.get(own) ?? []
+      pulled.push({ near, far, weight: ('lane' in near.place.slot ? LANE_WEIGHT : 1) * (wire.isUp ? 1 : FLOW_WEIGHT), rank: rankOf(wire) })
+      pulls.set(own, pulled)
     }
+  }
+  const neighbors = new Map(units.map(unit => [unit, { before: new Set<Unit>(), after: new Set<Unit>() }]))
+  const onShelf = new Map<number, Unit[]>()
+  for (const unit of units) {
+    for (let shelf = unit.first; shelf <= unit.last; shelf += 1) {
+      const row = onShelf.get(shelf) ?? []
+      row.push(unit)
+      onShelf.set(shelf, row)
+    }
+  }
+  for (const row of onShelf.values()) {
+    row.sort((a, b) => a.x() - b.x())
+    row.forEach((unit, index) => {
+      const [left, right] = [row[index - 1], row[index + 1]]
+      if (left !== undefined) neighbors.get(unit)?.before.add(left)
+      if (right !== undefined) neighbors.get(unit)?.after.add(right)
+    })
   }
   const order = units.toSorted((a, b) => a.x() - b.x())
   for (let time = 0; time < SETTLES; time += 1) {
     let isMoved = false
     for (const unit of time % 2 === 0 ? order : order.toReversed()) {
-      const wishes = (pulls.get(unit) ?? []).map(({ near, far, weight }) => ({ at: far.place.x + far.at - near.place.x - near.at, weight, rank: 0 }))
-      const wanted = medianOf(wishes)
-      if (wanted === undefined) continue
-      let [least, most] = [-unit.x(), limit - unit.width - unit.x()]
-      for (const other of units) {
-        if (other === unit || other.last < unit.first || other.first > unit.last) continue
-        if (other.x() < unit.x()) least = Math.max(least, other.x() + other.width + gap - unit.x())
-        else most = Math.min(most, other.x() - gap - unit.width - unit.x())
-      }
+      const wanted = medianOf((pulls.get(unit) ?? []).map(({ near, far, weight, rank }) => ({ at: far.place.x + far.at - near.place.x - near.at, weight, rank })))
+      const beside = neighbors.get(unit)
+      if (wanted === undefined || beside === undefined) continue
+      const least = Math.max(-unit.x(), ...[...beside.before].map(other => other.x() + other.width + gap - unit.x()))
+      const most = Math.min(limit - unit.width - unit.x(), ...[...beside.after].map(other => other.x() - gap - unit.width - unit.x()))
       const by = Math.max(least, Math.min(most, wanted))
       if (by === 0) continue
       unit.move(by)
@@ -1245,6 +1268,7 @@ function settle(units: Unit[], wires: Wire[], columns: number, gap: number, isCe
     }
     if (!isMoved) break
   }
+  if (isLess(before, weighed(costOf(channels, ranks, rankOf)))) units.forEach((unit, index) => unit.move((started[index] ?? unit.x()) - unit.x()))
   const left = Math.min(...units.map(unit => unit.x()))
   const by = isCentered && reach() - left <= columns ? Math.floor((columns - (reach() - left)) / 2) - left : start - left
   for (const unit of units) unit.move(by)
