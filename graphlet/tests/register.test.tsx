@@ -1184,6 +1184,40 @@ test('a group collapsed or opened stays on the rows where it stood in the window
   await reply.unmount()
 })
 
+/** A map of a system too large for the screen: five tiers, the largest of nine services. */
+const SERVICES = [
+  ...['Web app', 'iOS app', 'Android app', 'Admin console'].map(client => `${client} -> CDN`),
+  'CDN -> WAF -> Load balancer -> API gateway',
+  ...['Auth', 'Users', 'Orders', 'Payments', 'Inventory', 'Shipping', 'Search', 'Notifications', 'Reports'].map(service => `API gateway -> ${service}`),
+  'Auth -> Redis', 'Users -> Postgres', 'Orders -> Postgres', 'Payments -> Postgres', 'Inventory -> Postgres', 'Shipping -> Kafka', 'Search -> Elasticsearch', 'Notifications -> Kafka', 'Reports -> S3',
+  'Orders -> Payments', 'Prometheus -> Grafana -> PagerDuty', 'Sentry -> PagerDuty', 'Auth -> Prometheus',
+  'Clients:', ...['Web app', 'iOS app', 'Android app', 'Admin console'].map(node => `  ${node}`),
+  'Edge:', ...['CDN', 'WAF', 'Load balancer', 'API gateway'].map(node => `  ${node}`),
+  'Services:', ...['Auth', 'Users', 'Orders', 'Payments', 'Inventory', 'Shipping', 'Search', 'Notifications', 'Reports'].map(node => `  ${node}`),
+  'Data:', ...['Postgres', 'Redis', 'Elasticsearch', 'S3', 'Kafka'].map(node => `  ${node}`),
+  'Ops:', ...['Prometheus', 'Grafana', 'Sentry', 'PagerDuty'].map(node => `  ${node}`),
+]
+
+test('fit, a reply\'s graph too large for the screen starts with its largest group collapsed, and on the main screen with every group open', async ($, on) => {
+  replies(on)
+  const text = ['```graphlet', ...SERVICES, '```'].join('\n')
+  const clicked = await say($, 'terminal', text)
+  const [{ key = '' } = {}] = await clientsOf(clicked)
+  expect((await rowsOf(clicked, key)).join('\n')).toContain('▸ Services  9')
+  await clicked.unmount()
+  const still = await say($, 'terminal', text, {}, false)
+  expect(screenOf(await still.drawn()).join('\n')).not.toContain('▸')
+  await still.unmount()
+})
+
+test('expanded, a reply\'s graph starts with every group open, however large', { options: { groups: 'expanded' } }, async ($, on) => {
+  replies(on)
+  const clicked = await say($, 'terminal', ['```graphlet', ...SERVICES, '```'].join('\n'))
+  const [{ key = '' } = {}] = await clientsOf(clicked)
+  expect((await rowsOf(clicked, key)).join('\n')).not.toContain('▸')
+  await clicked.unmount()
+})
+
 test('in a reply, a graph too large to fold into the reply\'s width is copied whole, as a mod\'s graph is', async ($, on) => {
   const seen = world(on)
   replies(on)

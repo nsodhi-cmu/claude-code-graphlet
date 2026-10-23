@@ -101,6 +101,36 @@ export function collapsedOf(graph: Graph, shut: Set<string>): Graph {
   return { ...graph, nodes, edges, groups: graph.groups.filter(group => !shut.has(group.id)) }
 }
 
+/** Which of a graph's groups it starts with collapsed: none, as `fit` finds, or every group of more than one node. */
+export type Opening = 'expanded' | 'fit' | 'collapsed'
+
+/**
+ * The groups a graph starts with collapsed in a room, as `opening` says.
+ * `fit`: a graph of more than `FOCUS_NODES` nodes that is not seen whole
+ * with every group open has its groups collapsed, the largest first, until
+ * no more than `FOCUS_NODES` boxes show; of groups as large, the one the
+ * graph names last first, and a group that holds a node put foremost, or the
+ * node the graph is selected on when nothing else is, after every other. A
+ * group of one node is never collapsed, since its box would only trade the
+ * node's label for the group's.
+ */
+export function openingOf(view: View, graph: Graph, room: Room, opening: Opening): Set<string> {
+  const sizes = new Map(graph.groups.map(group => [group.id, graph.nodes.filter(node => node.group === group.id).length]))
+  const collapsible = graph.groups.filter(group => (sizes.get(group.id) ?? 0) > 1)
+  if (opening === 'collapsed') return new Set(collapsible.map(group => group.id))
+  const shut = new Set<string>()
+  if (opening === 'expanded' || graph.nodes.length <= FOCUS_NODES || view.fits(graph, room)) return shut
+  const lead = leadOf(graph)
+  const isKept = (id: string): boolean => graph.nodes.some(node => node.group === id && (node.isForemost || node.id === lead))
+  let shown = graph.nodes.length
+  for (const group of collapsible.toReversed().sort((a, b) => Number(isKept(a.id)) - Number(isKept(b.id)) || (sizes.get(b.id) ?? 0) - (sizes.get(a.id) ?? 0))) {
+    if (shown <= FOCUS_NODES) break
+    shut.add(group.id)
+    shown -= (sizes.get(group.id) ?? 0) - 1
+  }
+  return shut
+}
+
 /** The node a graph is drawn with selected when nothing else is: the first it names of those of the highest priority; null in a graph with no nodes. */
 export function leadOf(graph: Graph): string | null {
   return graph.nodes.reduce<Node | undefined>((lead, node) => (lead === undefined || priorityOf(node) > priorityOf(lead) ? node : lead), undefined)?.id ?? null
@@ -148,6 +178,8 @@ export type View = {
   order: (graph: Graph, room: Room) => string[]
   /** Where the window stands to show the selected node: as near `from` as it can. */
   show: (graph: Graph, selected: string | null, room: Room, from: Pan) => Pan
+  /** Whether all of a graph is seen in a room, nothing of it out of view. */
+  fits: (graph: Graph, room: Room) => boolean
   /** Where the window stands after it is scrolled from `from`: by cells, or by turns of the wheel. */
   scroll: (graph: Graph, room: Room, from: Pan, by: Pan | number) => Pan
   /** Where a node's box, or a group's frame, has its top left corner in the window at `pan`: none where the graph has neither. */
@@ -212,6 +244,7 @@ export function viewOf(look: Look, fold = false, hasCorner = true): View {
     },
     order: (graph, room) => orderOf(laid(graph, room)),
     show: (graph, selected, room, from) => showIn(laid(graph, room), selected, room, from),
+    fits: (graph, room) => sightOf(laid(graph, room), room).isWhole,
     scroll: (graph, room, from, by) => scrollIn(laid(graph, room), room, from, by),
     spot: (graph, id, room, pan) => spotIn(laid(graph, room), id, room, pan),
     keep: (graph, id, room, spot, from) => keepIn(laid(graph, room), id, room, spot, from),

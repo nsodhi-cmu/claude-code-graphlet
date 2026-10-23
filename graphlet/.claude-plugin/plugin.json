@@ -48,6 +48,17 @@
       ],
       "default": "merged"
     },
+    "groups": {
+      "type": "string",
+      "title": "Groups",
+      "description": "fit starts a graph of more than two dozen nodes that is too large for the screen with its largest groups collapsed, until two dozen boxes or fewer show; expanded starts every group open; collapsed starts every group collapsed.",
+      "options": [
+        "expanded",
+        "fit",
+        "collapsed"
+      ],
+      "default": "fit"
+    },
     "replies": {
       "type": "string",
       "title": "Graphs in replies",

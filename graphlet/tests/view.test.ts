@@ -4,8 +4,9 @@ import { LOOK, busy, numbers } from './fixture'
 import type { GraphletMove } from '../types'
 import { rowText, sizeOf } from '../hooks/draw'
 import { ranksOf, readGraph } from '../hooks/layers'
+import type { Graph } from '../hooks/layers'
 import type { Look } from '../hooks/layout'
-import { FOCUS_NODES, MOVES, collapsedOf, focusOf, viewOf } from '../hooks/view'
+import { FOCUS_NODES, MOVES, collapsedOf, focusOf, openingOf, viewOf } from '../hooks/view'
 
 const LABELS = ['a', 'node', 'src/some/long/path/to/file.component.ts', 'Validate the incoming request', 'x-y_z.w', '', '数据库连接池', '✅ 完成']
 const LOOKS: Look[] = (['pinned', 'sheet'] as const).flatMap(scroll =>
@@ -164,4 +165,36 @@ test('collapsed in a graph whose nodes name their layers, a group\'s box stands 
   const shut = collapsedOf(graph, new Set(['g']))
   expect(shut.nodes.map(node => `${node.id} ${node.layer}`)).toEqual(['top 0', 'g 2', 'low 5'])
   expect([...ranksOf(shut)]).toEqual([['top', 0], ['g', 1], ['low', 2]])
+})
+
+/** A graph of groups one after another, each a chain of as many nodes as `sizes` says, its last node joined to the next group's first; the node `foremost` names has a priority of 1. */
+const chainsOf = (sizes: number[], foremost = ''): Graph => {
+  const ids = sizes.map((size, group) => Array.from({ length: size }, (_, at) => `g${group} n${at}`))
+  return readGraph({
+    nodes: ids.flatMap((group, at) => group.map(id => ({ id, label: id, group: `g${at}`, ...(id === foremost ? { priority: 1 } : {}) }))),
+    edges: ids.flat().slice(1).map((id, at) => ({ from: ids.flat()[at] ?? '', to: id })),
+  })
+}
+
+test('fit leaves alone a graph of a couple dozen nodes or fewer, however far it runs past its room, and a larger one seen whole', () => {
+  const view = viewOf(LOOK, true)
+  expect(openingOf(view, chainsOf([12, 12]), { columns: 40, rows: 10 }, 'fit')).toEqual(new Set())
+  expect(openingOf(view, chainsOf([12, 13]), { columns: 1000, rows: 1000 }, 'fit')).toEqual(new Set())
+})
+
+test('fit collapses a larger graph\'s groups that it does not see whole, the largest first, until no more than a couple dozen boxes show, keeping the group of the node put foremost, or with none of the first node, open longest', () => {
+  const view = viewOf(LOOK, true)
+  const tiny = { columns: 40, rows: 10 }
+  expect(openingOf(view, chainsOf([12, 1, 8, 6], 'g0 n3'), tiny, 'fit')).toEqual(new Set(['g2']))
+  expect(openingOf(view, chainsOf([20, 1, 5, 5]), tiny, 'fit')).toEqual(new Set(['g3', 'g2']))
+  expect(openingOf(view, chainsOf([20, 1, 5, 5]), { columns: 80, rows: 120 }, 'fit')).toEqual(openingOf(view, chainsOf([20, 1, 5, 5]), tiny, 'fit'))
+})
+
+test('expanded starts every group open, and collapsed every group of more than one node, in any room', () => {
+  const view = viewOf(LOOK, true)
+  const graph = chainsOf([12, 1, 8, 6])
+  for (const room of [{ columns: 40, rows: 10 }, { columns: 1000, rows: 1000 }]) {
+    expect(openingOf(view, graph, room, 'expanded')).toEqual(new Set())
+    expect(openingOf(view, graph, room, 'collapsed')).toEqual(new Set(['g0', 'g2', 'g3']))
+  }
 })

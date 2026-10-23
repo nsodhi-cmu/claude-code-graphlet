@@ -9,8 +9,8 @@ import type { Direction } from './layout'
 import { pageOf } from './page'
 import { GUIDE, fencedOf, inReply, partsOf, pictureOf } from './reply'
 import { TIP_ODDS, tipOf } from './tips'
-import { FOCUS_NODES, MOVES, collapsedOf, focusOf, leadOf, viewOf } from './view'
-import type { Vector, View } from './view'
+import { FOCUS_NODES, MOVES, collapsedOf, focusOf, leadOf, openingOf, viewOf } from './view'
+import type { Opening, Vector, View } from './view'
 import { stepThrough } from './window'
 
 /**
@@ -27,8 +27,9 @@ type Held = { view: View; given: Graph; whole: Graph; graph: Graph; room: Room; 
  * What graphlet keeps for a place a graph is drawn, a mod's site or a graph
  * in a reply: the node the person last picked there; where they scrolled its
  * window to, missing while it follows the selection; whether each group is
- * collapsed, as last asked there, and where in the window the group last
- * collapsed or opened there stood, until it is drawn there again; whether it is drawn in focus on the
+ * collapsed, as last asked there; which groups a reply's graph started with
+ * collapsed; where in the window the group last collapsed or opened there
+ * stood, until it is drawn there again; whether it is drawn in focus on the
  * selected node; what the person is typing to find, missing while they are
  * not finding a node; how far they have dragged the graph since the button
  * went down, as far as it has scrolled the graph for, and in which drag; how
@@ -40,6 +41,7 @@ type Place = {
   picked?: string
   scrolled?: Pan
   shut: Map<string, boolean>
+  starts?: Set<string>
   kept?: { id: string; spot: Pan }
   isFocused: boolean
   finding?: string
@@ -98,7 +100,8 @@ const foundIn = (graph: Graph, query: string): string[] =>
 
 /**
  * Draws a graph in a place as the person left it there, and keeps what was
- * drawn: its groups collapsed as last asked there, or as the graph says; the
+ * drawn: its groups collapsed as last asked there, or as the graph says, or
+ * as they started there; the
  * node `asked` selected, or else the one last picked there, or the box of the
  * collapsed group either is in, or else the node `fallback` names; in focus
  * where the place is; with what is being found marked; through a window where
@@ -106,7 +109,7 @@ const foundIn = (graph: Graph, query: string): string[] =>
  * where it keeps a group that was collapsed or opened where it stood.
  */
 const drawIn = (place: Place, given: Graph, room: Room, most: number, view: View, asked: string | undefined, fallback: (graph: Graph) => string | null): Held => {
-  const shut = new Set(given.groups.filter(group => place.shut.get(group.id) ?? group.isCollapsed === true).map(group => group.id))
+  const shut = new Set(given.groups.filter(group => place.shut.get(group.id) ?? (group.isCollapsed === true || place.starts?.has(group.id) === true)).map(group => group.id))
   const whole = collapsedOf(given, shut)
   const wanted = asked ?? place.picked
   const group = given.nodes.find(node => node.id === wanted)?.group
@@ -184,6 +187,8 @@ const tallOf = (room: Room): Room => ({ columns: room.columns, rows: MOST_CELLS 
 let view = viewOf({ scroll: 'pinned', labels: 'wrap', edges: 'merged' })
 let folded = inReply(viewOf({ scroll: 'pinned', labels: 'wrap', edges: 'merged' }, true))
 let still = viewOf({ scroll: 'pinned', labels: 'wrap', edges: 'separate' }, true, false)
+/** Which groups a reply's graph to click starts with collapsed: the person's setting. */
+let opening: Opening = 'fit'
 
 /** The programs that open a file as the person's system would, each tried in turn: Linux's, macOS's, and Windows's. */
 const OPENERS: ReadonlyArray<(path: string) => string[]> = [
@@ -469,6 +474,7 @@ export const register: Register = (on, options) => {
   view = viewOf(look)
   folded = inReply(viewOf(look, true))
   still = viewOf({ ...look, edges: 'separate' }, true, false)
+  opening = options.groups === 'expanded' || options.groups === 'collapsed' ? options.groups : 'fit'
   const isDrawingReplies = options.replies !== 'off'
   vectored = new Set<Vectored>(options.pictures === 'on' ? ['desktop', 'vscode', 'mobile'] : [])
 
@@ -570,14 +576,17 @@ export const register: Register = (on, options) => {
     /**
      * The graph at `index` among the block's graphs: in the fullscreen layout,
      * which alone reports the mouse, to click and move through, as the person
-     * left it in its place, through a window no taller than the screen has
-     * room for; and else, or where that failed, still and as tall as it needs.
+     * left it in its place, its groups at first collapsed as the person's
+     * setting says, through a window no taller than the screen has room for;
+     * and else, or where that failed, still and as tall as it needs, every
+     * group open.
      */
     const treeOf = (graph: Graph, index: number) => {
       const key = keyOf(index)
       if (!isClickable(e.viewport) || faulted.has(faultOf(e.requestId, key))) return rowsOf(Text, bounded(pictureOf(still, graph, room), share))
       const place = kept.get(key) ?? placeOf()
       kept.set(key, place)
+      place.starts ??= openingOf(folded, graph, screen, opening)
       return <Client key={key} module="./surface.tsx" props={drawIn(place, graph, screen, share, folded, undefined, () => null).drawing} />
     }
     return (
