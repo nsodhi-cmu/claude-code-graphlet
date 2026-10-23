@@ -1066,9 +1066,9 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
 /**
  * Each group's frame, around every place of it, standing `FRAME_MARGIN` out
  * from them across their shelves, or more where the label needs it, what it
- * holds then in its middle; where that would be wider than `columns`
- * the places of each shelf first moved together to stand in the middle of
- * all of them, and where the graph runs down, wide enough
+ * holds then in its middle, the places of each shelf first packed a gap
+ * apart around their own middle, and moved as little as keeps them within
+ * the widest shelf's; and where the graph runs down, wide enough
  * for the group's label in its top border, between the lines that cross it
  * into the group's first shelf and out of it, or else widened back past the
  * first of them until it is. On each shelf it spans, what is
@@ -1088,15 +1088,20 @@ function framesOf(graph: Graph, shelves: Shelf[], channels: Channel[], columns: 
     const held = shelves.flatMap((shelf, index) => shelf.places.filter(place => groupOf(place.slot) === group.id).map(place => ({ place, index })))
     if (held.length === 0) return []
     const spanOf = (places: Place[]): [number, number] => [Math.min(...places.map(place => place.x)), Math.max(...places.map(place => place.x + place.width))]
-    const [wide, high] = spanOf(held.map(({ place }) => place))
-    if (high - wide + 2 * FRAME_MARGIN > columns) {
-      const middle = (wide + high) / 2
-      for (const index of new Set(held.map(one => one.index))) {
-        const block = held.filter(one => one.index === index).map(({ place }) => place)
-        const [start, end] = spanOf(block)
-        const by = Math.round(middle - (start + end) / 2)
-        for (const place of block) place.x += by
+    const blocks = [...new Set(held.map(one => one.index))].map(index => held.filter(one => one.index === index).map(({ place }) => place).toSorted((a, b) => a.x - b.x))
+    for (const block of blocks) {
+      const [start, end] = spanOf(block)
+      let x = Math.round((start + end) / 2 - block.reduce((sum, place) => sum + place.width + gap, -gap) / 2)
+      for (const place of block) {
+        place.x = x
+        x += place.width + gap
       }
+    }
+    const [wide, high] = spanOf(blocks.reduce((widest, block) => (spanOf(block)[1] - spanOf(block)[0] > spanOf(widest)[1] - spanOf(widest)[0] ? block : widest)))
+    for (const block of blocks) {
+      const [start, end] = spanOf(block)
+      const by = start < wide ? wide - start : end > high ? high - end : 0
+      for (const place of block) place.x += by
     }
     const [left, right] = spanOf(held.map(({ place }) => place))
     const title = direction === 'down' ? sizeOf(group.label) + TITLE_CELLS : 0

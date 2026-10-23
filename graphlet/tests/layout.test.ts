@@ -265,3 +265,18 @@ describe('folding into a room', () => {
     expect(layout.shelves.length).toBeLessThan(15)
   })
 })
+
+describe('frames', () => {
+  test('a group\'s nodes on one shelf are packed a gap apart, however far apart the shelves above would seat them, so its frame is no wider than they are', () => {
+    const graph = readGraph({
+      nodes: [...['Left side', 'Middle one', 'Middle two', 'Right side'].map(id => ({ id, label: id })), { id: 'A', label: 'A', group: 'g' }, { id: 'B', label: 'B', group: 'g' }],
+      edges: [{ from: 'Left side', to: 'A' }, { from: 'Right side', to: 'B' }, { from: 'Middle one', to: 'Middle two' }],
+      direction: 'down',
+    })
+    const layout = laid(graph)
+    const [a, b] = ['A', 'B'].map(id => layout.shelves.flatMap(shelf => shelf.places).find(place => 'node' in place.slot && place.slot.node.id === id))
+    if (a === undefined || b === undefined) throw new Error('both are laid out')
+    expect(b.x - (a.x + a.width)).toBe(2)
+    expect(layout.frames[0]?.width).toBe(b.x + b.width - a.x + 4)
+  })
+})
