@@ -957,16 +957,12 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
     const labels = [...new Set(leaving.map(labelOf).filter(text => text !== ''))]
     return labels.length === 0 ? 0 : labels.reduce((sum, text) => sum + sizeOf(text) + 2, 0) + 1
   }
+  const widths = new Map(graph.nodes.map(node => [node.id, Math.max(widthOf(wordsOf(graph, node, look.labels)), writtenOf(node))]))
+  const size = { widthOf: (node: GraphletNode) => widths.get(node.id) ?? BOX_COLUMNS, gap }
   const layers = layersOf(
     graph,
-    into === undefined
-      ? undefined
-      : {
-          columns: into,
-          widthOf: node => Math.max(widthOf(wordsOf(graph, node, look.labels)), writtenOf(node)),
-          gap,
-          frameOf: (group, inner) => Math.max(inner + 2 * FRAME_MARGIN, sizeOf(graph.groups.find(one => one.id === group)?.label ?? '') + TITLE_CELLS),
-        },
+    into === undefined ? undefined : { ...size, columns: into, frameOf: (group, inner) => Math.max(inner + 2 * FRAME_MARGIN, sizeOf(graph.groups.find(one => one.id === group)?.label ?? '') + TITLE_CELLS) },
+    size,
   )
   const placeOf = new Map<Slot, Place>()
   const shelves: Shelf[] = layers.slots.map((slots, shelf) => {

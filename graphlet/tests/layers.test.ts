@@ -178,6 +178,13 @@ describe('layers', () => {
     expect(lanesOf('out')).toEqual(['g', 'g', undefined])
   })
 
+  test('given how wide each box is, a layer is sat by where what its slots join stands across the layer beside it, where that crosses no more than sitting it by their places', () => {
+    const graph = graphOf(['A long label for a wide box', 'B', 'C', 'x', 'y'], [['B', 'x'], ['A long label for a wide box', 'y'], ['C', 'y']])
+    const size = { widthOf: (node: { label: string }) => node.label.length + 4, gap: 2 }
+    expect(layers(graph)[1]).toEqual(['x', 'y'])
+    expect(layersOf(graph, undefined, size).slots[1]?.map(named)).toEqual(['y', 'x'])
+  })
+
   test('a node stands one layer under the lowest node with an edge to it', () => {
     expect(layers(graphOf(['a', 'b', 'c', 'd'], [['a', 'b'], ['b', 'c'], ['a', 'd'], ['d', 'c']]))).toEqual([['a'], ['b', 'd'], ['c']])
   })

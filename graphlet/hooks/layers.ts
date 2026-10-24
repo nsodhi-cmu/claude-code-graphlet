@@ -429,7 +429,10 @@ function orderOf(nodes: GraphletNode[], edges: Edge[]): string[] {
 }
 
 /** The room a graph is folded into: the columns a layer may take, how wide a node's box is, the room between two neighbors in a layer, and how wide a group's frame is around nodes of it that take `inner` columns side by side. A lane takes a column. */
-export type Fold = { columns: number; widthOf: (node: GraphletNode) => number; gap: number; frameOf: (group: string, inner: number) => number }
+export type Fold = Size & { columns: number; frameOf: (group: string, inner: number) => number }
+
+/** How wide a node's box is, and the room between two neighbors in a layer. */
+export type Size = { widthOf: (node: GraphletNode) => number; gap: number }
 
 /**
  * The layers folded into a room: each layer too wide for it gives up a node
@@ -623,12 +626,25 @@ function crossingsOf(pieces: Piece[], upper: Slot[], lower: Slot[]): number {
 /**
  * A layer in the order that sits each slot by what it is joined to in the
  * layer `beside` it: by the middle of those slots' places, scaled to this
- * layer's length. A slot joined to nothing there keeps its own place, and
- * slots that tie keep their order.
+ * layer's length, or given the `size` of a node's box, by the middle of where
+ * they stand across their layer, a lane a column. A slot joined to nothing
+ * there keeps its own place, and slots that tie keep their order.
  */
-function sorted(layer: Slot[], beside: Slot[], pieces: Piece[], groupOf: (slot: Slot) => string | undefined): Slot[] {
-  const scale = beside.length > 1 && layer.length > 1 ? (layer.length - 1) / (beside.length - 1) : 1
-  const placeOf = new Map(beside.map((slot, place) => [slot, place]))
+function sorted(layer: Slot[], beside: Slot[], pieces: Piece[], groupOf: (slot: Slot) => string | undefined, size?: Size): Slot[] {
+  const middles = (slots: Slot[]): number[] => {
+    if (size === undefined) return slots.map((_, place) => place)
+    const widths = slots.map(slot => ('node' in slot ? size.widthOf(slot.node) : 1))
+    const total = widths.reduce((sum, width) => sum + width + size.gap, -size.gap)
+    let at = -total / 2
+    return widths.map(width => {
+      const middle = at + width / 2
+      at += width + size.gap
+      return middle
+    })
+  }
+  const [own, far] = [middles(layer), middles(beside)]
+  const scale = size !== undefined ? 1 : beside.length > 1 && layer.length > 1 ? (layer.length - 1) / (beside.length - 1) : 1
+  const placeOf = new Map(beside.map((slot, place) => [slot, far[place] ?? place]))
   const joined = new Map<Slot, number[]>()
   for (const piece of pieces) {
     for (const [own, far] of [[piece.upper, piece.lower], [piece.lower, piece.upper]] as const) {
@@ -637,9 +653,9 @@ function sorted(layer: Slot[], beside: Slot[], pieces: Piece[], groupOf: (slot: 
     }
   }
   const pulls = new Map(
-    layer.map((slot, own) => {
+    layer.map((slot, index) => {
       const places = joined.get(slot) ?? []
-      const pull = places.length === 0 ? own : (places.reduce((sum, place) => sum + place, 0) / places.length) * scale
+      const pull = places.length === 0 ? (own[index] ?? index) : (places.reduce((sum, place) => sum + place, 0) / places.length) * scale
       return [slot, pull]
     }),
   )
@@ -713,14 +729,17 @@ function inOrder(slots: Slot[][], groupOf: (slot: Slot) => string | undefined): 
  * passes a lane in each layer between them, after that layer's nodes, which
  * it may share with edges bound for the same node, or else from it. The
  * layers are then ordered against the layer above on the way down and the
- * layer below on the way back up, a few times over, and the ordering whose
- * stretches cross least is the one kept; with nothing crossing, every layer
+ * layer below on the way back up, a few times over, each slot sat by the
+ * places of what it is joined to, and given the `size` of a node's box, again
+ * by where those stand across their layer; the ordering whose stretches
+ * cross least is the one kept, sat by where they stand where it ties; with
+ * nothing crossing, every layer
  * keeps the order it starts in: the graph's `order`, where it has one, and
  * else the order the graph names its nodes in. The slots of a group stand
  * together in each layer, and the groups in one order across the layers.
  * Given a room to `fold` into, the layers are folded into it first.
  */
-export function layersOf(graph: Graph, fold?: Fold): Layers {
+export function layersOf(graph: Graph, fold?: Fold, size: Size | undefined = fold): Layers {
   const ranks = fold === undefined ? ranksOf(graph) : folded(graph, ranksOf(graph), fold)
   const count = Math.max(-1, ...ranks.values()) + 1
   const slotOf = new Map<string, Slot>(graph.nodes.map(node => [node.id, { node }]))
@@ -760,17 +779,25 @@ export function layersOf(graph: Graph, fold?: Fold): Layers {
 
   const crossings = (order: Slot[][]): number =>
     pieces.reduce((sum, between, index) => sum + crossingsOf(between, order[index] ?? [], order[index + 1] ?? []), 0)
-  let best = { slots: [...slots], crossings: crossings(slots) }
-  const keepBest = (): void => {
-    const now = crossings(slots)
-    if (now < best.crossings) best = { slots: [...slots], crossings: now }
+  /** The ordering whose stretches cross least, of those the sweeps from the layers' first order make, each slot sat by its neighbors' places, or by where they stand across the `size` of what is laid beside them. */
+  const sweptBy = (sizing: Size | undefined): { slots: Slot[][]; crossings: number } => {
+    const order = [...slots]
+    let best = { slots: [...order], crossings: crossings(order) }
+    const keepBest = (): void => {
+      const now = crossings(order)
+      if (now < best.crossings) best = { slots: [...order], crossings: now }
+    }
+    for (let sweep = 0; sweep < SWEEPS && best.crossings > 0; sweep += 1) {
+      for (let index = 1; index < count; index += 1) order[index] = sorted(order[index] ?? [], order[index - 1] ?? [], pieces[index - 1] ?? [], groupOfSlot, sizing)
+      keepBest()
+      for (let index = count - 2; index >= 0; index -= 1) order[index] = sorted(order[index] ?? [], order[index + 1] ?? [], pieces[index] ?? [], groupOfSlot, sizing)
+      keepBest()
+    }
+    return best
   }
-  for (let sweep = 0; sweep < SWEEPS && best.crossings > 0; sweep += 1) {
-    for (let index = 1; index < count; index += 1) slots[index] = sorted(slots[index] ?? [], slots[index - 1] ?? [], pieces[index - 1] ?? [], groupOfSlot)
-    keepBest()
-    for (let index = count - 2; index >= 0; index -= 1) slots[index] = sorted(slots[index] ?? [], slots[index + 1] ?? [], pieces[index] ?? [], groupOfSlot)
-    keepBest()
-  }
+  const across = size === undefined ? undefined : sweptBy(size)
+  const placed = across !== undefined && across.crossings === 0 ? across : sweptBy(undefined)
+  const best = across !== undefined && across.crossings <= placed.crossings ? across : placed
   const kept = best.slots.map(layer => together(layer, slot => layer.indexOf(slot), groupOfSlot))
   return { slots: graph.groups.length === 0 ? kept : inOrder(kept, groupOfSlot), pieces, flats }
 }
