@@ -7,7 +7,7 @@ import { readGraph } from './layers'
 import type { Graph } from './layers'
 import type { Direction } from './layout'
 import { pageOf } from './page'
-import { GUIDE, fencedOf, inReply, partsOf, pictureOf } from './reply'
+import { GUIDE, alignedLeft, fencedOf, inReply, partsOf, pictureOf } from './reply'
 import { TIP_ODDS, tipOf } from './tips'
 import { FOCUS_NODES, MOVES, collapsedOf, focusOf, leadOf, openingOf, viewOf } from './view'
 import type { Opening, Vector, View } from './view'
@@ -52,8 +52,6 @@ type Place = {
 }
 
 const ORIGIN: Pan = { x: 0, y: 0 }
-/** The room a graph is copied in where its own does not hold all of it, a site's, which a window shows a part of, or a reply's too narrow for it to fold into: so that a graph no wider than this is copied whole. */
-const SHEET: Room = { columns: MOST_CELLS, rows: MOST_CELLS }
 
 /** The sites graphlet was told of, those `show` named last at the end. */
 const sites = new Map<string, Place>()
@@ -192,6 +190,13 @@ const tallOf = (room: Room): Room => ({ columns: room.columns, rows: MOST_CELLS 
 let view = viewOf({ scroll: 'pinned', labels: 'wrap', edges: 'merged' })
 let folded = inReply(viewOf({ scroll: 'pinned', labels: 'wrap', edges: 'merged' }, true))
 let still = viewOf({ scroll: 'pinned', labels: 'wrap', edges: 'separate' }, true, false)
+/**
+ * How a graph is copied as plain text, all of it at once: on one sheet, with
+ * its edges kept separate and no corner; folded into the room it has, as a
+ * reply's is, or as a site lays it out.
+ */
+let copied = viewOf({ scroll: 'sheet', labels: 'wrap', edges: 'separate' }, true, false)
+let copiedSite = viewOf({ scroll: 'sheet', labels: 'wrap', edges: 'separate' }, false, false)
 /** Which groups a reply's graph to click starts with collapsed: the person's setting. */
 let opening: Opening = 'auto'
 
@@ -233,8 +238,12 @@ const openPage = async ($: EngineInterface, name: string, title: string, graph: 
 const cellsOf = (asked: unknown): number =>
   typeof asked === 'number' && Number.isFinite(asked) ? Math.min(Math.max(Math.floor(asked), 1), MOST_CELLS) : 1
 
-/** A graph as plain text: its still picture, in `room`, a line a row with no blanks at its end. */
-const textOf = (graph: Graph, room: Room): string => pictureOf(still, graph, room).rows.map(row => rowText(row).trimEnd()).join('\n')
+/** A graph as plain text: all of its still picture, laid out by `by` as for `room`, a line a row with no blanks at its end. */
+const textOf = (graph: Graph, room: Room, by: View = copied): string =>
+  alignedLeft(by.whole(graph, room))
+    .rows.map(row => rowText(row).trimEnd())
+    .join('\n')
+    .trimEnd()
 
 /** A site's graph as plain text, as it runs and with its groups as they are there, folded into the site's columns. */
 const plainOf = (at: Held): string => textOf(runningOf(at), tallOf(at.room))
@@ -361,8 +370,8 @@ const siteDrawingOf = ($: EngineInterface, e: RenderInput<SiteComponent>, place:
 }
 
 /** Puts a graph on the clipboard as plain text, as `textOf` draws it, and says whether it went. */
-const copyGraph = async ($: EngineInterface, graph: Graph, room: Room, surface?: RenderSurface): Promise<void> => {
-  const text = textOf(graph, room)
+const copyGraph = async ($: EngineInterface, graph: Graph, room: Room, by: View, surface?: RenderSurface): Promise<void> => {
+  const text = textOf(graph, room, by)
   const copied = await $.ui.copy({ text, ...(surface === undefined ? {} : { surface }) })
   $.ui.toast(copied.isCopied ? 'graphlet: copied the graph as text.' : `graphlet: could not copy the graph (${copied.reason}).`)
 }
@@ -479,6 +488,8 @@ export const register: Register = (on, options) => {
   view = viewOf(look)
   folded = inReply(viewOf(look, true))
   still = viewOf({ ...look, edges: 'separate' }, true, false)
+  copied = viewOf({ ...look, scroll: 'sheet', edges: 'separate' }, true, false)
+  copiedSite = viewOf({ ...look, scroll: 'sheet', edges: 'separate' }, false, false)
   opening = options.groups === 'expanded' || options.groups === 'collapsed' ? options.groups : 'auto'
   const isDrawingReplies = options.replies !== 'off'
   vectored = new Set<Vectored>(options.pictures === 'on' ? ['desktop', 'vscode', 'mobile'] : [])
@@ -730,8 +741,7 @@ export const register: Register = (on, options) => {
       if (before.x !== drag.x || before.y !== drag.y) await acts.scroll({ x: before.x - drag.x, y: before.y - drag.y })
     } else if (copy === true || (query === undefined && key === 'c')) {
       const graph = runningOf(at)
-      const isFitting = isReply && still.measure(graph, at.room.columns).columns <= at.room.columns
-      await copyGraph($, graph, isFitting ? tallOf(at.room) : SHEET, e.surface)
+      await copyGraph($, graph, at.room, isReply ? copied : copiedSite, e.surface)
     } else if (page === true) {
       const graph = runningOf(at)
       await openPage($, isReply ? pageNameOf(site, e.element) : site, isReply ? 'reply' : site, graph, graph.direction)

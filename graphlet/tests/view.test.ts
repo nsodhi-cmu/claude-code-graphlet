@@ -208,3 +208,20 @@ test('collapsed from the order its nodes stand in across the open picture, a gro
   const isInOrder = (shown: Graph): boolean => acrossOf(layoutOf(shown, room, LOOK)).indexOf('n3') < acrossOf(layoutOf(shown, room, LOOK)).indexOf('n4')
   expect(isInOrder(collapsedOf(graph, new Set(['g']), acrossOf(open)))).toBe(isInOrder(graph))
 })
+
+test('drawn whole, a graph still wider than its room once folded shows all of it, laid out as for the room, where a window over the room counts what is past its edge', () => {
+  const next = numbers(109)
+  const count = 10 + Math.floor(next() * 25)
+  const groups = 2 + Math.floor(next() * 4)
+  const graph = readGraph({
+    nodes: Array.from({ length: count }, (_, at) => ({ id: `n${at}`, label: `node ${at}${next() < 0.4 ? ' long label' : ''}`, ...(next() < 0.75 ? { group: `g${Math.floor(next() * groups)}` } : {}) })),
+    edges: Array.from({ length: count + Math.floor(next() * count) }, (_, at) => ({ from: `n${Math.floor(next() * Math.max(1, at % count))}`, to: `n${at % count}` })),
+  })
+  const view = viewOf({ ...LOOK, scroll: 'sheet' }, true, false)
+  const room = { columns: 50, rows: 1000 }
+  const [windowed, whole] = [view.draw(graph, null, room, { x: 0, y: 0 }), view.whole(graph, room)].map(drawing => drawing.rows.map(rowText).join('\n'))
+  expect(windowed).toContain('more →')
+  expect(whole).not.toContain('more')
+  expect(graph.nodes.filter(node => !whole.includes(`node ${node.id.slice(1)}`))).toEqual([])
+  expect(view.whole(graph, room).rows.length).toBe(view.draw(graph, null, room, { x: 0, y: 0 }).rows.length)
+})

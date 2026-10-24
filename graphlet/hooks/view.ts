@@ -164,6 +164,8 @@ export type View = {
   measure: (graph: Graph, columns: number) => GraphletSize
   /** Draws the graph through a window at `pan`, with what is being found marked. */
   draw: (graph: Graph, selected: string | null, room: Room, pan: Pan, finding?: Finding) => Drawing
+  /** Draws all of the graph, laid out as for `room`, with nothing selected, through a window as wide and as tall as it is. */
+  whole: (graph: Graph, room: Room) => Drawing
   /** Draws the graph whole, in SVG, laid out as for `room`: none for a graph with no nodes, or one whose document is longer than a surface takes. */
   vector: (graph: Graph, selected: string | null, room: Room) => Vector | undefined
   /** The graph's nodes in the order its picture, laid out as for `room`, is read. */
@@ -228,6 +230,11 @@ export function viewOf(look: Look, fold = false, hasCorner = true): View {
       return { columns: across, rows: layout.shelves.length === 0 ? 0 : layout.rows + 1 }
     },
     draw: (graph, selected, room, pan, finding) => paint(laid(graph, room), graph, selected, room, pan, finding, hasCorner),
+    whole: (graph, room) => {
+      const layout = laid(graph, room)
+      const across = Math.max(layout.columns, ...layout.shelves.map(shelf => shelf.across))
+      return paint({ ...layout, columns: across }, graph, null, { columns: Math.max(MOST_CELLS, layout.rows + 1), rows: Math.max(MOST_CELLS, layout.rows + 1) }, { x: 0, y: 0 }, undefined, hasCorner)
+    },
     vector: (graph, selected, room) => {
       if (graph.nodes.length === 0) return undefined
       const layout = laid(graph, room)
