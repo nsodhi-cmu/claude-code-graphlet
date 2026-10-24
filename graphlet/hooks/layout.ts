@@ -957,7 +957,7 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
     const labels = [...new Set(leaving.map(labelOf).filter(text => text !== ''))]
     return labels.length === 0 ? 0 : labels.reduce((sum, text) => sum + sizeOf(text) + 2, 0) + 1
   }
-  const widths = new Map(graph.nodes.map(node => [node.id, Math.max(widthOf(wordsOf(graph, node, look.labels)), writtenOf(node))]))
+  const widths = new Map(graph.nodes.map(node => [node.id, direction === 'down' ? Math.max(widthOf(wordsOf(graph, node, look.labels)), writtenOf(node)) : wordsOf(graph, node, look.labels).lines.length + 2]))
   const size = { widthOf: (node: GraphletNode) => widths.get(node.id) ?? BOX_COLUMNS, gap }
   const layers = layersOf(
     graph,

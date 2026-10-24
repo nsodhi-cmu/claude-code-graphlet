@@ -247,7 +247,7 @@ describe('the rows between two shelves', () => {
 })
 
 describe('folding into a room', () => {
-  test('a graph still wider than its room once folded is folded again only where that fits it or takes less room all told, not narrower and far taller', () => {
+  test('a graph still wider than its room once folded is not folded again into one a few columns narrower and far taller', () => {
     const next = numbers(109)
     const count = 10 + Math.floor(next() * 25)
     const groups = 2 + Math.floor(next() * 4)

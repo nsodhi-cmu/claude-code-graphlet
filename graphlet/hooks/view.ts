@@ -196,15 +196,17 @@ export type View = {
  * finds better. A view keeps the layouts it last made, each by what its
  * graph holds, which way it runs, and the columns of its room, and its rows
  * too for one that runs right, and hands the same one back for the same
- * graph in such a room. Its drawings have a corner to copy and open the graph
+ * graph in such a room; and how many layers each graph it last laid out
+ * has. Its drawings have a corner to copy and open the graph
  * by where it `hasCorner`, as a drawing to click has. Its pictures in SVG
  * light the node the pointer is over, where that leaves the document short
  * enough for a surface.
  */
 export function viewOf(look: Look, fold = false, hasCorner = true): View {
   const kept = new Map<string, Layout>()
-  const laidAs = (graph: Graph, room: Room, direction: Direction): Layout => {
-    const key = `${direction} ${room.columns} ${direction === 'right' ? room.rows : ''} ${JSON.stringify(graph)}`
+  const layered = new Map<string, number>()
+  const laidAs = (graph: Graph, room: Room, direction: Direction, text = JSON.stringify(graph)): Layout => {
+    const key = `${direction} ${room.columns} ${direction === 'right' ? room.rows : ''} ${text}`
     const layout = kept.get(key) ?? layoutOf(graph, room, look, fold, direction)
     kept.delete(key)
     kept.set(key, layout)
@@ -213,10 +215,13 @@ export function viewOf(look: Look, fold = false, hasCorner = true): View {
   }
   const laid = (graph: Graph, room: Room): Layout => {
     if (graph.direction !== undefined) return laidAs(graph, room, graph.direction)
-    const down = laidAs(graph, room, 'down')
-    const layers = Math.max(0, ...ranksOf(graph).values()) + 1
+    const text = JSON.stringify(graph)
+    const down = laidAs(graph, room, 'down', text)
+    const layers = layered.get(text) ?? Math.max(0, ...ranksOf(graph).values()) + 1
+    layered.set(text, layers)
+    for (const old of [...layered.keys()].slice(0, Math.max(0, layered.size - KEPT_LAYOUTS))) layered.delete(old)
     if (layers * LEAST_LAYER_COLUMNS + (layers - 1) * LEAST_CHANNEL_COLUMNS > room.columns) return down
-    const right = laidAs(graph, room, 'right')
+    const right = laidAs(graph, room, 'right', text)
     return isRighter(down, right, room) ? right : down
   }
   return {
@@ -233,7 +238,7 @@ export function viewOf(look: Look, fold = false, hasCorner = true): View {
     whole: (graph, room) => {
       const layout = laid(graph, room)
       const across = Math.max(layout.columns, ...layout.shelves.map(shelf => shelf.across))
-      return paint({ ...layout, columns: across }, graph, null, { columns: Math.max(MOST_CELLS, layout.rows + 1), rows: Math.max(MOST_CELLS, layout.rows + 1) }, { x: 0, y: 0 }, undefined, hasCorner)
+      return paint({ ...layout, columns: across, shelves: layout.shelves.map(shelf => ({ ...shelf, across })) }, graph, null, { columns: Math.max(MOST_CELLS, layout.rows + 1), rows: Math.max(MOST_CELLS, layout.rows + 1) }, { x: 0, y: 0 }, undefined, hasCorner)
     },
     vector: (graph, selected, room) => {
       if (graph.nodes.length === 0) return undefined

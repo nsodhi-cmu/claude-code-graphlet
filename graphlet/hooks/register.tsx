@@ -245,7 +245,7 @@ const textOf = (graph: Graph, room: Room, by: View = copied): string =>
     .join('\n')
     .trimEnd()
 
-/** A site's graph as plain text, as it runs and with its groups as they are there, folded into the site's columns. */
+/** A site's graph as plain text, all of it, as it runs and with its groups as they are there, folded into the site's columns, however wide that leaves it. */
 const plainOf = (at: Held): string => textOf(runningOf(at), tallOf(at.room))
 
 /** A drawing's rows as Text, painted as they are: for where nothing in them can be clicked. */
@@ -358,9 +358,9 @@ const vectorSiteOf = ($: EngineInterface, e: VectorSite, place: Place, at: Held)
 /**
  * A site's graph as its surface draws it: on the terminal, to click and move
  * through; on a surface graphlet draws pictures on, as a picture with
- * controls under it; and on any other, as plain text, drawn still, running the way it runs
- * on the terminal, with its groups as they are there, folded into the site's
- * columns and as tall as it needs.
+ * controls under it; and on any other, as plain text, all of it, drawn
+ * still, running the way it runs on the terminal, with its groups as they
+ * are there, folded into the site's columns, however wide that leaves it.
  */
 const siteDrawingOf = ($: EngineInterface, e: RenderInput<SiteComponent>, place: Place, at: Held) => {
   if (e.surface === 'terminal') return siteTreeOf($.ui.resolve(e), e.requestId, e.viewport, at)

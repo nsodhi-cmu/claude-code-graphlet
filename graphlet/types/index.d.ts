@@ -153,8 +153,8 @@ export type Graphlet = {
   /**
    * The graph as plain text: all of its still picture, drawn with nothing
    * selected and its edges kept separate, folded into a room `columns` wide,
-   * however wide that leaves it, a line a row with no blanks at its end. For what a tool hands back to the
-   * model, or a file.
+   * however wide that leaves it, a line a row with no blanks at its end. For
+   * what a tool hands back to the model, or a file.
    */
   text(input: { graph: GraphletGraph; columns: number }): Promise<string>
   /**

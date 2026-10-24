@@ -313,13 +313,13 @@ export function loopEdges(graph: Graph): Set<GraphletEdge> {
 /**
  * The layer of each node with each group laid in layers of its own: the
  * nodes of each group are laid in layers by the edges among them alone, and
- * the group then stands as a run of that many layers, one under another, in
- * the graph as the edges between groups, and between them and the nodes of
- * no group, lay it; so that a group's frame spans as few layers as its own
- * edges let it, and the edges into it and out of it run against the flow
- * where they must.
+ * the group's layers then stand in that order, one under another, in the
+ * graph as the edges between groups, and between them and the nodes of no
+ * group, lay it; so that a group's frame spans as few layers as its own edges
+ * let it, and the edges into it and out of it run against the flow where
+ * they must. None where that would turn a group's own layers around.
  */
-function groupedRanksOf(graph: Graph): Map<string, number> {
+function groupedRanksOf(graph: Graph): Map<string, number> | undefined {
   const inner = new Map<string, number>()
   for (const group of graph.groups) {
     const held = new Set(graph.nodes.filter(node => node.group === group.id).map(node => node.id))
@@ -327,8 +327,10 @@ function groupedRanksOf(graph: Graph): Map<string, number> {
     for (const [id, rank] of flowRanksOf(own)) inner.set(id, rank)
   }
   const groupOf = new Map(graph.nodes.map(node => [node.id, node.group]))
-  /** The id of a group's layer, which no node's can be: it starts with a character no id read from a block has. */
-  const layerOf = (group: string, rank: number): string => `\u0000${group}#${rank}`
+  let mark = '\u0000'
+  while (graph.nodes.some(node => node.id.startsWith(mark))) mark += '\u0000'
+  /** The id of a group's layer: it starts with a `mark` no node's id starts with. */
+  const layerOf = (group: string, rank: number): string => `${mark}${group}#${rank}`
   /** What stands for a node in the graph of groups: the layer of its group that holds it, or itself. */
   const standIn = (id: string): string => {
     const group = groupOf.get(id)
@@ -353,7 +355,8 @@ function groupedRanksOf(graph: Graph): Map<string, number> {
     }),
   ]
   const ranks = flowRanksOf({ ...graph, nodes, edges, groups: [] })
-  return new Map(graph.nodes.map(node => [node.id, ranks.get(standIn(node.id)) ?? 0]))
+  const isInOrder = graph.groups.every(group => Array.from({ length: Math.max(0, (heights.get(group.id) ?? 0) - 1) }, (_, rank) => (ranks.get(layerOf(group.id, rank)) ?? 0) < (ranks.get(layerOf(group.id, rank + 1)) ?? 0)).every(Boolean))
+  return isInOrder ? new Map(graph.nodes.map(node => [node.id, ranks.get(standIn(node.id)) ?? 0])) : undefined
 }
 /** How many edges a graph has for each one that laying its groups in layers of their own may turn against the flow, past those its edges turn anyway: a graph of fewer has none turned so. */
 const UPWARD_EVERY = 20
@@ -369,6 +372,7 @@ export function ranksOf(graph: Graph): Map<string, number> {
   const flowing = flowRanksOf(graph)
   if (graph.groups.length === 0 || graph.nodes.every(node => node.layer !== undefined) || !graph.edges.some(edge => edge.isDirected)) return flowing
   const grouped = groupedRanksOf(graph)
+  if (grouped === undefined) return flowing
   const upward = (ranks: Map<string, number>): number => graph.edges.filter(edge => edge.isDirected && (ranks.get(edge.from) ?? 0) > (ranks.get(edge.to) ?? 0)).length
   const spans = (ranks: Map<string, number>): number =>
     graph.groups.reduce((sum, group) => {
@@ -381,8 +385,8 @@ export function ranksOf(graph: Graph): Map<string, number> {
 
 /**
  * The layer of each node as the edges lay it, 0 the top. Where every node
- * names its layer, those
- * are kept, in their order. Else, where no edge runs one way, a node stands
+ * names its layer, those are kept, in their order. Else, where no edge runs
+ * one way, a node stands
  * as many layers down as it is edges away from the first node the graph
  * names of those it is joined to. Any other graph is laid in layers with the
  * edges that close a loop turned around, found among the edges that run one
@@ -563,7 +567,11 @@ function laneKeys(graph: Graph, ranks: Map<string, number>): Map<Edge, Array<{ k
   }
   /** The group whose frame an edge's lane stands in at a layer: the group of both its ends, or else of the one whose group's frame spans the layer, the higher first. */
   const groupAt = (edge: Edge, ends: [string, string], layer: number): string | undefined =>
-    within(edge) ?? ends.map(end => groupOf.get(end)).find(group => group !== undefined && (reach.get(group)?.first ?? Infinity) <= layer && layer <= (reach.get(group)?.last ?? -Infinity))
+    within(edge) ??
+    ends
+      .toSorted((a, b) => (ranks.get(a) ?? 0) - (ranks.get(b) ?? 0))
+      .map(end => groupOf.get(end))
+      .find(group => group !== undefined && (reach.get(group)?.first ?? Infinity) <= layer && layer <= (reach.get(group)?.last ?? -Infinity))
   const spans = graph.edges.flatMap(edge => {
     const [from, to] = [ranks.get(edge.from) ?? 0, ranks.get(edge.to) ?? 0]
     const layers = Array.from({ length: Math.max(0, Math.abs(from - to) - 1) }, (_, step) => Math.min(from, to) + 1 + step)
@@ -733,11 +741,11 @@ function inOrder(slots: Slot[][], groupOf: (slot: Slot) => string | undefined): 
  * places of what it is joined to, and given the `size` of a node's box, again
  * by where those stand across their layer; the ordering whose stretches
  * cross least is the one kept, sat by where they stand where it ties; with
- * nothing crossing, every layer
- * keeps the order it starts in: the graph's `order`, where it has one, and
- * else the order the graph names its nodes in. The slots of a group stand
- * together in each layer, and the groups in one order across the layers.
- * Given a room to `fold` into, the layers are folded into it first.
+ * nothing crossing, every layer keeps the order it starts in: the graph's
+ * `order`, where it has one, and else the order the graph names its nodes
+ * in. The slots of a group stand together in each layer, and the groups in
+ * one order across the layers. Given a room to `fold` into, the layers are
+ * folded into it first.
  */
 export function layersOf(graph: Graph, fold?: Fold, size: Size | undefined = fold): Layers {
   const ranks = fold === undefined ? ranksOf(graph) : folded(graph, ranksOf(graph), fold)

@@ -158,6 +158,25 @@ describe('layers', () => {
     expect(ranksOf({ ...graph, groups: [], nodes: graph.nodes.map(({ group: _group, ...node }) => node) }).get('x')).toBe(1)
   })
 
+  test('a group\'s own layers are never turned around to lay it in layers of its own, however few edges that turns', () => {
+    const chain = Array.from({ length: 17 }, (_, at) => `z${at}`)
+    const graph = readGraph({
+      nodes: [...['a', 'b', 'c'].map(id => ({ id, label: id, group: 'g' })), ...['x', 'y', ...chain].map(id => ({ id, label: id }))],
+      edges: [['y', 'b'], ['a', 'b'], ['b', 'x'], ['x', 'c'], ...chain.slice(1).map((id, at) => [chain[at] ?? '', id])].map(([from = '', to = '']) => ({ from, to })),
+    })
+    const ranks = ranksOf(graph)
+    expect((ranks.get('a') ?? 0) < (ranks.get('b') ?? 0)).toBe(true)
+    expect((ranks.get('b') ?? 0) < (ranks.get('c') ?? 0)).toBe(true)
+  })
+
+  test('a node whose id looks like a group\'s layer is laid out as a node of its own', () => {
+    const graph = readGraph({
+      nodes: [{ id: '\u0000g#0', label: 'odd' }, { id: 'a', label: 'a', group: 'g' }, { id: 'b', label: 'b', group: 'g' }],
+      edges: [{ from: '\u0000g#0', to: 'a' }, { from: 'a', to: 'b' }],
+    })
+    expect(['\u0000g#0', 'a', 'b'].map(id => ranksOf(graph).get(id))).toEqual([0, 1, 2])
+  })
+
   test('a small graph keeps the layers its edges give where laying a group in layers of its own would turn an edge against the flow', () => {
     const graph = readGraph({
       nodes: ['Router', 'Page', 'Form', 'Api'].map(id => ({ id, label: id, ...(['Router', 'Api'].includes(id) ? { group: 'app' } : {}) })),
@@ -176,6 +195,20 @@ describe('layers', () => {
       layersOf(graph).slots.flatMap(layer => layer.flatMap(slot => ('lane' in slot && slot.lane.some(edge => edge.from === 'a' && edge.to === to) ? [groupOfSlot(slot)] : [])))
     expect(lanesOf('c')).toEqual(['g'])
     expect(lanesOf('out')).toEqual(['g', 'g', undefined])
+  })
+
+  test('where the frames of both its ends\' groups span a lane\'s layer, it stands in the frame of the higher end\'s, whichever way its edge runs', () => {
+    const graph = readGraph({
+      nodes: [
+        { id: 'a', label: 'a', group: 'g', layer: 0 },
+        { id: 'a2', label: 'a2', group: 'g', layer: 2 },
+        { id: 'z1', label: 'z1', group: 'h', layer: 1 },
+        { id: 'z', label: 'z', group: 'h', layer: 3 },
+      ],
+      edges: [['a', 'a2'], ['z1', 'z'], ['z', 'a']].map(([from = '', to = '']) => ({ from, to })),
+    })
+    const lanes = layersOf(graph).slots.flatMap(layer => layer.flatMap(slot => ('lane' in slot && slot.lane.some(edge => edge.from === 'z' && edge.to === 'a') ? [groupOfSlot(slot)] : [])))
+    expect(lanes).toEqual(['g', 'g'])
   })
 
   test('given how wide each box is, a layer is sat by where what its slots join stands across the layer beside it, where that crosses no more than sitting it by their places', () => {

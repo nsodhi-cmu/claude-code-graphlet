@@ -225,3 +225,16 @@ test('drawn whole, a graph still wider than its room once folded shows all of it
   expect(graph.nodes.filter(node => !whole.includes(`node ${node.id.slice(1)}`))).toEqual([])
   expect(view.whole(graph, room).rows.length).toBe(view.draw(graph, null, room, { x: 0, y: 0 }).rows.length)
 })
+
+test('drawn whole, a pinned graph shows each shelf where a window at its start shows it, and the rest of the long ones after', () => {
+  const graph = readGraph({
+    nodes: [{ id: 'root', label: 'root' }, ...Array.from({ length: 12 }, (_, at) => ({ id: `leaf ${at}`, label: `leaf number ${at}` }))],
+    edges: Array.from({ length: 12 }, (_, at) => ({ from: 'root', to: `leaf ${at}` })),
+    direction: 'down',
+  })
+  const view = viewOf(LOOK)
+  const room = { columns: 60, rows: 40 }
+  const [windowed, whole] = [view.draw(graph, null, room, { x: 0, y: 0 }), view.whole(graph, room)].map(drawing => drawing.rows.slice(0, -1).map(rowText))
+  expect(whole.slice(0, windowed.length).map(row => row.slice(0, room.columns - 1).trimEnd())).toEqual(windowed.map(row => row.slice(0, room.columns - 1).trimEnd()))
+  expect(whole.some(row => row.includes('leaf number 11'))).toBe(true)
+})
