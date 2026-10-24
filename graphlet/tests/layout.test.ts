@@ -3,6 +3,8 @@ import { describe, expect, test } from 'claude-code/testing'
 import { LOOK, SEPARATE, graphOf, numbers } from './fixture'
 import { readGraph } from '../hooks/layers'
 import { graphOf as graphLines } from '../hooks/reply'
+import { viewOf } from '../hooks/view'
+import { rowText } from '../hooks/draw'
 import type { Graph } from '../hooks/layers'
 import { breadthOf, costOf, layoutOf, routeOf, wordsOf, wrap } from '../hooks/layout'
 import type { Layout, Wire } from '../hooks/layout'
@@ -267,6 +269,26 @@ describe('folding into a room', () => {
 })
 
 describe('frames', () => {
+  test('a picture of a graph with groups has no more than four columns side by side that hold nothing but lines across them', () => {
+    const next = numbers(23)
+    const pick = (below: number): number => Math.floor(next() * below)
+    const view = viewOf({ ...LOOK, scroll: 'sheet' })
+    for (let run = 0; run < 60; run += 1) {
+      const count = 20 + pick(40)
+      const graph = readGraph({
+        nodes: Array.from({ length: count }, (_, at) => ({ id: `n${at}`, label: `node ${at}`, ...(pick(10) < 7 ? { group: `g${Math.floor((at * 4) / count)}` } : {}) })),
+        edges: Array.from({ length: count + pick(count) }, (_, at) => ({ from: `n${pick(Math.max(1, (at % count)))}`, to: `n${at % count}` })),
+        direction: 'down',
+      })
+      const rows = view.draw(graph, null, { columns: 1000, rows: 1000 }, { x: 0, y: 0 }).rows.slice(0, -1).map(rowText)
+      const width = Math.max(...rows.map(row => row.length))
+      const isEmpty = (x: number): boolean => rows.every(row => [' ', '─', '┈', undefined].includes(row[x]))
+      const kept = Array.from({ length: width }, (_, x) => x).filter(x => !isEmpty(x))
+      const gaps = kept.slice(1).map((x, at) => x - (kept[at] ?? x) - 1)
+      expect(Math.max(0, ...gaps)).toBeLessThanOrEqual(4)
+    }
+  })
+
   test('a frame, with all it holds, and a node no frame holds are each moved toward the edges that join them, so an edge between them runs straight where nothing beside them stops it', () => {
     const graph = readGraph({
       nodes: [{ id: 'Browser', label: 'Browser' }, ...['API', 'Auth', 'Cache'].map(id => ({ id, label: id, group: 'back' })), ...['Postgres', 'Redis'].map(id => ({ id, label: id, group: 'data' })), { id: 'Logs', label: 'Logs' }],

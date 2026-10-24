@@ -92,6 +92,8 @@ const LANE_BEND = 2
 const BREAKS = '/-_.'
 /** The sign in the box of a node with an edge to itself. */
 const LOOP = '↺'
+/** The most empty columns a layout with frames keeps side by side: past it, columns that hold nothing on any shelf but lines that cross them are taken out. */
+const CARVED_GAP = 4
 /** How many times the units on shelves with frames are each moved toward their wires, where nothing stops them sooner. */
 const SETTLES = 8
 /** How far a group's frame stands out from what it holds across a shelf: its border, and a blank inside it. */
@@ -1026,6 +1028,7 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
   reseat(shelves, channels, columns, rankOf, gap)
 
   const frames = framesOf(graph, shelves, channels, direction === 'down' ? columns : room, gap, direction, rankOf)
+  if (frames.length > 0) carve(shelves, channels, frames, direction === 'down' ? columns : room, direction)
   shelves.forEach((shelf, index) => {
     const spans = [...shelf.places, ...frames.filter(frame => frame.first <= index && index <= frame.last)]
     if (spans.length > 0) shelf.width = Math.max(shelf.width, Math.max(...spans.map(one => one.x + one.width)) - Math.min(...spans.map(one => one.x)))
@@ -1272,4 +1275,53 @@ function settle(units: Unit[], channels: Channel[], columns: number, gap: number
   const left = Math.min(...units.map(unit => unit.x()))
   const by = isCentered && reach() - left <= columns ? Math.floor((columns - (reach() - left)) / 2) - left : start - left
   for (const unit of units) unit.move(by)
+}
+
+/**
+ * Takes out a layout's empty columns: where more than `CARVED_GAP` columns
+ * side by side hold nothing on any shelf or in any channel but stretches of
+ * line that cross them, no box, lane, frame's side or label, edge's label, or
+ * line that turns up or down, the rest of them are taken out, and what stands
+ * past them moved back as many. Every shelf moves alike, so no line that ran
+ * straight bends; a graph that runs down and then fits `columns` is set in
+ * their middle.
+ */
+function carve(shelves: Shelf[], channels: Channel[], frames: Frame[], columns: number, direction: Direction): void {
+  const places = shelves.flatMap(shelf => shelf.places)
+  const spans = [...places, ...frames]
+  const [low, high] = [Math.min(...spans.map(one => one.x)), Math.max(...spans.map(one => one.x + one.width))]
+  const isUsed = Array.from({ length: Math.max(0, high - low) }, () => false)
+  const use = (from: number, to: number): void => {
+    for (let x = Math.max(from, low); x < Math.min(to, high); x += 1) isUsed[x - low] = true
+  }
+  for (const place of places) use(place.x, place.x + place.width)
+  for (const frame of frames) {
+    use(frame.x, frame.x + (direction === 'down' ? sizeOf(frame.group.label) + TITLE_CELLS : 1))
+    use(frame.x + frame.width - 1, frame.x + frame.width)
+  }
+  for (const wire of channels.flatMap(channel => channel.wires)) {
+    const { out, into } = routeOf(wire, place => place.x)
+    use(out, out + 1)
+    use(into, into + 1)
+    const label = labelOf(wire.edge)
+    if (direction === 'down' && label !== '' && 'node' in wire.from.place.slot) use(wire.from.place.x + wire.from.at, wire.from.place.x + wire.from.at + 2 + sizeOf(label))
+  }
+  const before: number[] = [0]
+  let run = 0
+  isUsed.forEach((used, at) => {
+    run = used ? 0 : run + 1
+    before.push((before[at] ?? 0) + (run > CARVED_GAP ? 1 : 0))
+  })
+  const moved = (x: number): number => x - (before[Math.min(Math.max(x - low, 0), before.length - 1)] ?? 0)
+  for (const place of places) place.x = moved(place.x)
+  for (const frame of frames) {
+    const end = moved(frame.x + frame.width - 1) + 1
+    frame.x = moved(frame.x)
+    frame.width = end - frame.x
+  }
+  const reach = high - (before.at(-1) ?? 0) - low
+  if (direction !== 'down' || reach > columns) return
+  const by = Math.floor((columns - reach) / 2) - low
+  for (const place of places) place.x += by
+  for (const frame of frames) frame.x += by
 }
