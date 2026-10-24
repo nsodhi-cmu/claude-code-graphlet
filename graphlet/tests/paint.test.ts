@@ -4,7 +4,7 @@ import { LOOK, SEPARATE, SHOP, cellsOf, graphOf, graphRows, numbers, picture, un
 import type { GraphletEdge } from '../types'
 import { sizeOf } from '../hooks/draw'
 import type { Drawing, Hit, Span } from '../hooks/draw'
-import { readGraph, slotGroups } from '../hooks/layers'
+import { groupOfSlot, readGraph } from '../hooks/layers'
 import type { Graph } from '../hooks/layers'
 import { labelOf, layoutOf } from '../hooks/layout'
 import type { Layout, Look, Place } from '../hooks/layout'
@@ -1248,7 +1248,6 @@ describe('what a picture says', () => {
         groups: [{ id: 'g0', label: 'zero' }, { id: 'g1', label: 'a longer name for a group' }],
         direction: 'down',
       })
-      const groupOf = slotGroups(graph)
       const laid = layoutOf(graph, { columns: 40 + pick(100), rows: 0 }, someLook(), pick(2) === 0)
       const layout = { ...laid, columns: Math.max(laid.columns, ...laid.shelves.map(shelf => shelf.across)) }
       const isOn = (frame: (typeof layout.frames)[number], shelf: number): boolean => frame.first <= shelf && shelf <= frame.last
@@ -1257,7 +1256,7 @@ describe('what a picture says', () => {
           for (const place of shelf.places) {
             const isInside = isOn(frame, index) && place.x >= frame.x + 2 && place.x + place.width <= frame.x + frame.width - 2
             const isOver = isOn(frame, index) && place.x < frame.x + frame.width && place.x + place.width > frame.x
-            expect(groupOf(place.slot) === frame.group.id ? isInside : !isOver).toBe(true)
+            expect(groupOfSlot(place.slot) === frame.group.id ? isInside : !isOver).toBe(true)
           }
         })
         for (const other of layout.frames.filter(one => one !== frame && layout.shelves.some((_, index) => isOn(one, index) && isOn(frame, index)))) {

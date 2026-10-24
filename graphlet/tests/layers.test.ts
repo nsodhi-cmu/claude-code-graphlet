@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { graphOf, numbers, undirected } from './fixture'
-import { layersOf, loopEdges, ranksOf, readGraph, slotGroups } from '../hooks/layers'
+import { groupOfSlot, layersOf, loopEdges, ranksOf, readGraph } from '../hooks/layers'
 import type { Graph, Slot } from '../hooks/layers'
 
 const named = (slot: Slot): string => ('node' in slot ? slot.node.id : slot.lane.map(edge => `${edge.from}→${edge.to}`).join(' '))
@@ -148,6 +148,36 @@ describe('layers', () => {
     expect(layers({ ...fan, order: ['d', 'a', 'b'] })).toEqual([['a'], ['d', 'b', 'c']])
   })
 
+  test('a group is laid in layers of its own where that has it span fewer layers and turns no edge against the flow, and its nodes stand together', () => {
+    const graph = readGraph({
+      nodes: ['a', 'b', 'c', 'd', 'x'].map(id => ({ id, label: id, ...(['d', 'x'].includes(id) ? { group: 'g' } : {}) })),
+      edges: [['a', 'b'], ['b', 'c'], ['c', 'd'], ['a', 'x']].map(([from = '', to = '']) => ({ from, to })),
+    })
+    const ranks = ranksOf(graph)
+    expect(ranks.get('x')).toBe(ranks.get('d'))
+    expect(ranksOf({ ...graph, groups: [], nodes: graph.nodes.map(({ group: _group, ...node }) => node) }).get('x')).toBe(1)
+  })
+
+  test('a small graph keeps the layers its edges give where laying a group in layers of its own would turn an edge against the flow', () => {
+    const graph = readGraph({
+      nodes: ['Router', 'Page', 'Form', 'Api'].map(id => ({ id, label: id, ...(['Router', 'Api'].includes(id) ? { group: 'app' } : {}) })),
+      edges: [['Router', 'Page'], ['Page', 'Form'], ['Form', 'Api']].map(([from = '', to = '']) => ({ from, to })),
+    })
+    expect(['Router', 'Page', 'Form', 'Api'].map(id => ranksOf(graph).get(id))).toEqual([0, 1, 2, 3])
+  })
+
+  test('a lane stands in the frame of its edges\' group: both ends\', or else the one end\'s whose frame spans its layer, and past the frame in none', () => {
+    const graph = readGraph({
+      nodes: [...['a', 'b', 'c'].map(id => ({ id, label: id, group: 'g' })), { id: 'm', label: 'm' }, { id: 'out', label: 'out' }],
+      edges: [['a', 'b'], ['b', 'c'], ['a', 'c'], ['a', 'out'], ['c', 'm'], ['m', 'out']].map(([from = '', to = '']) => ({ from, to })),
+      direction: 'down',
+    })
+    const lanesOf = (to: string): Array<string | undefined> =>
+      layersOf(graph).slots.flatMap(layer => layer.flatMap(slot => ('lane' in slot && slot.lane.some(edge => edge.from === 'a' && edge.to === to) ? [groupOfSlot(slot)] : [])))
+    expect(lanesOf('c')).toEqual(['g'])
+    expect(lanesOf('out')).toEqual(['g', 'g', undefined])
+  })
+
   test('a node stands one layer under the lowest node with an edge to it', () => {
     expect(layers(graphOf(['a', 'b', 'c', 'd'], [['a', 'b'], ['b', 'c'], ['a', 'd'], ['d', 'c']]))).toEqual([['a'], ['b', 'd'], ['c']])
   })
@@ -232,10 +262,9 @@ describe('layers', () => {
         nodes: Array.from({ length: count }, (_, index) => ({ id: `n${index}`, label: `n${index}`, ...(pick(3) === 0 ? {} : { group: `g${pick(3)}` }) })),
         edges: Array.from({ length: pick(count * 2) }, () => ({ from: `n${pick(count)}`, to: `n${pick(count)}` })),
       })
-      const groupOf = slotGroups(graph)
       const order: string[][] = []
       for (const layer of layersOf(graph).slots) {
-        const groups = layer.map(groupOf)
+        const groups = layer.map(groupOfSlot)
         const met = [...new Set(groups.flatMap(group => group ?? []))]
         for (const group of met) expect(groups.lastIndexOf(group) - groups.indexOf(group) + 1).toBe(groups.filter(one => one === group).length)
         order.push(met)

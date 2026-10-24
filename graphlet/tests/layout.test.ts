@@ -2,7 +2,6 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import { LOOK, SEPARATE, graphOf, numbers } from './fixture'
 import { readGraph } from '../hooks/layers'
-import { graphOf as graphLines } from '../hooks/reply'
 import { viewOf } from '../hooks/view'
 import { rowText } from '../hooks/draw'
 import type { Graph } from '../hooks/layers'
@@ -248,23 +247,17 @@ describe('the rows between two shelves', () => {
 })
 
 describe('folding into a room', () => {
-  /** A small site in groups, its gallery holding eight photos: too wide for a narrow reply however it folds. */
-  const SITE = readGraph(
-    graphLines([
-      'Browser -> DNS', 'Browser -> TCP -> TLS -> CDN', 'CDN -> Next.js -> Router', 'Router -> Home', 'Router -> Blog', 'Router -> Contact',
-      'Home -> Header', 'Blog -> Header', 'Contact -> Header', 'Blog -> Gallery', 'Contact -> Form',
-      ...Array.from({ length: 8 }, (_, at) => `Gallery -> photo-${at + 1}.webp`),
-      'Form -> /api/contact -> Mailer',
-      'Network:', '  DNS', '  TCP', '  TLS', 'App:', '  Next.js', '  Router', '  /api/contact', '  Mailer', 'Pages:', '  Home', '  Blog', '  Contact',
-      'Components:', '  Header', '  Gallery', '  Form', 'Assets:', ...Array.from({ length: 8 }, (_, at) => `  photo-${at + 1}.webp`),
-    ]),
-  )
-
   test('a graph still wider than its room once folded is folded again only where that fits it or takes less room all told, not narrower and far taller', () => {
-    const layout = layoutOf(SITE, { columns: 60, rows: 1000 }, LOOK, true)
-    expect(breadthOf(layout)).toBeGreaterThan(60)
-    expect(layout.rows).toBeLessThan(90)
-    expect(layout.shelves.length).toBeLessThan(15)
+    const next = numbers(109)
+    const count = 10 + Math.floor(next() * 25)
+    const groups = 2 + Math.floor(next() * 4)
+    const graph = readGraph({
+      nodes: Array.from({ length: count }, (_, at) => ({ id: `n${at}`, label: `node ${at}${next() < 0.4 ? ' long label' : ''}`, ...(next() < 0.75 ? { group: `g${Math.floor(next() * groups)}` } : {}) })),
+      edges: Array.from({ length: count + Math.floor(next() * count) }, (_, at) => ({ from: `n${Math.floor(next() * Math.max(1, at % count))}`, to: `n${at % count}` })),
+    })
+    const layout = layoutOf(graph, { columns: 50, rows: 1000 }, LOOK, true)
+    expect(breadthOf(layout)).toBeGreaterThan(50)
+    expect(layout.rows).toBeLessThan(45)
   })
 })
 
@@ -308,7 +301,7 @@ describe('frames', () => {
     })
     const layout = layoutOf(graph, { columns: 137, rows: 1000 }, { ...LOOK, scroll: 'sheet' }, true)
     const sideways = layout.channels.flatMap(channel => channel.wires).reduce((sum, wire) => sum + Math.abs(routeOf(wire, place => place.x).out - routeOf(wire, place => place.x).into), 0)
-    expect([breadthOf(layout), sideways]).toEqual([34, 12])
+    expect([breadthOf(layout), sideways]).toEqual([34, 4])
   })
 
   test('a group\'s nodes on one shelf are packed a gap apart, however far apart the shelves above would seat them, so its frame is no wider than they are', () => {

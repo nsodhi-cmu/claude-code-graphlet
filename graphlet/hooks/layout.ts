@@ -1,7 +1,7 @@
 import type { GraphletDirection, GraphletEdge, GraphletNode } from '../types'
 import { charactersOf, clipMiddle, fitting, sizeOf } from './draw'
 import type { Room } from './draw'
-import { layersOf, priorityOf, slotGroups } from './layers'
+import { groupOfSlot, layersOf, priorityOf } from './layers'
 import type { Edge, Graph, Group, Piece, Slot } from './layers'
 
 // The layout: a box a node, the boxes of a layer side by side on a shelf with
@@ -1091,9 +1091,8 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
  */
 function framesOf(graph: Graph, shelves: Shelf[], channels: Channel[], columns: number, gap: number, direction: Direction, rankOf: (wire: Wire) => number): Frame[] {
   if (graph.groups.length === 0) return []
-  const groupOf = slotGroups(graph)
   const framed = graph.groups.flatMap(group => {
-    const held = shelves.flatMap((shelf, index) => shelf.places.filter(place => groupOf(place.slot) === group.id).map(place => ({ place, index })))
+    const held = shelves.flatMap((shelf, index) => shelf.places.filter(place => groupOfSlot(place.slot) === group.id).map(place => ({ place, index })))
     if (held.length === 0) return []
     const spanOf = (places: Place[]): [number, number] => [Math.min(...places.map(place => place.x)), Math.max(...places.map(place => place.x + place.width))]
     const blocks = [...new Set(held.map(one => one.index))].map(index => held.filter(one => one.index === index).map(({ place }) => place).toSorted((a, b) => a.x - b.x))

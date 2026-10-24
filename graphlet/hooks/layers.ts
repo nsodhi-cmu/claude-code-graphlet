@@ -311,7 +311,77 @@ export function loopEdges(graph: Graph): Set<GraphletEdge> {
 }
 
 /**
- * The layer of each node, 0 the top. Where every node names its layer, those
+ * The layer of each node with each group laid in layers of its own: the
+ * nodes of each group are laid in layers by the edges among them alone, and
+ * the group then stands as a run of that many layers, one under another, in
+ * the graph as the edges between groups, and between them and the nodes of
+ * no group, lay it; so that a group's frame spans as few layers as its own
+ * edges let it, and the edges into it and out of it run against the flow
+ * where they must.
+ */
+function groupedRanksOf(graph: Graph): Map<string, number> {
+  const inner = new Map<string, number>()
+  for (const group of graph.groups) {
+    const held = new Set(graph.nodes.filter(node => node.group === group.id).map(node => node.id))
+    const own: Graph = { ...graph, nodes: graph.nodes.filter(node => held.has(node.id)), edges: graph.edges.filter(edge => held.has(edge.from) && held.has(edge.to)), groups: [] }
+    for (const [id, rank] of flowRanksOf(own)) inner.set(id, rank)
+  }
+  const groupOf = new Map(graph.nodes.map(node => [node.id, node.group]))
+  /** The id of a group's layer, which no node's can be: it starts with a character no id read from a block has. */
+  const layerOf = (group: string, rank: number): string => `\u0000${group}#${rank}`
+  /** What stands for a node in the graph of groups: the layer of its group that holds it, or itself. */
+  const standIn = (id: string): string => {
+    const group = groupOf.get(id)
+    return group === undefined ? id : layerOf(group, inner.get(id) ?? 0)
+  }
+  const heights = new Map(graph.groups.map(group => [group.id, Math.max(-1, ...graph.nodes.filter(node => node.group === group.id).map(node => inner.get(node.id) ?? 0)) + 1]))
+  const nodes = graph.nodes.flatMap((node): Node[] => {
+    if (node.group === undefined) return [node]
+    if (graph.nodes.find(one => one.group === node.group) !== node) return []
+    const group = node.group
+    return Array.from({ length: heights.get(group) ?? 0 }, (_, rank) => ({ id: layerOf(group, rank), label: '', isForemost: false }))
+  })
+  const kept = new Set<string>()
+  const edges: Edge[] = [
+    ...graph.groups.flatMap(group => Array.from({ length: Math.max(0, (heights.get(group.id) ?? 0) - 1) }, (_, rank) => ({ from: layerOf(group.id, rank), to: layerOf(group.id, rank + 1), isDirected: true }))),
+    ...graph.edges.flatMap((edge): Edge[] => {
+      const [from, to] = [standIn(edge.from), standIn(edge.to)]
+      const key = JSON.stringify([from, to, edge.isDirected])
+      if (from === to || (groupOf.get(edge.from) !== undefined && groupOf.get(edge.from) === groupOf.get(edge.to)) || kept.has(key)) return []
+      kept.add(key)
+      return [{ ...edge, from, to }]
+    }),
+  ]
+  const ranks = flowRanksOf({ ...graph, nodes, edges, groups: [] })
+  return new Map(graph.nodes.map(node => [node.id, ranks.get(standIn(node.id)) ?? 0]))
+}
+/** How many edges a graph has for each one that laying its groups in layers of their own may turn against the flow, past those its edges turn anyway: a graph of fewer has none turned so. */
+const UPWARD_EVERY = 20
+
+/**
+ * The layer of each node, 0 the top: as the edges lay it, `flowRanksOf`; or,
+ * in a graph with groups, some edge that runs one way, and nodes that name no
+ * layers, with each group laid in layers of its own, `groupedRanksOf`, where
+ * that has the groups span fewer layers all told and turns no more than one
+ * edge in `UPWARD_EVERY` against the flow past those the edges turn anyway.
+ */
+export function ranksOf(graph: Graph): Map<string, number> {
+  const flowing = flowRanksOf(graph)
+  if (graph.groups.length === 0 || graph.nodes.every(node => node.layer !== undefined) || !graph.edges.some(edge => edge.isDirected)) return flowing
+  const grouped = groupedRanksOf(graph)
+  const upward = (ranks: Map<string, number>): number => graph.edges.filter(edge => edge.isDirected && (ranks.get(edge.from) ?? 0) > (ranks.get(edge.to) ?? 0)).length
+  const spans = (ranks: Map<string, number>): number =>
+    graph.groups.reduce((sum, group) => {
+      const at = graph.nodes.filter(node => node.group === group.id).map(node => ranks.get(node.id) ?? 0)
+      return sum + (at.length === 0 ? 0 : Math.max(...at) - Math.min(...at))
+    }, 0)
+  const isTighter = spans(grouped) < spans(flowing) && upward(grouped) - upward(flowing) <= Math.floor(graph.edges.length / UPWARD_EVERY)
+  return isTighter ? grouped : flowing
+}
+
+/**
+ * The layer of each node as the edges lay it, 0 the top. Where every node
+ * names its layer, those
  * are kept, in their order. Else, where no edge runs one way, a node stands
  * as many layers down as it is edges away from the first node the graph
  * names of those it is joined to. Any other graph is laid in layers with the
@@ -321,7 +391,7 @@ export function loopEdges(graph: Graph): Set<GraphletEdge> {
  * laid; then each such edge runs forward along an order the edges that run
  * one way keep as they are laid, so that none of them closes a loop.
  */
-export function ranksOf(graph: Graph): Map<string, number> {
+function flowRanksOf(graph: Graph): Map<string, number> {
   if (graph.nodes.every(node => node.layer !== undefined)) {
     return packed(new Map(graph.nodes.map(node => [node.id, node.layer ?? 0])))
   }
@@ -456,9 +526,10 @@ function folded(graph: Graph, ranks: Map<string, number>, fold: Fold): Map<strin
 /**
  * What stands in a layer: a node, or a lane, which the edges bound for one
  * node pass through the layer in, the one way, up it where they run against
- * the flow. A lane holds the edges it carries there.
+ * the flow. A lane holds the edges it carries there, and stands in the frame
+ * of its `group`, where it has one.
  */
-export type Slot = { node: Node } | { lane: Edge[]; isUp: boolean }
+export type Slot = { node: Node } | { lane: Edge[]; isUp: boolean; group?: string }
 
 /** The two nodes of an edge: the one it leaves and the one it is bound for; for an edge that runs no way, the higher and the lower. */
 const endsOf = (edge: Edge, ranks: Map<string, number>): [string, string] =>
@@ -468,7 +539,7 @@ const endsOf = (edge: Edge, ranks: Map<string, number>): [string, string] =>
  * The lane each edge passes each layer between its ends in, as a key the
  * edges that share the lane have in common, from the layer under its higher
  * end down. In a layer, the edges of one kind that pass it the one way, with
- * one label and one tone, both within one group or not, bound for the same
+ * one label and one tone, in one group's frame or in none, bound for the same
  * node share a lane, which carries what
  * reaches that node from many; of the edges that share no such lane
  * anywhere, those from the same node share one, which carries what leaves it
@@ -477,8 +548,19 @@ const endsOf = (edge: Edge, ranks: Map<string, number>): [string, string] =>
  * node, or comes from it; and a lane from a node feeds no lane others reach,
  * where their lines would meet.
  */
-function laneKeys(graph: Graph, ranks: Map<string, number>): Map<Edge, string[]> {
+function laneKeys(graph: Graph, ranks: Map<string, number>): Map<Edge, Array<{ key: string; group: string | undefined }>> {
   const within = innerGroups(graph)
+  const groupOf = new Map(graph.nodes.map(node => [node.id, node.group]))
+  const reach = new Map<string, { first: number; last: number }>()
+  for (const node of graph.nodes) {
+    const [group, rank] = [node.group, ranks.get(node.id) ?? 0]
+    if (group === undefined) continue
+    const span = reach.get(group)
+    reach.set(group, { first: Math.min(span?.first ?? rank, rank), last: Math.max(span?.last ?? rank, rank) })
+  }
+  /** The group whose frame an edge's lane stands in at a layer: the group of both its ends, or else of the one whose group's frame spans the layer, the higher first. */
+  const groupAt = (edge: Edge, ends: [string, string], layer: number): string | undefined =>
+    within(edge) ?? ends.map(end => groupOf.get(end)).find(group => group !== undefined && (reach.get(group)?.first ?? Infinity) <= layer && layer <= (reach.get(group)?.last ?? -Infinity))
   const spans = graph.edges.flatMap(edge => {
     const [from, to] = [ranks.get(edge.from) ?? 0, ranks.get(edge.to) ?? 0]
     const layers = Array.from({ length: Math.max(0, Math.abs(from - to) - 1) }, (_, step) => Math.min(from, to) + 1 + step)
@@ -488,8 +570,8 @@ function laneKeys(graph: Graph, ranks: Map<string, number>): Map<Edge, string[]>
     for (const key of keys) counts.set(key, (counts.get(key) ?? 0) + 1)
   }
   const [toward, from] = [new Map<string, number>(), new Map<string, number>()]
-  const towardKey = (span: (typeof spans)[number], layer: number): string => JSON.stringify([layer, span.isUp, span.edge.isDirected, span.edge.label, span.edge.tone, within(span.edge), 'to', span.ends[1]])
-  const fromKey = (span: (typeof spans)[number], layer: number): string => JSON.stringify([layer, span.isUp, span.edge.isDirected, span.edge.label, span.edge.tone, within(span.edge), 'from', span.ends[0]])
+  const towardKey = (span: (typeof spans)[number], layer: number): string => JSON.stringify([layer, span.isUp, span.edge.isDirected, span.edge.label, span.edge.tone, groupAt(span.edge, span.ends, layer), 'to', span.ends[1]])
+  const fromKey = (span: (typeof spans)[number], layer: number): string => JSON.stringify([layer, span.isUp, span.edge.isDirected, span.edge.label, span.edge.tone, groupAt(span.edge, span.ends, layer), 'from', span.ends[0]])
   for (const span of spans) count(span.layers.map(layer => towardKey(span, layer)), toward)
   const isBound = (span: (typeof spans)[number]): boolean => span.layers.some(layer => (toward.get(towardKey(span, layer)) ?? 0) > 1)
   for (const span of spans) if (!isBound(span)) count(span.layers.map(layer => fromKey(span, layer)), from)
@@ -498,7 +580,8 @@ function laneKeys(graph: Graph, ranks: Map<string, number>): Map<Edge, string[]>
       span.edge,
       span.layers.map(layer => {
         const [bound, leaving] = [towardKey(span, layer), fromKey(span, layer)]
-        return (toward.get(bound) ?? 0) > 1 ? bound : !isBound(span) && (from.get(leaving) ?? 0) > 1 ? leaving : JSON.stringify([layer, index])
+        const key = (toward.get(bound) ?? 0) > 1 ? bound : !isBound(span) && (from.get(leaving) ?? 0) > 1 ? leaving : JSON.stringify([layer, index])
+        return { key, group: groupAt(span.edge, span.ends, layer) }
       }),
     ]),
   )
@@ -563,11 +646,8 @@ function sorted(layer: Slot[], beside: Slot[], pieces: Piece[], groupOf: (slot: 
   return together([...layer].sort((a, b) => (pulls.get(a) ?? 0) - (pulls.get(b) ?? 0)), slot => pulls.get(slot) ?? 0, groupOf)
 }
 
-/** Each slot's group: a node's, or a lane's whose edges are within one group. */
-export function slotGroups(graph: Graph): (slot: Slot) => string | undefined {
-  const within = innerGroups(graph)
-  return slot => ('node' in slot ? slot.node.group : slot.lane[0] === undefined ? undefined : within(slot.lane[0]))
-}
+/** A slot's group: a node's, or the group a lane stands in the frame of. */
+export const groupOfSlot = (slot: Slot): string | undefined => ('node' in slot ? slot.node.group : slot.group)
 
 /** Which group each edge is within: the group of both its nodes, where they are of one; else none. */
 function innerGroups(graph: Graph): (edge: GraphletEdge) => string | undefined {
@@ -651,7 +731,6 @@ export function layersOf(graph: Graph, fold?: Fold): Layers {
   const flats: Edge[][] = Array.from({ length: count }, () => [])
   const lanes = new Map<string, Slot & { lane: Edge[] }>()
   const laneKeysOf = laneKeys(graph, ranks)
-  const groupOf = slotGroups(graph)
 
   for (const edge of graph.edges) {
     const [from, to] = [ranks.get(edge.from) ?? 0, ranks.get(edge.to) ?? 0]
@@ -666,8 +745,8 @@ export function layersOf(graph: Graph, fold?: Fold): Layers {
     let upper = slotOf.get(from > to ? edge.to : edge.from)
     const keys = laneKeysOf.get(edge) ?? []
     for (let layer = first; layer < last && upper !== undefined && bottom !== undefined; layer += 1) {
-      const key = keys[layer - first] ?? ''
-      const lane = layer + 1 === last ? undefined : (lanes.get(key) ?? { lane: [], isUp })
+      const { key = '', group } = keys[layer - first] ?? {}
+      const lane = layer + 1 === last ? undefined : (lanes.get(key) ?? { lane: [], isUp, ...(group === undefined ? {} : { group }) })
       if (lane !== undefined && !lanes.has(key)) {
         lanes.set(key, lane)
         slots[layer + 1]?.push(lane)
@@ -687,11 +766,11 @@ export function layersOf(graph: Graph, fold?: Fold): Layers {
     if (now < best.crossings) best = { slots: [...slots], crossings: now }
   }
   for (let sweep = 0; sweep < SWEEPS && best.crossings > 0; sweep += 1) {
-    for (let index = 1; index < count; index += 1) slots[index] = sorted(slots[index] ?? [], slots[index - 1] ?? [], pieces[index - 1] ?? [], groupOf)
+    for (let index = 1; index < count; index += 1) slots[index] = sorted(slots[index] ?? [], slots[index - 1] ?? [], pieces[index - 1] ?? [], groupOfSlot)
     keepBest()
-    for (let index = count - 2; index >= 0; index -= 1) slots[index] = sorted(slots[index] ?? [], slots[index + 1] ?? [], pieces[index] ?? [], groupOf)
+    for (let index = count - 2; index >= 0; index -= 1) slots[index] = sorted(slots[index] ?? [], slots[index + 1] ?? [], pieces[index] ?? [], groupOfSlot)
     keepBest()
   }
-  const kept = best.slots.map(layer => together(layer, slot => layer.indexOf(slot), groupOf))
-  return { slots: graph.groups.length === 0 ? kept : inOrder(kept, groupOf), pieces, flats }
+  const kept = best.slots.map(layer => together(layer, slot => layer.indexOf(slot), groupOfSlot))
+  return { slots: graph.groups.length === 0 ? kept : inOrder(kept, groupOfSlot), pieces, flats }
 }
