@@ -72,8 +72,9 @@ const COLLAPSED = '▸'
  * after `COLLAPSED`, in its tone,
  * and how many nodes it holds as its badge; put foremost where any of them
  * is, and of the highest priority any of them has. An edge to or from any of
- * them is to or from the box, given once for each label and tone however
- * many of them it joins it to; an edge between two of them is not drawn.
+ * them is to or from the box, with no label, given once for each tone
+ * however many of them it joins it to; an edge between two of them is not
+ * drawn.
  * Given the `order` its nodes stand in across a picture of the graph with
  * every group open, its layers start in that order, each box where the first
  * of its nodes stands; and given the layers they `stood` in, each node stays
@@ -97,11 +98,13 @@ export function collapsedOf(graph: Graph, shut: Set<string>, order?: string[], s
   const kept = new Set<string>()
   const edges = graph.edges.flatMap((edge): Edge[] => {
     const [from, to] = [into.get(edge.from) ?? edge.from, into.get(edge.to) ?? edge.to]
-    if (from === to && (into.has(edge.from) || into.has(edge.to))) return []
-    const key = JSON.stringify([...(edge.isDirected ? [from, to] : [from, to].sort().concat('--')), edge.label ?? '', edge.tone ?? ''])
+    const isShut = into.has(edge.from) || into.has(edge.to)
+    if (from === to && isShut) return []
+    const { label, ...unlabeled } = edge
+    const key = JSON.stringify([...(edge.isDirected ? [from, to] : [from, to].sort().concat('--')), isShut ? '' : (label ?? ''), edge.tone ?? ''])
     if (kept.has(key)) return []
     kept.add(key)
-    return [{ ...edge, from, to }]
+    return [{ ...(isShut ? unlabeled : edge), from, to }]
   })
   const collapsed = { ...graph, nodes, edges, groups: graph.groups.filter(group => !shut.has(group.id)) }
   const ordered = order === undefined ? collapsed : { ...collapsed, order: [...new Set(order.map(id => into.get(id) ?? id))] }

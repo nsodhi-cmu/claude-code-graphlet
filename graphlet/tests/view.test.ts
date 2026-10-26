@@ -131,7 +131,7 @@ test('a graph that says not which way it runs runs right where that fits its roo
   expect(view.measure(chain, 80)).toEqual({ columns: 41, rows: 4 })
 })
 
-test('collapsed, a group is one box where its first node stood, saying its label and how many nodes it holds, its edges those of all of them once for each label and tone, and none between two of them', () => {
+test('collapsed, a group is one box where its first node stood, saying its label and how many nodes it holds, its edges those of all of them with no labels, once for each tone, and none between two of them', () => {
   const graph = readGraph({
     nodes: [{ id: 'in', label: 'in' }, { id: 'a', label: 'a', group: 'g' }, { id: 'out', label: 'out' }, { id: 'b', label: 'b', group: 'g', priority: 2 }],
     edges: [{ from: 'in', to: 'a' }, { from: 'in', to: 'b' }, { from: 'a', to: 'b' }, { from: 'b', to: 'out', tone: 'bad' }, { from: 'a', to: 'a' }],
@@ -150,12 +150,13 @@ test('collapsed, a group is one box where its first node stood, saying its label
   expect(shut.groups).toEqual([])
   expect(collapsedOf(graph, new Set())).toBe(graph)
   const toned = readGraph({
-    nodes: [{ id: 'm1', label: 'm1', group: 'g' }, { id: 'm2', label: 'm2', group: 'g' }, { id: 'x', label: 'x' }],
-    edges: [{ from: 'm1', to: 'x' }, { from: 'm2', to: 'x', tone: 'bad' }],
+    nodes: [{ id: 'm1', label: 'm1', group: 'g' }, { id: 'm2', label: 'm2', group: 'g' }, { id: 'x', label: 'x' }, { id: 'y', label: 'y' }],
+    edges: [{ from: 'm1', to: 'x', label: 'reads' }, { from: 'm2', to: 'x', label: 'writes' }, { from: 'm2', to: 'x', tone: 'bad', label: 'fails' }, { from: 'x', to: 'y', label: 'keeps' }],
   })
   expect(collapsedOf(toned, new Set(['g'])).edges).toEqual([
     { from: 'g', to: 'x', isDirected: true },
     { from: 'g', to: 'x', isDirected: true, tone: 'bad' },
+    { from: 'x', to: 'y', isDirected: true, label: 'keeps' },
   ])
 })
 

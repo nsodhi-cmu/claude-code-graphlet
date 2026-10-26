@@ -29,7 +29,7 @@ A drawing is rows of painted text, and the rectangles of them that answer a clic
 - `↺` in a box says the node has an edge to itself.
 - A box with a heavy frame, `┏━┓`, and a bold label is a node the graph puts foremost: one of the highest priority its nodes have, where that is above 0 and above another node's.
 - A frame with round corners, `╭─ Backend ─╮`, holds the nodes of a group, and nothing else. A line that crosses its border is an edge into the group or out of it, and passes over the border, which is broken there.
-- A box with round corners that says `▸` and a count, `▸ Backend  3`, is a collapsed group, standing for all its nodes: its edges are theirs. Selected, it has a double frame, as any box does.
+- A box with round corners that says `▸` and a count, `▸ Backend  3`, is a collapsed group, standing for all its nodes: its edges are theirs, with no labels. Selected, it has a double frame, as any box does.
 - A box with a double frame, `╔═╗`, is the selected node's, and its edges, their labels, and the boxes they reach are lit, as [What Is Selected](#what-is-selected) tells.
 
 An undirected graph is drawn the same way, with no arrowheads and no flow, and in a graph with edges of both kinds, each is drawn as its kind is:
