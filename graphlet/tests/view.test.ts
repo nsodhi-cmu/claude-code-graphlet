@@ -238,3 +238,14 @@ test('drawn whole, a pinned graph shows each shelf where a window at its start s
   expect(whole.slice(0, windowed.length).map(row => row.slice(0, room.columns - 1).trimEnd())).toEqual(windowed.map(row => row.slice(0, room.columns - 1).trimEnd()))
   expect(whole.some(row => row.includes('leaf number 11'))).toBe(true)
 })
+
+test('collapsed from the layers its nodes stood in with every group open, a group leaves every other node in its place among the layers, and its box in the place of the highest of its nodes', () => {
+  const graph = readGraph({
+    nodes: ['a', 'b', 'c', 'd', 'e'].map(id => ({ id, label: id, ...(['a', 'c', 'd'].includes(id) ? { group: 'g' } : {}) })),
+    edges: [['a', 'b'], ['a', 'c'], ['c', 'd'], ['c', 'e']].map(([from = '', to = '']) => ({ from, to })),
+  })
+  const open = ranksOf(graph)
+  const [kept, fresh] = [ranksOf(collapsedOf(graph, new Set(['g']), undefined, open)), ranksOf(collapsedOf(graph, new Set(['g'])))]
+  expect([kept.get('g'), kept.get('b'), kept.get('e')]).toEqual([open.get('a'), open.get('b'), open.get('e')])
+  expect(fresh.get('b')).toBe(fresh.get('e'))
+})

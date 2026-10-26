@@ -24,9 +24,10 @@ export type Group = { id: string; label: string; tone?: GraphletTone; isCollapse
  * its nodes, the groups that hold any of its nodes, how many nodes and edges
  * it was given past the most that are read, which are left out, and which way
  * it runs, where it says; and where it has one, the `order` the nodes of each
- * layer start in, by their ids, those it leaves out after them.
+ * layer start in, by their ids, those it leaves out after them, and the layer
+ * each node is `kept` in, by its id.
  */
-export type Graph = { nodes: Node[]; edges: Edge[]; groups: Group[]; unread: { nodes: number; edges: number }; direction?: GraphletDirection; order?: string[] }
+export type Graph = { nodes: Node[]; edges: Edge[]; groups: Group[]; unread: { nodes: number; edges: number }; direction?: GraphletDirection; order?: string[]; kept?: Record<string, number> }
 
 /** How many of the nodes no edge reaches the edges are followed from first, each in turn, to find the loops that lay the graph in fewest layers. */
 const LOOP_STARTS = 8
@@ -377,13 +378,16 @@ function groupedRanksOf(graph: Graph): Map<string, number> | undefined {
 const UPWARD_EVERY = 20
 
 /**
- * The layer of each node, 0 the top: as the edges lay it, `flowRanksOf`; or,
+ * The layer of each node, 0 the top: where the graph keeps its nodes' layers,
+ * those, with none left empty; else as the edges lay it, `flowRanksOf`; or,
  * in a graph with groups, some edge that runs one way, and nodes that name no
  * layers, with each group laid in layers of its own, `groupedRanksOf`, where
  * that has the groups span fewer layers all told and turns no more than one
  * edge in `UPWARD_EVERY` against the flow past those the edges turn anyway.
  */
 export function ranksOf(graph: Graph): Map<string, number> {
+  const { kept } = graph
+  if (kept !== undefined) return packed(new Map(graph.nodes.map(node => [node.id, kept[node.id] ?? 0])))
   const flowing = flowRanksOf(graph)
   if (graph.groups.length === 0 || graph.nodes.every(node => node.layer !== undefined) || !graph.edges.some(edge => edge.isDirected)) return flowing
   const grouped = groupedRanksOf(graph)

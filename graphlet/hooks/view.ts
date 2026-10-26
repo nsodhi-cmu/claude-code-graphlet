@@ -76,10 +76,12 @@ const COLLAPSED = '▸'
  * many of them it joins it to; an edge between two of them is not drawn.
  * Given the `order` its nodes stand in across a picture of the graph with
  * every group open, its layers start in that order, each box where the first
- * of its nodes stands, so that what a collapse leaves stands as it stood. A graph with
+ * of its nodes stands; and given the layers they `stood` in, each node stays
+ * in its own, and each box in the highest of its nodes', so that what a
+ * collapse leaves stands as it stood. A graph with
  * nothing shut is as it is.
  */
-export function collapsedOf(graph: Graph, shut: Set<string>, order?: string[]): Graph {
+export function collapsedOf(graph: Graph, shut: Set<string>, order?: string[], stood?: Map<string, number>): Graph {
   const groups = graph.groups.filter(group => shut.has(group.id))
   if (groups.length === 0) return graph
   const into = new Map(graph.nodes.flatMap(node => (node.group !== undefined && shut.has(node.group) ? [[node.id, node.group] as const] : [])))
@@ -102,7 +104,14 @@ export function collapsedOf(graph: Graph, shut: Set<string>, order?: string[]): 
     return [{ ...edge, from, to }]
   })
   const collapsed = { ...graph, nodes, edges, groups: graph.groups.filter(group => !shut.has(group.id)) }
-  return order === undefined ? collapsed : { ...collapsed, order: [...new Set(order.map(id => into.get(id) ?? id))] }
+  const ordered = order === undefined ? collapsed : { ...collapsed, order: [...new Set(order.map(id => into.get(id) ?? id))] }
+  if (stood === undefined) return ordered
+  const layers: Record<string, number> = {}
+  for (const node of graph.nodes) {
+    const id = into.get(node.id) ?? node.id
+    layers[id] = Math.min(layers[id] ?? Infinity, stood.get(node.id) ?? 0)
+  }
+  return { ...ordered, kept: layers }
 }
 
 /** Which of a graph's groups it starts with collapsed: none, every group of more than one node, or under `auto`, one or the other as the graph and its room are. */

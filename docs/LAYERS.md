@@ -21,7 +21,7 @@ A graph is drawn in layers: every node in a layer, a row of the drawing, or a co
 
 Where every node names its `layer`, `ranksOf` keeps those, in their order, numbered from the top with none left empty.
 
-Where any node leaves it out, every layer is worked out from the edges.
+Where any node leaves it out, every layer is worked out from the edges. A graph with a group collapsed is not worked out again: every node keeps the layer it stood in with every group open, and each group's box the layer of the highest of its nodes, with no layer left empty, so that collapsing or opening a group moves nothing else up or down.
 
 An undirected graph, every edge of it running no way, has no flow to follow. A node stands as many layers down as the fewest edges between it and the first node the graph names of those it is joined to, through any others: the graph spreads down, a layer an edge, from where it starts. Each part of the graph that no edge joins to the rest starts again at the top. So every edge joins two neighboring layers or two nodes of one layer, and a loop closes where its two sides meet, at a node or by an edge between two nodes of one layer, with nothing running back up. To choose where a graph starts, a mod names that node first.
 
