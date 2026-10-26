@@ -282,6 +282,15 @@ describe('layers', () => {
     expect(layers(graph)).toEqual([['a'], ['b', 'late'], ['c']])
   })
 
+  test('a node of a group moves down toward its edges no lower than the rest of its group, so the group\'s frame is no taller for it', () => {
+    const graph = readGraph({
+      nodes: [...['Visitor', 'Browser', 'Reader', 'Crawler'].map(id => ({ id, label: id, group: 'people' })), ...['DNS', 'Edge', 'Router', 'robots.txt'].map(id => ({ id, label: id }))],
+      edges: [['Visitor', 'Browser'], ['Browser', 'DNS'], ['DNS', 'Reader'], ['DNS', 'Edge'], ['Edge', 'Router'], ['Router', 'robots.txt'], ['Crawler', 'robots.txt']].map(([from = '', to = '']) => ({ from, to })),
+    })
+    const ranks = ranksOf(graph)
+    expect(['Visitor', 'Browser', 'Reader', 'Crawler', 'robots.txt'].map(id => ranks.get(id))).toEqual([0, 1, 3, 3, 5])
+  })
+
   test('an edge between layers that are not neighbors has a lane in each layer it passes through', () => {
     const graph = graphOf(['a', 'b', 'c', 'd'], [['a', 'b'], ['b', 'c'], ['c', 'd'], ['a', 'd']])
     expect(layers(graph)).toEqual([['a'], ['b', 'a→d'], ['c', 'a→d'], ['d']])

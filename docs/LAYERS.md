@@ -33,7 +33,7 @@ A graph with any edge that runs one way runs down the way its edges do. An edge 
 
    Read the other way around, either set of edges leaves a graph with no loop. Following keeps a flow that returns to its start drawn from its start; the order keeps a graph of many loops from running its edges long.
 2. A node then stands one layer under the lowest node with an edge to it.
-3. A node with more edges below it than above it moves down to stand just over the nearest node its edges reach, which makes more edges shorter than longer.
+3. A node with more edges below it than above it moves down to stand just over the nearest node its edges reach, which makes more edges shorter than longer; but a node of a group moves no lower than the lowest of the rest of its group stood, so that its group's frame is no taller for it.
 
 So a directed graph runs down the drawing from where it starts, and the edge of a loop that runs back up is, where the loop is simple, the one that returns to where the loop was entered.
 

@@ -267,7 +267,8 @@ function distancesOf(graph: Graph): Map<string, number> {
  * The layer of each node of a directed graph, 0 the top, with the edges that
  * close a loop read the other way around: a node stands one layer under the
  * lowest node with an edge to it, and is then moved down toward what its edges
- * reach wherever that makes more edges shorter than longer.
+ * reach wherever that makes more edges shorter than longer, a node of a group
+ * no lower than the lowest of the rest of its group stood.
  */
 function ranksWith(graph: Graph, closing: Set<GraphletEdge>): Map<string, number> {
   const [above, below] = [new Map<string, string[]>(), new Map<string, string[]>()]
@@ -287,13 +288,22 @@ function ranksWith(graph: Graph, closing: Set<GraphletEdge>): Map<string, number
   }
   for (const node of graph.nodes) rankOf(node.id)
 
+  const members = new Map<string, string[]>()
+  for (const node of graph.nodes) if (node.group !== undefined) members.set(node.group, [...(members.get(node.group) ?? []), node.id])
+  const lowest = new Map(
+    graph.nodes.flatMap(node => {
+      const others = (members.get(node.group ?? '') ?? []).filter(id => id !== node.id)
+      return others.length === 0 ? [] : [[node.id, Math.max(...others.map(id => ranks.get(id) ?? 0))] as const]
+    }),
+  )
   const settled = new Set<string>()
   const settle = (id: string): void => {
     if (settled.has(id)) return
     settled.add(id)
     const downs = below.get(id) ?? []
     for (const to of downs) settle(to)
-    if (downs.length > (above.get(id) ?? []).length) ranks.set(id, Math.min(...downs.map(to => ranks.get(to) ?? 0)) - 1)
+    const rank = ranks.get(id) ?? 0
+    if (downs.length > (above.get(id) ?? []).length) ranks.set(id, Math.min(Math.min(...downs.map(to => ranks.get(to) ?? 0)) - 1, Math.max(rank, lowest.get(id) ?? Infinity)))
   }
   for (const node of graph.nodes) settle(node.id)
   return packed(ranks)
