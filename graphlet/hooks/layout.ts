@@ -96,6 +96,8 @@ const LOOP = '↺'
 const CARVED_GAP = 4
 /** How many times the units on shelves with frames are each moved toward their wires, where nothing stops them sooner. */
 const SETTLES = 8
+/** How many times over the shelves of a group's frame are lined up with one another by the wires between them. */
+const ALIGNS = 4
 /** How far a group's frame stands out from what it holds across a shelf: its border, and a blank inside it. */
 const FRAME_MARGIN = 2
 /** What a frame's top border takes besides its label: its two corners, a cell of border and a blank before the label, and a blank and a cell of border after. */
@@ -542,6 +544,9 @@ function seat(shelf: Shelf, columns: number, beside: Place[], wires: Wire[], gap
   for (const place of places) place.x += best
 }
 
+/** How much a wire weighs where the place at its end `near` is moved toward it: a lane's `LANE_WEIGHT` times a box's, and one with the flow `FLOW_WEIGHT` times one against it. */
+const weightOf = (near: End, wire: Wire): number => ('lane' in near.place.slot ? LANE_WEIGHT : 1) * (wire.isUp ? 1 : FLOW_WEIGHT)
+
 /** A column a place's wire would have it stand at, how much the wire weighs, and its rank. */
 type Wish = { at: number; weight: number; rank: number }
 
@@ -587,7 +592,7 @@ function balance(shelf: Shelf, columns: number, beside: Place[], wires: Wire[], 
     for (const [near, far] of [[wire.from, wire.to], [wire.to, wire.from]] as const) {
       const index = indexOf.get(near.place)
       if (index === undefined || !isBeside.has(far.place) || isBeside.has(near.place)) continue
-      const weight = ('lane' in near.place.slot ? LANE_WEIGHT : 1) * (wire.isUp ? 1 : FLOW_WEIGHT)
+      const weight = weightOf(near, wire)
       wishes[index]?.push({ at: far.place.x + far.at - near.at - (offsets[index] ?? 0), weight, rank: rankOf(wire) })
     }
   }
@@ -1071,7 +1076,9 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
  * from them across their shelves, or more where the label needs it, what it
  * holds then in its middle, the places of each shelf first packed a gap
  * apart around their own middle, and moved as little as keeps them within
- * the widest shelf's; and where the graph runs down, wide enough
+ * the widest shelf's, and then, `ALIGNS` times over, moved together within
+ * it toward where their wires to the group's other shelves run least
+ * sideways; and where the graph runs down, wide enough
  * for the group's label in its top border, between the lines that cross it
  * into the group's first shelf and out of it, or else widened back past the
  * first of them until it is. On each shelf it spans, what is
@@ -1087,6 +1094,9 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
  */
 function framesOf(graph: Graph, shelves: Shelf[], channels: Channel[], columns: number, gap: number, direction: Direction, rankOf: (wire: Wire) => number): Frame[] {
   if (graph.groups.length === 0) return []
+  const inGroups = channels
+    .flatMap(channel => channel.wires)
+    .filter(wire => wire.from.place.shelf !== wire.to.place.shelf && groupOfSlot(wire.from.place.slot) !== undefined && groupOfSlot(wire.from.place.slot) === groupOfSlot(wire.to.place.slot))
   const framed = graph.groups.flatMap(group => {
     const held = shelves.flatMap((shelf, index) => shelf.places.filter(place => groupOfSlot(place.slot) === group.id).map(place => ({ place, index })))
     if (held.length === 0) return []
@@ -1106,16 +1116,31 @@ function framesOf(graph: Graph, shelves: Shelf[], channels: Channel[], columns: 
       const by = start < wide ? wide - start : end > high ? high - end : 0
       for (const place of block) place.x += by
     }
+    const members = new Set(held.map(({ place }) => place))
+    const within = inGroups.filter(wire => members.has(wire.from.place))
+    for (let time = 0; time < ALIGNS; time += 1) {
+      for (const block of time % 2 === 0 ? blocks : blocks.toReversed()) {
+        const [start, end] = spanOf(block)
+        const wishes = within.flatMap(wire =>
+          ([[wire.from, wire.to], [wire.to, wire.from]] as const)
+            .filter(([near]) => block.includes(near.place))
+            .map(([near, far]) => ({ at: far.place.x + far.at - near.at - (near.place.x - start), weight: weightOf(near, wire), rank: 0 })),
+        )
+        const at = medianOf(wishes)
+        if (at === undefined) continue
+        const by = Math.max(wide - start, Math.min(high - end, at - start))
+        for (const place of block) place.x += by
+      }
+    }
     const [left, right] = spanOf(held.map(({ place }) => place))
     const title = direction === 'down' ? sizeOf(group.label) + TITLE_CELLS : 0
     const [first, last] = [Math.min(...held.map(({ index }) => index)), Math.max(...held.map(({ index }) => index))]
     const [inner, width] = [right - left + 2 * FRAME_MARGIN, Math.max(right - left + 2 * FRAME_MARGIN, title)]
     const frame: Frame = { group, first, last, x: left - FRAME_MARGIN - Math.floor((width - inner) / 2), width, top: 0, bottom: 0 }
-    const places = new Set(held.map(({ place }) => place))
     if (direction === 'down') {
       const crossed = (channels[first - 1]?.wires ?? []).flatMap(wire => {
         const { out, into } = routeOf(wire, place => place.x)
-        return places.has(wire.to.place) && !wire.to.isAbove ? [into] : places.has(wire.from.place) && !wire.from.isAbove ? [out] : []
+        return members.has(wire.to.place) && !wire.to.isAbove ? [into] : members.has(wire.from.place) && !wire.from.isAbove ? [out] : []
       })
       const stops = [frame.x + 1, ...new Set(crossed.toSorted((a, b) => a - b)), frame.x + frame.width - 1]
       const room = Math.max(...stops.slice(1).map((stop, index) => stop - (stops[index] ?? 0) - 2))
@@ -1126,7 +1151,7 @@ function framesOf(graph: Graph, shelves: Shelf[], channels: Channel[], columns: 
         frame.width = end - frame.x
       }
     }
-    return [{ frame, held: places }]
+    return [{ frame, held: members }]
   })
   const shift = (one: (typeof framed)[number], by: number): void => {
     one.frame.x += by
@@ -1229,7 +1254,7 @@ function settle(units: Unit[], channels: Channel[], columns: number, gap: number
       const [own, other] = [unitOf.get(near.place), unitOf.get(far.place)]
       if (own === undefined || other === undefined || own === other) continue
       const pulled = pulls.get(own) ?? []
-      pulled.push({ near, far, weight: ('lane' in near.place.slot ? LANE_WEIGHT : 1) * (wire.isUp ? 1 : FLOW_WEIGHT), rank: rankOf(wire) })
+      pulled.push({ near, far, weight: weightOf(near, wire), rank: rankOf(wire) })
       pulls.set(own, pulled)
     }
   }

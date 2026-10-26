@@ -304,6 +304,22 @@ describe('frames', () => {
     expect([breadthOf(layout), sideways]).toEqual([34, 4])
   })
 
+  test('inside a frame, a chain of nodes under a wider shelf of the group stands each box over the next, port over port, though edges from outside pull them aside', () => {
+    const chain = ['normalize', 'SALT + answer', 'sha3_384', 'Compare stored hash', 'Tally']
+    const graph = readGraph({
+      nodes: [...['Check answers', '8 answer inputs', ...chain].map(id => ({ id, label: id, group: 'quiz' })), ...['quiz.js', 'Salt store', 'BigInt shim'].map(id => ({ id, label: id }))],
+      edges: [
+        ...[['quiz.js', 'Check answers'], ['quiz.js', '8 answer inputs'], ['Salt store', 'SALT + answer'], ['BigInt shim', 'Compare stored hash']],
+        ...[['Check answers', 'normalize'], ['8 answer inputs', 'normalize'], ...chain.slice(1).map((to, at) => [chain[at] ?? '', to])],
+      ].map(([from = '', to = '']) => ({ from, to })),
+      direction: 'down',
+    })
+    const wires = laid(graph).channels.flatMap(channel => channel.wires)
+    const offset = (from: string, to: string): number[] =>
+      wires.filter(wire => wire.edge.from === from && wire.edge.to === to).map(wire => wire.to.place.x + wire.to.at - wire.from.place.x - wire.from.at)
+    expect(chain.slice(1).flatMap((to, at) => offset(chain[at] ?? '', to))).toEqual([0, 0, 0, 0])
+  })
+
   test('a group\'s nodes on one shelf are packed a gap apart, however far apart the shelves above would seat them, so its frame is no wider than they are', () => {
     const graph = readGraph({
       nodes: [...['Left side', 'Middle one', 'Middle two', 'Right side'].map(id => ({ id, label: id })), { id: 'A', label: 'A', group: 'g' }, { id: 'B', label: 'B', group: 'g' }],
