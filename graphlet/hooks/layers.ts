@@ -315,15 +315,16 @@ const passedBy = (graph: Graph, ranks: Map<string, number>): number =>
 
 /**
  * The edges that close a loop: found by following the edges from where the
- * graph starts, from each of the first `LOOP_STARTS` nodes no edge reaches,
- * and in Eades, Lin and Smyth's order; of those, the ones whose layers are
- * fewest, then that leave the edges passing fewest layers by, and where they
- * tie, the first found. With these turned around, the graph has no loop.
+ * graph starts, in Eades, Lin and Smyth's order, and by following them from
+ * each other of the first `LOOP_STARTS` nodes no edge reaches; of those, the
+ * ones whose layers are fewest, then that leave the edges passing fewest
+ * layers by, and where they tie, the first found. With these turned around,
+ * the graph has no loop.
  */
 export function loopEdges(graph: Graph): Set<GraphletEdge> {
   const { into } = adjacencyOf(graph)
   const starts = graph.nodes.filter(node => (into.get(node.id) ?? []).length === 0).slice(0, LOOP_STARTS)
-  const candidates = [followedLoops(graph), orderedLoops(graph), ...starts.map(node => followedLoops(graph, node.id))].map(loops => {
+  const candidates = [followedLoops(graph), orderedLoops(graph), ...starts.slice(1).map(node => followedLoops(graph, node.id))].map(loops => {
     const ranks = ranksWith(graph, loops)
     return { loops, weight: [Math.max(0, ...ranks.values()), passedBy(graph, ranks)] }
   })
@@ -397,7 +398,7 @@ const UPWARD_EVERY = 20
  */
 export function ranksOf(graph: Graph): Map<string, number> {
   const { kept } = graph
-  if (kept !== undefined) return packed(new Map(graph.nodes.map(node => [node.id, kept[node.id] ?? 0])))
+  if (kept !== undefined) return packed(new Map(graph.nodes.map(node => [node.id, (Object.hasOwn(kept, node.id) ? kept[node.id] : 0) ?? 0])))
   const flowing = flowRanksOf(graph)
   if (graph.groups.length === 0 || graph.nodes.every(node => node.layer !== undefined) || !graph.edges.some(edge => edge.isDirected)) return flowing
   const grouped = groupedRanksOf(graph)

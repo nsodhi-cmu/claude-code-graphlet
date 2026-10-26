@@ -924,8 +924,9 @@ export function layTracks(channel: Channel, xOf: (place: Place) => number, under
  * or the frames then make a shelf wider than the room after all, it is
  * folded again into less room, and kept so where that makes it narrower
  * and fits the room, or takes fewer of its columns times its rows. A graph
- * of more than
- * `FOLDED_NODES` nodes or `FOLDED_EDGES` edges is laid out unfolded. Every
+ * of more than `FOLDED_NODES` nodes or `FOLDED_EDGES` edges is laid out
+ * unfolded, and so is one with a group collapsed, in the layers it is kept
+ * in. Every
  * face of every box is dealt its ports. The longest shelf is seated first, in
  * the middle of what it is laid out across, then each other shelf against the
  * one nearer it where the two are laid out across the same columns. Pinned,
@@ -942,7 +943,7 @@ export function layTracks(channel: Channel, xOf: (place: Place) => number, under
 export function layoutOf(graph: Graph, room: Room, look: Look, fold = false, direction: Direction = 'down'): Layout {
   if (direction === 'right') return laidOut(graph, Math.max(room.rows - 1, LEAST_ROWS), look, undefined, direction)
   const columns = Math.max(room.columns, LEAST_COLUMNS)
-  if (!fold || graph.nodes.length > FOLDED_NODES || graph.edges.length > FOLDED_EDGES) return laidOut(graph, columns, look)
+  if (!fold || graph.kept !== undefined || graph.nodes.length > FOLDED_NODES || graph.edges.length > FOLDED_EDGES) return laidOut(graph, columns, look)
   let [into, layout] = [columns, laidOut(graph, columns, look, columns)]
   for (let tries = 0; tries < REFOLDS && breadthOf(layout) > columns; tries += 1) {
     into -= breadthOf(layout) - columns
@@ -1094,9 +1095,11 @@ function laidOut(graph: Graph, room: number, look: Look, into?: number, directio
  */
 function framesOf(graph: Graph, shelves: Shelf[], channels: Channel[], columns: number, gap: number, direction: Direction, rankOf: (wire: Wire) => number): Frame[] {
   if (graph.groups.length === 0) return []
-  const inGroups = channels
-    .flatMap(channel => channel.wires)
-    .filter(wire => wire.from.place.shelf !== wire.to.place.shelf && groupOfSlot(wire.from.place.slot) !== undefined && groupOfSlot(wire.from.place.slot) === groupOfSlot(wire.to.place.slot))
+  const inGroups = new Map<string, Wire[]>()
+  for (const wire of channels.flatMap(channel => channel.wires)) {
+    const group = groupOfSlot(wire.from.place.slot)
+    if (group !== undefined && wire.from.place.shelf !== wire.to.place.shelf && group === groupOfSlot(wire.to.place.slot)) inGroups.set(group, [...(inGroups.get(group) ?? []), wire])
+  }
   const framed = graph.groups.flatMap(group => {
     const held = shelves.flatMap((shelf, index) => shelf.places.filter(place => groupOfSlot(place.slot) === group.id).map(place => ({ place, index })))
     if (held.length === 0) return []
@@ -1117,16 +1120,20 @@ function framesOf(graph: Graph, shelves: Shelf[], channels: Channel[], columns: 
       for (const place of block) place.x += by
     }
     const members = new Set(held.map(({ place }) => place))
-    const within = inGroups.filter(wire => members.has(wire.from.place))
+    const blockOf = new Map(blocks.flatMap((block, index) => block.map(place => [place, index] as const)))
+    const pulls = blocks.map((): Array<{ near: End; far: End; weight: number }> => [])
+    for (const wire of inGroups.get(group.id) ?? []) {
+      for (const [near, far] of [[wire.from, wire.to], [wire.to, wire.from]] as const) {
+        const index = blockOf.get(near.place)
+        if (index !== undefined) pulls[index]?.push({ near, far, weight: weightOf(near, wire) })
+      }
+    }
+    const indices = blocks.map((_, index) => index)
     for (let time = 0; time < ALIGNS; time += 1) {
-      for (const block of time % 2 === 0 ? blocks : blocks.toReversed()) {
+      for (const index of time % 2 === 0 ? indices : indices.toReversed()) {
+        const block = blocks[index] ?? []
         const [start, end] = spanOf(block)
-        const wishes = within.flatMap(wire =>
-          ([[wire.from, wire.to], [wire.to, wire.from]] as const)
-            .filter(([near]) => block.includes(near.place))
-            .map(([near, far]) => ({ at: far.place.x + far.at - near.at - (near.place.x - start), weight: weightOf(near, wire), rank: 0 })),
-        )
-        const at = medianOf(wishes)
+        const at = medianOf((pulls[index] ?? []).map(({ near, far, weight }) => ({ at: far.place.x + far.at - near.at - (near.place.x - start), weight, rank: 0 })))
         if (at === undefined) continue
         const by = Math.max(wide - start, Math.min(high - end, at - start))
         for (const place of block) place.x += by

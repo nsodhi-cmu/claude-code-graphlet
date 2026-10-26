@@ -109,12 +109,12 @@ export function collapsedOf(graph: Graph, shut: Set<string>, order?: string[], s
   const collapsed = { ...graph, nodes, edges, groups: graph.groups.filter(group => !shut.has(group.id)) }
   const ordered = order === undefined ? collapsed : { ...collapsed, order: [...new Set(order.map(id => into.get(id) ?? id))] }
   if (stood === undefined) return ordered
-  const layers: Record<string, number> = {}
+  const layers = new Map<string, number>()
   for (const node of graph.nodes) {
     const id = into.get(node.id) ?? node.id
-    layers[id] = Math.min(layers[id] ?? Infinity, stood.get(node.id) ?? 0)
+    layers.set(id, Math.min(layers.get(id) ?? Infinity, stood.get(node.id) ?? 0))
   }
-  return { ...ordered, kept: layers }
+  return { ...ordered, kept: Object.fromEntries(layers) }
 }
 
 /** Which of a graph's groups it starts with collapsed: none, every group of more than one node, or under `auto`, one or the other as the graph and its room are. */
@@ -184,6 +184,10 @@ export type View = {
   order: (graph: Graph, room: Room) => string[]
   /** The graph's nodes in the order they stand across its picture, laid out as for `room`, whatever layer each is in. */
   across: (graph: Graph, room: Room) => string[]
+  /** The layer each of the graph's nodes stands in, in its picture laid out as for `room`. */
+  stood: (graph: Graph, room: Room) => Map<string, number>
+  /** The layer each of the graph's nodes stands in as its edges lay it, before any fold. */
+  ranks: (graph: Graph) => Map<string, number>
   /** Where the window stands to show the selected node: as near `from` as it can. */
   show: (graph: Graph, selected: string | null, room: Room, from: Pan) => Pan
   /** Whether all of a graph is seen in a room, nothing of it out of view. */
@@ -208,15 +212,22 @@ export type View = {
  * finds better. A view keeps the layouts it last made, each by what its
  * graph holds, which way it runs, and the columns of its room, and its rows
  * too for one that runs right, and hands the same one back for the same
- * graph in such a room; and how many layers each graph it last laid out
- * has. Its drawings have a corner to copy and open the graph
+ * graph in such a room; and the layers each graph it last laid out stands
+ * in as its edges lay it. Its drawings have a corner to copy and open the graph
  * by where it `hasCorner`, as a drawing to click has. Its pictures in SVG
  * light the node the pointer is over, where that leaves the document short
  * enough for a surface.
  */
 export function viewOf(look: Look, fold = false, hasCorner = true): View {
   const kept = new Map<string, Layout>()
-  const layered = new Map<string, number>()
+  const ranked = new Map<string, Map<string, number>>()
+  const ranksFor = (graph: Graph, text = JSON.stringify(graph)): Map<string, number> => {
+    const ranks = ranked.get(text) ?? ranksOf(graph)
+    ranked.delete(text)
+    ranked.set(text, ranks)
+    for (const old of [...ranked.keys()].slice(0, Math.max(0, ranked.size - KEPT_LAYOUTS))) ranked.delete(old)
+    return ranks
+  }
   const laidAs = (graph: Graph, room: Room, direction: Direction, text = JSON.stringify(graph)): Layout => {
     const key = `${direction} ${room.columns} ${direction === 'right' ? room.rows : ''} ${text}`
     const layout = kept.get(key) ?? layoutOf(graph, room, look, fold, direction)
@@ -229,9 +240,7 @@ export function viewOf(look: Look, fold = false, hasCorner = true): View {
     if (graph.direction !== undefined) return laidAs(graph, room, graph.direction)
     const text = JSON.stringify(graph)
     const down = laidAs(graph, room, 'down', text)
-    const layers = layered.get(text) ?? Math.max(0, ...ranksOf(graph).values()) + 1
-    layered.set(text, layers)
-    for (const old of [...layered.keys()].slice(0, Math.max(0, layered.size - KEPT_LAYOUTS))) layered.delete(old)
+    const layers = Math.max(0, ...ranksFor(graph, text).values()) + 1
     if (layers * LEAST_LAYER_COLUMNS + (layers - 1) * LEAST_CHANNEL_COLUMNS > room.columns) return down
     const right = laidAs(graph, room, 'right', text)
     return isRighter(down, right, room) ? right : down
@@ -262,6 +271,8 @@ export function viewOf(look: Look, fold = false, hasCorner = true): View {
     },
     order: (graph, room) => orderOf(laid(graph, room)),
     across: (graph, room) => acrossOf(laid(graph, room)),
+    stood: (graph, room) => new Map(laid(graph, room).shelves.flatMap((shelf, index) => shelf.places.flatMap(place => ('node' in place.slot ? [[place.slot.node.id, index] as const] : [])))),
+    ranks: graph => ranksFor(graph),
     show: (graph, selected, room, from) => showIn(laid(graph, room), selected, room, from),
     fits: (graph, room) => sightOf(laid(graph, room), room).isWhole,
     scroll: (graph, room, from, by) => scrollIn(laid(graph, room), room, from, by),

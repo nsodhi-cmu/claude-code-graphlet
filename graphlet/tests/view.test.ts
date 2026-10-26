@@ -250,3 +250,40 @@ test('collapsed from the layers its nodes stood in with every group open, a grou
   expect([kept.get('g'), kept.get('b'), kept.get('e')]).toEqual([open.get('a'), open.get('b'), open.get('e')])
   expect(fresh.get('b')).toBe(fresh.get('e'))
 })
+
+test('a node whose id names what every object has keeps its layer as a group collapses', () => {
+  const ids = ['top', 'constructor', 'a', 'b', 'toString', '__proto__', 'x']
+  const graph = readGraph({
+    nodes: ids.map(id => ({ id, label: id, ...(['a', 'b'].includes(id) ? { group: 'g' } : {}) })),
+    edges: ids.slice(1).map((to, at) => ({ from: ids[at] ?? '', to })),
+  })
+  expect([...ranksOf(collapsedOf(graph, new Set(['g']), undefined, ranksOf(graph)))]).toEqual([['top', 0], ['constructor', 1], ['g', 2], ['toString', 3], ['__proto__', 4], ['x', 5]])
+})
+
+test('folded into a room, a graph collapsed from the layers of its folded picture moves no other node up or down past another', () => {
+  const next = numbers(41)
+  const pick = (below: number): number => Math.floor(next() * below)
+  const view = viewOf(LOOK, true)
+  const room = { columns: 60, rows: 1000 }
+  const moved: string[] = []
+  for (let run = 0; run < 40; run += 1) {
+    const count = 8 + pick(30)
+    const graph = readGraph({
+      nodes: Array.from({ length: count }, (_, at) => ({ id: `n${at}`, label: `node ${at}`, ...(pick(10) < 7 ? { group: `g${pick(4)}` } : {}) })),
+      edges: Array.from({ length: count + pick(count) }, (_, at) => ({ from: `n${pick(Math.max(1, at % count))}`, to: `n${at % count}` })),
+      direction: 'down',
+    })
+    const open = view.stood(graph, room)
+    for (const group of graph.groups) {
+      const shut = view.stood(collapsedOf(graph, new Set([group.id]), view.across(graph, room), open), room)
+      const others = graph.nodes.filter(node => node.group !== group.id).map(node => node.id)
+      for (const a of others) {
+        for (const b of others) {
+          const [was, is] = [Math.sign((open.get(a) ?? 0) - (open.get(b) ?? 0)), Math.sign((shut.get(a) ?? 0) - (shut.get(b) ?? 0))]
+          if (was !== is) moved.push(`${run} ${group.id}: ${a} ${b}`)
+        }
+      }
+    }
+  }
+  expect(moved).toEqual([])
+})

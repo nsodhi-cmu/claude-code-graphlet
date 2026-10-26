@@ -3,7 +3,7 @@ import type { Elements, EngineInterface, Register, RenderElement, RenderInput, R
 import type { Graphlet } from '../types'
 import { MOST_CELLS, MOST_TREE_CHARS, bounded, charactersOf, cornerless, leftOut, rowText, sizeOf, styleOf } from './draw'
 import type { Drawing, Pan, Room } from './draw'
-import { ranksOf, readGraph } from './layers'
+import { readGraph } from './layers'
 import type { Graph } from './layers'
 import type { Direction } from './layout'
 import { pageOf } from './page'
@@ -103,8 +103,10 @@ const foundIn = (graph: Graph, query: string): string[] =>
  * Draws a graph in a place as the person left it there, and keeps what was
  * drawn: its groups collapsed as last asked there, or as the graph says, or
  * as they started there, each node kept in the layer it stands in with every
- * group open, and its layers starting in the order its nodes stand across a
- * picture of it so, where it has no more than `STEADY_NODES` nodes; the
+ * group open, and, where it has no more than `STEADY_NODES` nodes, in the
+ * layer it stands in in a picture of it so laid out for the room, folded as
+ * the view folds it, and its layers starting in the order its nodes stand
+ * across that picture; the
  * node `asked` selected, or else the one last picked there, or the box of the
  * collapsed group either is in, or else the node `fallback` names; in focus
  * where the place is; with what is being found marked; through a window where
@@ -113,7 +115,8 @@ const foundIn = (graph: Graph, query: string): string[] =>
  */
 const drawIn = (place: Place, given: Graph, room: Room, most: number, view: View, asked: string | undefined, fallback: (graph: Graph) => string | null): Held => {
   const shut = new Set(given.groups.filter(group => place.shut.get(group.id) ?? (group.isCollapsed === true || place.starts?.has(group.id) === true)).map(group => group.id))
-  const whole = shut.size === 0 ? given : collapsedOf(given, shut, given.nodes.length > STEADY_NODES ? undefined : view.across(given, room), ranksOf(given))
+  const isSteady = given.nodes.length <= STEADY_NODES
+  const whole = shut.size === 0 ? given : collapsedOf(given, shut, isSteady ? view.across(given, room) : undefined, isSteady ? view.stood(given, room) : view.ranks(given))
   const wanted = asked ?? place.picked
   const group = given.nodes.find(node => node.id === wanted)?.group
   const standing = group !== undefined && shut.has(group) ? group : wanted

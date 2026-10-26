@@ -19,19 +19,22 @@ A graph is drawn in layers: every node in a layer, a row of the drawing, or a co
 
 ## Which Layer A Node Stands In
 
+A graph with a group collapsed is not laid in layers again, whatever its nodes name: every node keeps the layer it stood in with every group open, as the picture in its room drew it, folded where that was, and each group's box the layer of the highest of its nodes, so that collapsing or opening a group moves nothing else up or down; only a layer that held nothing but the group's nodes closes up. An edge to or from a box may then pass layers by, or run back up dashed, though it closes no loop.
+
 Where every node names its `layer`, `ranksOf` keeps those, in their order, numbered from the top with none left empty.
 
-Where any node leaves it out, every layer is worked out from the edges. A graph with a group collapsed is not worked out again: every node keeps the layer it stood in with every group open, and each group's box the layer of the highest of its nodes, with no layer left empty, so that collapsing or opening a group moves nothing else up or down.
+Where any node leaves it out, every layer is worked out from the edges.
 
 An undirected graph, every edge of it running no way, has no flow to follow. A node stands as many layers down as the fewest edges between it and the first node the graph names of those it is joined to, through any others: the graph spreads down, a layer an edge, from where it starts. Each part of the graph that no edge joins to the rest starts again at the top. So every edge joins two neighboring layers or two nodes of one layer, and a loop closes where its two sides meet, at a node or by an edge between two nodes of one layer, with nothing running back up. To choose where a graph starts, a mod names that node first.
 
 A graph with any edge that runs one way runs down the way its edges do. An edge that runs no way is laid out as if it ran from the node it names first to the other, unless that would close a loop with the rest; then every such edge is laid out as running forward along an order the edges that run one way keep, so that no edge with no direction ever closes a loop, nor turns an edge that runs one way around. It is never drawn running up:
 
-1. The edges that close a loop are found among the edges that run one way, in several ways, and of those, the edges are kept whose layers, laid out as the next steps say, are fewest, and then leave the edges passing fewest layers by; where they tie, those found first.
-   - Following the edges from the nodes no edge reaches, and then from any node not yet reached, in the order the graph names them: an edge that leads back to a node still being followed closes a loop. That is done again starting from each of the first `LOOP_STARTS` nodes no edge reaches, so that where a graph starts is not only the node it names first.
+1. The edges that close a loop are found among the edges that run one way, in several ways, and of those, the edges are kept whose layers, laid out as the next steps say, are fewest, and then leave the edges passing fewest layers by; where they tie, those found first, in this order:
+   - Following the edges from the nodes no edge reaches, and then from any node not yet reached, in the order the graph names them: an edge that leads back to a node still being followed closes a loop.
    - Eades, Lin and Smyth's order: the nodes are put in a row so that as few edges as can run backward along it. Over and over, each node with no edge out to a node left goes to the end of the row, and each node with no edge in from a node left goes next at its front; where neither is left, the node with the most edges out over edges in goes next, and of two that tie, the one the following reaches first. An edge that runs backward along the row closes a loop.
+   - Following the edges again, first from each other node of the first `LOOP_STARTS` that no edge reaches, so that where a graph starts is not only the node it names first.
 
-   Read the other way around, either set of edges leaves a graph with no loop. Following keeps a flow that returns to its start drawn from its start; the order keeps a graph of many loops from running its edges long.
+   Read the other way around, any of these sets of edges leaves a graph with no loop. Following keeps a flow that returns to its start drawn from its start; the order keeps a graph of many loops from running its edges long.
 2. A node then stands one layer under the lowest node with an edge to it.
 3. A node with more edges below it than above it moves down to stand just over the nearest node its edges reach, which makes more edges shorter than longer; but a node of a group moves no lower than the lowest of the rest of its group stood, so that its group's frame is no taller for it.
 
@@ -49,7 +52,7 @@ A graph in a reply is as wide as the reply, and the wheel over it scrolls the tr
 - The node given up first is the one whose edges to the nodes above would add fewest lanes past the layer, as `folded` reckons it: one where more than one of its edges reach nodes above, which may share a lane; where one does, none if an edge of the node it reaches already passes the layer, else one. Then the one with the fewest edges to nodes above it; then one that takes no node down with it; and of those, the one the graph names last, so a folded layer keeps the nodes named first, in a row in the order they were named. Since a node's edges share their lanes, the children of one node folded onto rows of their own are reached down one lane.
 - A node with an edge that runs one way to a node of its own layer stays, so that no edge turns back up for the fold.
 
-Each layer under a fold is then folded in turn. A node with many lanes past it, or a layer whose every node edges within it, may still be wider than the room, and so may a box widened for its ports, which the fold cannot know of; `layoutOf` then folds again into the room less what it overflowed by, up to `REFOLDS` times, and keeps the result where it is narrower and fits the room, or takes less room all told, its columns times its rows. A picture still too wide keeps the count of what is past its edge, as a pane's does. A graph of more than `FOLDED_NODES` nodes or `FOLDED_EDGES` edges is not folded at all, since folding it would take long.
+Each layer under a fold is then folded in turn. A node with many lanes past it, or a layer whose every node edges within it, may still be wider than the room, and so may a box widened for its ports, which the fold cannot know of; `layoutOf` then folds again into the room less what it overflowed by, up to `REFOLDS` times, and keeps the result where it is narrower and fits the room, or takes less room all told, its columns times its rows. A picture still too wide keeps the count of what is past its edge, as a pane's does. A graph of more than `FOLDED_NODES` nodes or `FOLDED_EDGES` edges is not folded at all, since folding it would take long; nor is a graph with a group collapsed, which keeps the layers it stood in.
 
 ## Stretches And Lanes
 
