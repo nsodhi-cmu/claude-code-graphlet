@@ -28,6 +28,8 @@ export type Group = { id: string; label: string; tone?: GraphletTone; isCollapse
  */
 export type Graph = { nodes: Node[]; edges: Edge[]; groups: Group[]; unread: { nodes: number; edges: number }; direction?: GraphletDirection; order?: string[] }
 
+/** How many of the nodes no edge reaches the edges are followed from first, each in turn, to find the loops that lay the graph in fewest layers. */
+const LOOP_STARTS = 8
 /** How many times the layers are ordered against their neighbors, down and back up, before the best ordering is kept. */
 const SWEEPS = 4
 /** The tones a node may have. Any other is dropped, and the node drawn plain. */
@@ -151,11 +153,12 @@ function adjacencyOf(graph: Graph): { outOf: Map<string, GraphletEdge[]>; into: 
 }
 
 /**
- * Edges that close the loops, found by following the edges from the nodes
- * no edge reaches, and then from any node not yet reached: each edge that
- * leads back to a node still being followed.
+ * Edges that close the loops, found by following the edges from the node
+ * `first`, where it is given, then from the nodes no edge reaches, and then
+ * from any node not yet reached: each edge that leads back to a node still
+ * being followed.
  */
-function followedLoops(graph: Graph): Set<GraphletEdge> {
+function followedLoops(graph: Graph, first?: string): Set<GraphletEdge> {
   const { outOf, into } = adjacencyOf(graph)
   const closing = new Set<GraphletEdge>()
   const state = new Map<string, 'open' | 'done'>()
@@ -168,7 +171,7 @@ function followedLoops(graph: Graph): Set<GraphletEdge> {
     state.set(id, 'done')
   }
   const sources = graph.nodes.filter(node => (into.get(node.id) ?? []).length === 0)
-  for (const node of [...sources, ...graph.nodes]) if (!state.has(node.id)) follow(node.id)
+  for (const node of [...sources.filter(one => one.id === first), ...sources, ...graph.nodes]) if (!state.has(node.id)) follow(node.id)
   return closing
 }
 
@@ -300,14 +303,26 @@ const passedBy = (graph: Graph, ranks: Map<string, number>): number =>
   graph.edges.reduce((sum, edge) => sum + Math.max(0, Math.abs((ranks.get(edge.from) ?? 0) - (ranks.get(edge.to) ?? 0)) - 1), 0)
 
 /**
- * The edges that close a loop: found both by following the edges from where
- * the graph starts and in Eades, Lin and Smyth's order, and of the two, those
- * whose layers leave the edges passing fewest layers by; where they tie,
- * those followed. With these turned around, the graph has no loop.
+ * The edges that close a loop: found by following the edges from where the
+ * graph starts, from each of the first `LOOP_STARTS` nodes no edge reaches,
+ * and in Eades, Lin and Smyth's order; of those, the ones whose layers are
+ * fewest, then that leave the edges passing fewest layers by, and where they
+ * tie, the first found. With these turned around, the graph has no loop.
  */
 export function loopEdges(graph: Graph): Set<GraphletEdge> {
-  const [followed, ordered] = [followedLoops(graph), orderedLoops(graph)]
-  return passedBy(graph, ranksWith(graph, ordered)) < passedBy(graph, ranksWith(graph, followed)) ? ordered : followed
+  const { into } = adjacencyOf(graph)
+  const starts = graph.nodes.filter(node => (into.get(node.id) ?? []).length === 0).slice(0, LOOP_STARTS)
+  const candidates = [followedLoops(graph), orderedLoops(graph), ...starts.map(node => followedLoops(graph, node.id))].map(loops => {
+    const ranks = ranksWith(graph, loops)
+    return { loops, weight: [Math.max(0, ...ranks.values()), passedBy(graph, ranks)] }
+  })
+  return candidates.reduce((best, one) => (isFewer(one.weight, best.weight) ? one : best)).loops
+}
+
+/** Whether one list of numbers comes before another, the first that differs deciding. */
+const isFewer = (a: number[], b: number[]): boolean => {
+  const at = a.findIndex((one, index) => one !== b[index])
+  return at !== -1 && (a[at] ?? 0) < (b[at] ?? 0)
 }
 
 /**

@@ -267,6 +267,16 @@ describe('layers', () => {
     expect(layers(returns).map(layer => layer.filter(slot => !slot.includes('→')))).toEqual([['A'], ['B'], ['C'], ['D']])
   })
 
+  test('the edges that close loops are found from whichever start lays the graph in fewest layers, not only from the node it names first', () => {
+    const graph = graphOf(
+      ['Author', 'Deploy', 'Router', 'Visitor', 'Browser', 'Resolver', 'Network', 'Edge', 'Redirect'],
+      [['Author', 'Deploy'], ['Deploy', 'Router'], ['Visitor', 'Browser'], ['Browser', 'Resolver'], ['Resolver', 'Network'], ['Network', 'Edge'], ['Edge', 'Router'], ['Router', 'Redirect'], ['Redirect', 'Browser']],
+    )
+    const ranks = ranksOf(graph)
+    expect((ranks.get('Edge') ?? 0) < (ranks.get('Router') ?? 0)).toBe(true)
+    expect((ranks.get('Redirect') ?? 0) > (ranks.get('Browser') ?? 0)).toBe(true)
+  })
+
   test('a node with more edges below it than above moves down toward them, so fewer edges run long', () => {
     const graph = graphOf(['a', 'b', 'c', 'late'], [['a', 'b'], ['b', 'c'], ['late', 'c']])
     expect(layers(graph)).toEqual([['a'], ['b', 'late'], ['c']])
