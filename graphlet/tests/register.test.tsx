@@ -893,7 +893,7 @@ test('each system\'s opener is tried in turn, and where none opens the page grap
 
   seen.opener = null
   await pane.pointer(corner)
-  expect(seen.ran.slice(2)).toEqual([['xdg-open', '/tmp/graphlet.html'], ['open', '/tmp/graphlet.html'], ['cmd', '/c', 'start', '', '\\tmp\\graphlet.html']])
+  expect(seen.ran.slice(2)).toEqual([['xdg-open', '/tmp/graphlet.html'], ['open', '/tmp/graphlet.html']])
   expect(seen.toasts.at(-1)).toBe("graphlet: the graph's page is at /tmp/graphlet.html")
   await pane.unmount()
 })

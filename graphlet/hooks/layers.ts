@@ -357,7 +357,7 @@ function groupedRanksOf(graph: Graph): Map<string, number> | undefined {
   let mark = '\u0000'
   while (graph.nodes.some(node => node.id.startsWith(mark))) mark += '\u0000'
   /** The id of a group's layer: it starts with a `mark` no node's id starts with. */
-  const layerOf = (group: string, rank: number): string => `${mark}${group}#${rank}`
+  const layerOf = (group: string, rank: number): string => [mark, group, '#', String(rank)].join('')
   /** What stands for a node in the graph of groups: the layer of its group that holds it, or itself. */
   const standIn = (id: string): string => {
     const group = groupOf.get(id)

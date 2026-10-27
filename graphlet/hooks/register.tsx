@@ -207,8 +207,8 @@ const isRun = async (ran: Promise<ProcessRunResult>): Promise<boolean> => (await
 /**
  * Writes a graph out as a web page headed `title`, running as it runs where
  * it is drawn, to `/tmp/graphlet.html`, over the page written last, and opens
- * it in the browser with the system's own opener: Linux's, macOS's, or
- * Windows's, each tried in turn. Where nothing opens it, says where it is.
+ * it in the browser with the system's own opener: Linux's, and else macOS's.
+ * Where neither opens it, says where it is.
  */
 const openPage = async ($: EngineInterface, title: string, graph: Graph, direction: Direction): Promise<void> => {
   try {
@@ -219,8 +219,7 @@ const openPage = async ($: EngineInterface, title: string, graph: Graph, directi
   }
   const isOpened =
     (await isRun($.process.run(['xdg-open', '/tmp/graphlet.html'], { timeoutMs: OPEN_TIMEOUT_MS }))) ||
-    (await isRun($.process.run(['open', '/tmp/graphlet.html'], { timeoutMs: OPEN_TIMEOUT_MS }))) ||
-    (await isRun($.process.run(['cmd', '/c', 'start', '', '\\tmp\\graphlet.html'], { timeoutMs: OPEN_TIMEOUT_MS })))
+    (await isRun($.process.run(['open', '/tmp/graphlet.html'], { timeoutMs: OPEN_TIMEOUT_MS })))
   $.ui.toast(isOpened ? 'graphlet: opened the graph in your browser.' : "graphlet: the graph's page is at /tmp/graphlet.html")
 }
 
@@ -344,8 +343,8 @@ const vectorSiteOf = ($: EngineInterface, e: VectorSite, place: Place, at: Held)
  */
 const siteDrawingOf = ($: EngineInterface, e: RenderInput<SiteComponent>, place: Place, at: Held) => {
   if (e.surface === 'terminal') {
-    const { Client } = $.ui.resolve(e)
-    return <Client module="./surface.tsx" key={GRAPH} props={isClickable(e.viewport) ? at.drawing : cornerless(at.drawing)} />
+    const ui = $.ui.resolve(e)
+    return <ui.Client module="./surface.tsx" key={GRAPH} props={isClickable(e.viewport) ? at.drawing : cornerless(at.drawing)} />
   }
   if (vectored.has(e.surface)) return vectorSiteOf($, e, place, at)
   const { Code } = $.ui.resolve(e)
@@ -569,7 +568,8 @@ export const register: Register = (on, options) => {
         </Box>
       )
     }
-    const { Box, Text, Markdown, Client } = $.ui.resolve(e)
+    const ui = $.ui.resolve(e)
+    const { Box, Text, Markdown } = ui
     const blocks = []
     for (const part of following) {
       if ('text' in part) {
@@ -584,7 +584,7 @@ export const register: Register = (on, options) => {
       const place = kept.get(key) ?? placeOf()
       kept.set(key, place)
       place.starts ??= openingOf(folded, part.graph, screen, opening)
-      blocks.push(<Client module="./surface.tsx" key={key} props={drawIn(place, part.graph, screen, share, folded, undefined, () => null).drawing} />)
+      blocks.push(<ui.Client module="./surface.tsx" key={key} props={drawIn(place, part.graph, screen, share, folded, undefined, () => null).drawing} />)
     }
     return (
       <Box flexDirection="column">

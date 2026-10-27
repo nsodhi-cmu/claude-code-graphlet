@@ -14,7 +14,7 @@ A graph with no nodes gives a page that says there is nothing to draw.
 
 ## Opening It
 
-`openPage` writes the page to `/tmp/graphlet.html`, over the page it wrote last; on Windows, that is `\tmp` on the session's drive. It then runs the system's own opener on the file, trying each in turn, Linux's `xdg-open`, macOS's `open`, and Windows's `start` through `cmd`, each for at most `OPEN_TIMEOUT_MS`, until one exits with 0. The path and each command are written out whole in the source, so that the plugin directory can read what the mod writes and runs. A toast says the page was opened, or, where nothing opened it, where the file is.
+`openPage` writes the page to `/tmp/graphlet.html`, over the page it wrote last; on Windows, that is `\tmp` on the session's drive. It then runs the system's own opener on the file, Linux's `xdg-open` and else macOS's `open`, each for at most `OPEN_TIMEOUT_MS`, until one exits with 0. The path and each command are written out whole in the source, and no shell is run, so that the plugin directory can read what the mod writes and runs. A toast says the page was opened, or, where nothing opened it, as on Windows, where the file is.
 
 The opener runs on the machine the session runs on, which the mobile app is not, so no control under a picture there opens the page.
 
