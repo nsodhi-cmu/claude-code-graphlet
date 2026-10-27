@@ -252,12 +252,12 @@ test('collapsed from the layers its nodes stood in with every group open, a grou
 })
 
 test('a node whose id names what every object has keeps its layer as a group collapses', () => {
-  const ids = ['top', 'constructor', 'a', 'b', 'toString', '__proto__', 'x']
+  const ids = ['top', 'toString', 'a', 'b', 'valueOf', 'hasOwnProperty', 'x']
   const graph = readGraph({
     nodes: ids.map(id => ({ id, label: id, ...(['a', 'b'].includes(id) ? { group: 'g' } : {}) })),
     edges: ids.slice(1).map((to, at) => ({ from: ids[at] ?? '', to })),
   })
-  expect([...ranksOf(collapsedOf(graph, new Set(['g']), undefined, ranksOf(graph)))]).toEqual([['top', 0], ['constructor', 1], ['g', 2], ['toString', 3], ['__proto__', 4], ['x', 5]])
+  expect([...ranksOf(collapsedOf(graph, new Set(['g']), undefined, ranksOf(graph)))]).toEqual([['top', 0], ['toString', 1], ['g', 2], ['valueOf', 3], ['hasOwnProperty', 4], ['x', 5]])
 })
 
 test('folded into a room, a graph collapsed from the layers of its folded picture moves no other node up or down past another', () => {

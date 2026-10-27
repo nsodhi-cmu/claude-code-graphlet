@@ -13,6 +13,6 @@ graphlet is a **mod** that draws graphs inside Claude Code!
 
 2. graphlet can also be used as a dependency for other mods that wish to render graphs.
 
-graphlet adds one section to Claude's system prompt, which the Graphs in replies setting turns off. When you open a graph in your browser, it writes the page to your temporary folder. It makes no network requests and collects no data.
+graphlet adds one section to Claude's system prompt, which the Graphs in replies setting turns off, and reads Claude's replies to draw the graphs in them. When you ask, it copies a graph to your clipboard, or writes it as a web page to `/tmp/graphlet.html` and opens that file in your browser with your system's opener: `xdg-open`, `open`, or `start`. It makes no network requests and sends nothing anywhere.
 
 View the source code and learn more on the [graphlet repository](https://github.com/nsodhi-cmu/claude-code-graphlet).

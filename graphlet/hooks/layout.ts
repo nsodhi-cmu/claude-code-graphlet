@@ -679,13 +679,13 @@ function reseat(shelves: Shelf[], channels: Channel[], columns: number, rankOf: 
   for (const isRanked of ranks.length > 1 ? [false, true] : [false]) {
     if (isRanked) restore()
     for (let time = 0; time < RESEATS; time += 1) {
-      for (const pass of ['down', 'up', 'both'] as const) {
+      for (const way of ['down', 'up', 'both'] as const) {
         const order = shelves.map((_, index) => index)
-        for (const index of pass === 'up' ? order.reverse() : order) {
+        for (const index of way === 'up' ? order.reverse() : order) {
           const shelf = shelves[index]
           if (shelf === undefined) continue
           const [above, below] = [shelves[index - 1], shelves[index + 1]].map(one => (one?.across === shelf.across ? one : undefined))
-          const sides = [...(pass !== 'up' && above !== undefined ? [{ shelf: above, channel: channels[index - 1] }] : []), ...(pass !== 'down' && below !== undefined ? [{ shelf: below, channel: channels[index] }] : [])]
+          const sides = [...(way !== 'up' && above !== undefined ? [{ shelf: above, channel: channels[index - 1] }] : []), ...(way !== 'down' && below !== undefined ? [{ shelf: below, channel: channels[index] }] : [])]
           if (sides.length > 0) balance(shelf, shelf.across, sides.flatMap(side => side.shelf.places), sides.flatMap(side => side.channel?.wires ?? []), isRanked ? rankOf : () => 0, gap)
         }
         const cost = costOf(channels, ranks, rankOf)

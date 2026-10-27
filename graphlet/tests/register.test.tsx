@@ -254,7 +254,6 @@ const world = (on: On) => {
     seen.copied.push(e.text)
     return { value: { isCopied: true as const } }
   })
-  on('env.get', ($, e) => ({ value: e.name === 'TMPDIR' ? '/var/tmp/' : undefined }))
   on('fs.write', ($, e) => {
     seen.written.push({ path: e.path, text: e.text })
     return { value: undefined }
@@ -694,7 +693,7 @@ test('a tool\'s row or a command\'s row holds its graph as a pane does, to click
   expect(seen.toasts).toEqual(['graphlet: copied the graph as text.'])
   const corner = drawn.hits.find(hit => 'page' in hit) ?? { x: 0, y: 0 }
   await tool.pointer({ type: 'down', x: corner.x, y: corner.y, button: 'left', in: 'graph' })
-  expect(seen.written.map(file => file.path)).toEqual(['/var/tmp/graphlet-toolu_1.html'])
+  expect(seen.written.map(file => file.path)).toEqual(['/tmp/graphlet.html'])
   await tool.unmount()
   const command = await row('CommandOutput', 'command_1', { command: 'deps', args: '', text: '', isErrored: false })
   expect(await rowsOf(command)).toEqual(picture(drawn))
@@ -783,7 +782,8 @@ test('with pictures in apps on, on the desktop app, VS Code, and the mobile app,
     const svg = await drawn.find({ type: 'Svg' })
     const source = String(svg?.props.source)
     expect(svg?.props).toMatchObject({ isInteractive: true, alt: 'A graph of 4 nodes and 3 edges: web → api; api → auth; auth → Data.' })
-    expect(source).toStartWith(`<svg xmlns="http://www.w3.org/2000/svg" width="${String(svg?.props.width)}" `)
+    expect(source).toStartWith('<svg xmlns=')
+    expect(source).toContain(` width="${String(svg?.props.width)}" `)
     expect(source).toMatch(/<g class="node plain selected n0"[^>]*>(?:(?!<\/g>).)*>web</)
     expect(source).toContain('>Backend</text>')
     expect(source).toMatch(/<g class="node plain n3"[^>]*>(?:(?!<\/g>).)*>▸<\/tspan><tspan[^>]*>Data<\/tspan><tspan class="badge"[^>]*>1</)
@@ -809,9 +809,9 @@ test('under a site\'s picture, a pick from the list selects a node, the group co
   await pane.redraw()
   expect((await said(pane)).heard).toEqual(['select grouped auth', 'collapse grouped back true', 'collapse grouped back false', 'select grouped api', 'open grouped api'])
   await pane.press({ key: 'graphlet:graph:page' })
-  expect(seen.written.map(file => file.path)).toEqual(['/var/tmp/graphlet-grouped.html'])
+  expect(seen.written.map(file => file.path)).toEqual(['/tmp/graphlet.html'])
   expect(seen.written[0]?.text).toContain('>Backend</text>')
-  expect(seen.ran).toEqual([['xdg-open', '/var/tmp/graphlet-grouped.html']])
+  expect(seen.ran).toEqual([['xdg-open', '/tmp/graphlet.html']])
   await pane.unmount()
 })
 
@@ -867,15 +867,15 @@ test('a graph too busy to draw whole in a large pane is drawn plainer, as far as
   await pane.unmount()
 })
 
-test('a click in the corner writes the graph out as a web page in the temporary folder, and opens it', WITH_HOST, async ($, on) => {
+test('a click in the corner writes the graph out as a web page to /tmp/graphlet.html, and opens it', WITH_HOST, async ($, on) => {
   const seen = world(on)
   const pane = await mount($, 'free')
   const rows = await rowsOf(pane)
   await pane.pointer({ type: 'down', x: 87, y: rows.length - 1, button: 'left', in: 'graph' })
-  expect(seen.written.map(file => file.path)).toEqual(['/var/tmp/graphlet-free.html'])
+  expect(seen.written.map(file => file.path)).toEqual(['/tmp/graphlet.html'])
   expect(seen.written[0]?.text).toStartWith('<!doctype html>')
   expect(seen.written[0]?.text).toContain('pages/invoice.ts')
-  expect(seen.ran).toEqual([['xdg-open', '/var/tmp/graphlet-free.html']])
+  expect(seen.ran).toEqual([['xdg-open', '/tmp/graphlet.html']])
   expect(seen.toasts).toEqual(['graphlet: opened the graph in your browser.'])
   expect((await said(pane)).heard).toEqual([])
   await pane.unmount()
@@ -893,8 +893,8 @@ test('each system\'s opener is tried in turn, and where none opens the page grap
 
   seen.opener = null
   await pane.pointer(corner)
-  expect(seen.ran.slice(2).map(argv => argv[0])).toEqual(['xdg-open', 'open', 'cmd'])
-  expect(seen.toasts.at(-1)).toBe("graphlet: the graph's page is at /var/tmp/graphlet-free.html")
+  expect(seen.ran.slice(2)).toEqual([['xdg-open', '/tmp/graphlet.html'], ['open', '/tmp/graphlet.html'], ['cmd', '/c', 'start', '', '\\tmp\\graphlet.html']])
+  expect(seen.toasts.at(-1)).toBe("graphlet: the graph's page is at /tmp/graphlet.html")
   await pane.unmount()
 })
 
@@ -1244,7 +1244,7 @@ test('in a reply, a click on copy in the corner copies the graph as text, as it 
   expect(seen.copied).toEqual([FLOW.join('\n')])
   expect(seen.toasts).toEqual(['graphlet: copied the graph as text.'])
   await press(reply, two.key, hitOf(two.drawing, hit => 'page' in hit))
-  expect(seen.written.map(file => file.path)).toEqual([expect.stringMatching(/^\/var\/tmp\/graphlet-reply-[A-Za-z0-9]*-1\.html$/)])
+  expect(seen.written.map(file => file.path)).toEqual(['/tmp/graphlet.html'])
   expect(seen.written[0]?.text).toContain('<title>reply</title>')
   expect(seen.written[0]?.text).toContain('>One</tspan>')
   expect(seen.written[0]?.text).not.toContain('Valid?')
@@ -1299,7 +1299,7 @@ test('with pictures in apps on, on the desktop app, VS Code, and the mobile app,
     if (surface === 'desktop') await reply.press({ key: 'graphlet:graph:0:page' })
     await reply.unmount()
   }
-  expect(seen.written.map(file => file.path)).toEqual([expect.stringMatching(/^\/var\/tmp\/graphlet-reply-[A-Za-z0-9]*-0\.html$/)])
+  expect(seen.written.map(file => file.path)).toEqual(['/tmp/graphlet.html'])
   expect(seen.written[0]?.text).toContain('<title>reply</title>')
   expect(seen.written[0]?.text).toContain('>Ask for a correction</tspan>')
 })

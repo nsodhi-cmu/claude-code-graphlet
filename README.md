@@ -131,4 +131,4 @@ In `/config`, or `/plugin configure graphlet@claude-code-graphlet`. The first ch
 
 ## Security and Privacy
 
-graphlet makes no network requests, calls no model, and keeps nothing between sessions. The only file it writes is the web page `html ↗` and `Open in browser` open, in your temporary folder.
+graphlet makes no network requests, calls no model, and keeps nothing between sessions. The only file it writes is the web page `html ↗` and `Open in browser` open, at `/tmp/graphlet.html`.

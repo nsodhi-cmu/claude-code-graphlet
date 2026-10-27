@@ -1,4 +1,4 @@
-import type { Elements, EngineInterface, Register, RenderElement, RenderInput, RenderSurface, RenderViewport } from 'claude-code'
+import type { Elements, EngineInterface, ProcessRunResult, Register, RenderElement, RenderInput, RenderSurface, RenderViewport } from 'claude-code'
 
 import type { Graphlet } from '../types'
 import { MOST_CELLS, MOST_TREE_CHARS, bounded, charactersOf, cornerless, leftOut, rowText, sizeOf, styleOf } from './draw'
@@ -61,11 +61,6 @@ const KEPT_SITES = 128
 const replies = new Map<string, Map<string, Place>>()
 /** How many reply blocks graphlet keeps the places of their graphs for, those drawn last: a block is drawn again as it comes back into view. */
 const KEPT_REPLIES = 64
-
-/** The Clients that failed, by their request and their key: what they drew is drawn since with nothing to click. */
-const faulted = new Set<string>()
-/** What `faulted` knows a Client by. */
-const faultOf = (requestId: string, element: string): string => `${requestId}\n${element}`
 
 /** Whether graphlet has drawn a graph this session, in a reply or in a mod's site: what most tips are true only after. */
 let hasDrawn = false
@@ -203,38 +198,30 @@ let copiedSite = viewOf({ scroll: 'sheet', labels: 'wrap', edges: 'separate' }, 
 /** Which groups a reply's graph to click starts with collapsed: the person's setting. */
 let opening: Opening = 'auto'
 
-/** The programs that open a file as the person's system would, each tried in turn: Linux's, macOS's, and Windows's. */
-const OPENERS: ReadonlyArray<(path: string) => string[]> = [
-  path => ['xdg-open', path],
-  path => ['open', path],
-  path => ['cmd', '/c', 'start', '', path],
-]
 /** How long an opener may run, in milliseconds. */
 const OPEN_TIMEOUT_MS = 10_000
 
+/** Whether a program ran and exited with 0. */
+const isRun = async (ran: Promise<ProcessRunResult>): Promise<boolean> => (await ran.catch(() => undefined))?.exitCode === 0
+
 /**
- * Writes a graph out as a web page in the system's temporary folder, in a
- * file named `name` and headed `title`, running as it runs where it is
- * drawn, and opens it in the browser. Where nothing opens it, says where it
- * is.
+ * Writes a graph out as a web page headed `title`, running as it runs where
+ * it is drawn, to `/tmp/graphlet.html`, over the page written last, and opens
+ * it in the browser with the system's own opener: Linux's, macOS's, or
+ * Windows's, each tried in turn. Where nothing opens it, says where it is.
  */
-const openPage = async ($: EngineInterface, name: string, title: string, graph: Graph, direction: Direction): Promise<void> => {
-  const folder = (await $.env.get('TMPDIR')) ?? (await $.env.get('TEMP')) ?? '/tmp'
-  const path = `${folder.replace(/[\\/]+$/, '')}/graphlet-${name.replace(/[^A-Za-z0-9_-]/g, '-')}.html`
+const openPage = async ($: EngineInterface, title: string, graph: Graph, direction: Direction): Promise<void> => {
   try {
-    await $.fs.write(path, pageOf(graph, title, direction))
+    await $.fs.write('/tmp/graphlet.html', pageOf(graph, title, direction))
   } catch (error) {
     $.ui.toast(`graphlet: could not write the graph's page (${error instanceof Error ? error.message : String(error)}).`)
     return
   }
-  for (const opener of OPENERS) {
-    const ran = await $.process.run(opener(path), { timeoutMs: OPEN_TIMEOUT_MS }).catch(() => undefined)
-    if (ran?.exitCode === 0) {
-      $.ui.toast('graphlet: opened the graph in your browser.')
-      return
-    }
-  }
-  $.ui.toast(`graphlet: the graph's page is at ${path}`)
+  const isOpened =
+    (await isRun($.process.run(['xdg-open', '/tmp/graphlet.html'], { timeoutMs: OPEN_TIMEOUT_MS }))) ||
+    (await isRun($.process.run(['open', '/tmp/graphlet.html'], { timeoutMs: OPEN_TIMEOUT_MS }))) ||
+    (await isRun($.process.run(['cmd', '/c', 'start', '', '\\tmp\\graphlet.html'], { timeoutMs: OPEN_TIMEOUT_MS })))
+  $.ui.toast(isOpened ? 'graphlet: opened the graph in your browser.' : "graphlet: the graph's page is at /tmp/graphlet.html")
 }
 
 /** A count of cells another mod handed over, as a whole number a room can have. */
@@ -260,17 +247,6 @@ const isClickable = (viewport: RenderViewport | undefined): boolean => viewport?
 
 /** The key of the Client that draws a site's graph, and of a site's graph among the controls under its picture; the key of each of a reply's graphs starts with it. */
 const GRAPH = 'graph'
-
-/**
- * A site's graph on the terminal: to click and move through; on the main
- * screen, with no corner, since nothing there can be clicked; and where its
- * Client failed, its rows as they are, with no corner.
- */
-const siteTreeOf = (elements: Pick<Elements['terminal'], 'Box' | 'Text' | 'Client'>, site: string, viewport: RenderViewport | undefined, at: Held) => {
-  const { Box, Text, Client } = elements
-  if (faulted.has(faultOf(site, GRAPH))) return <Box flexDirection="column">{rowsOf(Text, cornerless(at.drawing))}</Box>
-  return <Client key={GRAPH} module="./surface.tsx" props={isClickable(viewport) ? at.drawing : cornerless(at.drawing)} />
-}
 
 /** The surfaces that draw a picture in SVG, an `Svg`: the desktop app, VS Code, and the mobile app. */
 type Vectored = 'desktop' | 'vscode' | 'mobile'
@@ -360,13 +336,17 @@ const vectorSiteOf = ($: EngineInterface, e: VectorSite, place: Place, at: Held)
 
 /**
  * A site's graph as its surface draws it: on the terminal, to click and move
- * through; on a surface graphlet draws pictures on, as a picture with
+ * through, and on its main screen with no corner, since nothing there can be
+ * clicked; on a surface graphlet draws pictures on, as a picture with
  * controls under it; and on any other, as plain text, all of it, drawn
  * still, running the way it runs on the terminal, with its groups as they
  * are there, folded into the site's columns, however wide that leaves it.
  */
 const siteDrawingOf = ($: EngineInterface, e: RenderInput<SiteComponent>, place: Place, at: Held) => {
-  if (e.surface === 'terminal') return siteTreeOf($.ui.resolve(e), e.requestId, e.viewport, at)
+  if (e.surface === 'terminal') {
+    const { Client } = $.ui.resolve(e)
+    return <Client module="./surface.tsx" key={GRAPH} props={isClickable(e.viewport) ? at.drawing : cornerless(at.drawing)} />
+  }
   if (vectored.has(e.surface)) return vectorSiteOf($, e, place, at)
   const { Code } = $.ui.resolve(e)
   return <Code source={plainOf(at)} wrap="truncate-end" />
@@ -389,8 +369,6 @@ const SPARE_ROWS = 8
 const LEAST_REPLY_ROWS = 10
 /** The key of the graph at `index` among a reply block's graphs: of the Client that draws it, and of the place it keeps. */
 const keyOf = (index: number): string => `${GRAPH}:${index}`
-/** What the web page of a reply block's graph is named: for the block's request, and the graph's place among its graphs. */
-const pageNameOf = (requestId: string, key: string): string => `reply-${requestId.replace(/[^A-Za-z0-9]/g, '').slice(-8)}-${key.slice(`${GRAPH}:`.length)}`
 
 /**
  * A reply block's graph on a surface that draws vectors: its picture, with
@@ -592,29 +570,29 @@ export const register: Register = (on, options) => {
       )
     }
     const { Box, Text, Markdown, Client } = $.ui.resolve(e)
-    /**
-     * The graph at `index` among the block's graphs: in the fullscreen layout,
-     * which alone reports the mouse, to click and move through, as the person
-     * left it in its place, its groups at first collapsed as the person's
-     * setting says, through a window no taller than the screen has room for;
-     * and else, or where that failed, still and as tall as it needs, every
-     * group open.
-     */
-    const treeOf = (graph: Graph, index: number) => {
-      const key = keyOf(index)
-      if (!isClickable(e.viewport) || faulted.has(faultOf(e.requestId, key))) return rowsOf(Text, bounded(pictureOf(still, graph, room), share))
+    const blocks = []
+    for (const part of following) {
+      if ('text' in part) {
+        blocks.push(<Markdown text={part.text} />)
+        continue
+      }
+      if (!isClickable(e.viewport)) {
+        blocks.push(rowsOf(Text, bounded(pictureOf(still, part.graph, room), share)))
+        continue
+      }
+      const key = keyOf(graphs.indexOf(part.graph))
       const place = kept.get(key) ?? placeOf()
       kept.set(key, place)
-      place.starts ??= openingOf(folded, graph, screen, opening)
-      return <Client key={key} module="./surface.tsx" props={drawIn(place, graph, screen, share, folded, undefined, () => null).drawing} />
+      place.starts ??= openingOf(folded, part.graph, screen, opening)
+      blocks.push(<Client module="./surface.tsx" key={key} props={drawIn(place, part.graph, screen, share, folded, undefined, () => null).drawing} />)
     }
     return (
       <Box flexDirection="column">
         {[
           ...lead,
-          ...following.map(part => (
+          ...blocks.map(block => (
             <Box flexDirection="column" marginLeft={BULLET_COLUMNS} marginTop={1}>
-              {'text' in part ? <Markdown text={part.text} /> : treeOf(part.graph, graphs.indexOf(part.graph))}
+              {block}
             </Box>
           )),
         ]}
@@ -644,12 +622,6 @@ export const register: Register = (on, options) => {
     return next(tip === undefined ? e : { ...e, props: { ...e.props, tail: `${TIP_LEAD}${tip}` } })
   })
 
-  on('ui.fault', async ($, e, next) => {
-    faulted.add(faultOf(e.requestId, e.element))
-    $.ui.log(`graphlet: a graph could not be drawn to click (${e.reason}), so it is drawn still.`, { to: 'debug' })
-    return next(e)
-  })
-
   /**
    * A press on a control under a picture on a surface that draws vectors: in
    * a reply, a web page of the graph as it was pictured, or where graphlet
@@ -666,7 +638,7 @@ export const register: Register = (on, options) => {
     if (e.component === 'AssistantMessage') {
       const pictured = replies.get(e.requestId)?.get(key)?.pictured
       if (pictured === undefined) $.ui.toast('graphlet: that graph is no longer kept; scroll it out of view and back to draw it again.')
-      else if (does === 'page') await openPage($, pageNameOf(e.requestId, key), 'reply', pictured, pictured.direction)
+      else if (does === 'page') await openPage($, 'reply', pictured, pictured.direction)
       return next(e)
     }
     const place = sites.get(e.requestId)
@@ -677,7 +649,7 @@ export const register: Register = (on, options) => {
     const group = groupOf(at)
     if (does === 'page') {
       const graph = runningOf(at)
-      await openPage($, e.requestId, e.requestId, graph, graph.direction)
+      await openPage($, e.requestId, graph, graph.direction)
     } else if (does === 'previous' || does === 'next') await moves.pick(stepThrough(orderIn(at), at.selected, does === 'next' ? 1 : -1))
     else if (does === 'open' && at.selected !== null) await moves.open(at.selected)
     else if (does === 'group' && group?.isShut === true) await moves.expand(group.id)
@@ -747,7 +719,7 @@ export const register: Register = (on, options) => {
       await copyGraph($, graph, at.room, isReply ? copied : copiedSite, e.surface)
     } else if (page === true) {
       const graph = runningOf(at)
-      await openPage($, isReply ? pageNameOf(site, e.element) : site, isReply ? 'reply' : site, graph, graph.direction)
+      await openPage($, isReply ? 'reply' : site, graph, graph.direction)
     } else if (query !== undefined && key === 'backspace' && query === '') {
       place.finding = undefined
       redraw()
