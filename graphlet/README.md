@@ -2,10 +2,6 @@
 
 graphlet is a **mod** that draws graphs inside Claude Code!
 
-```
-/plugin install graphlet --marketplace nsodhi-cmu/claude-code-graphlet
-```
-
 1. graphlet gives Claude Code the ability to draw graphs in its replies. Try asking Claude to:
    - sketch your system's architecture
    - trace how a bug got from one function to the crash

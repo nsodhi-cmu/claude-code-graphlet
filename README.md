@@ -23,13 +23,7 @@ graphlet is a **mod** that draws graphs inside Claude Code!
 
 ## Install
 
-At the prompt of a Claude Code session:
-
-```
-/plugin install graphlet --marketplace nsodhi-cmu/claude-code-graphlet
-```
-
-If another mod uses graphlet as a dependency, that mod will automatically install graphlet; you don't need to manually run the above command.
+If another mod uses graphlet as a dependency, that mod will automatically install graphlet.
 
 Claude Code mods were introduced in Claude Code 2.1.287.
 
