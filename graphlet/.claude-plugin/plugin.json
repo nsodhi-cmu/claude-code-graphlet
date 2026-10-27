@@ -1,6 +1,6 @@
 {
   "name": "graphlet",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Draw graphs inside Claude Code.",
   "author": {
     "name": "Neal Sodhi",
