@@ -217,7 +217,7 @@ describe('the edges of a page', () => {
     expect(Math.abs(at('yes') - at('no'))).toBeGreaterThanOrEqual(11)
     expect(page).not.toContain('again')
     const long = pageOf(readGraph({ nodes: ['a', 'b'].map(id => ({ id, label: id })), edges: [{ from: 'a', to: 'b', label: 'a much longer label than an edge may say' }] }), 'long')
-    expect(long).toContain('>a much l…may say</text>')
+    expect(long).toContain('>a much longer label tha…</text>')
   })
 
   test('an edge from a node to itself is a loop out of the side of its box and back into it', () => {

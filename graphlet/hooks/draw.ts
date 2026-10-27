@@ -215,6 +215,13 @@ export function fitting(characters: string[], cells: number): number {
   return Math.min(characters.length, Math.max(1, count))
 }
 
+/** A label cut to `max` cells at its end, which an ellipsis then takes. */
+export function clipEnd(label: string, max: number): string {
+  if (sizeOf(label) <= max) return label
+  const characters = charactersOf(label)
+  return `${characters.slice(0, fitting(characters, Math.max(0, max - 1))).join('').trimEnd()}…`
+}
+
 /** A label cut to `max` cells from its middle, so that it keeps how it starts and how it ends. */
 export function clipMiddle(label: string, max: number): string {
   if (sizeOf(label) <= max) return label

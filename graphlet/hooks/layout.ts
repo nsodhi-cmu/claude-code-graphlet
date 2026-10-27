@@ -1,5 +1,5 @@
 import type { GraphletDirection, GraphletEdge, GraphletNode } from '../types'
-import { charactersOf, clipMiddle, fitting, sizeOf } from './draw'
+import { charactersOf, clipEnd, clipMiddle, fitting, sizeOf } from './draw'
 import type { Room } from './draw'
 import { groupOfSlot, layersOf, priorityOf } from './layers'
 import type { Edge, Graph, Group, Piece, Slot } from './layers'
@@ -61,8 +61,8 @@ const WORD_COLUMNS = 32
 const LABEL_ROWS = 3
 /** The most cells of a label that is cut to one line. */
 const CLIP_CELLS = 32
-/** The most cells an edge's label takes: a longer one is cut in its middle. */
-const EDGE_LABEL_CELLS = 16
+/** The most cells an edge's label takes: a longer one is cut short, and ends in an ellipsis. */
+const EDGE_LABEL_CELLS = 24
 /** What a box adds to its widest line: a space and a border on each side. */
 const BOX_PADDING = 4
 /** The narrowest box: one whose two ports stand apart. A shorter label is set in its middle. */
@@ -148,7 +148,7 @@ export function linesOf(label: string): string[] {
 }
 
 /** What is written on an edge, cut to the cells an edge's label may take; nothing where it has no label. */
-export const labelOf = (edge: GraphletEdge): string => (edge.label === undefined ? '' : clipMiddle(edge.label, EDGE_LABEL_CELLS))
+export const labelOf = (edge: GraphletEdge): string => (edge.label === undefined ? '' : clipEnd(edge.label, EDGE_LABEL_CELLS))
 
 /** Whether an edge keeps to lines of edges that say what it says: one with a label or a tone, which is then true of every edge of the line. */
 export const isApart = (edge: GraphletEdge): boolean => labelOf(edge) !== '' || edge.tone !== undefined
